@@ -2,6 +2,8 @@
 
 # Variables
 SHELL := /bin/bash
+RPC_URL := $(shell echo $$SEPOLIA_RPC_URL)
+PRIVATE_KEY := $(shell echo $$PRIVATE_KEY)
 
 # Targets
 all: help
@@ -19,8 +21,9 @@ build:
 
 deploy:
 	@echo "Deploying the project ..."
-	@echo "Loading Environment variables ..."
-	source .env
-	@echo "Deploying ..."
-	forge script --rpc-url $SEPOLIA_RPC_URL --broadcast --verify -vvvv script/Deployment.s.sol:Deployment
+	@if [ -z "$(RPC_URL)" ] || [ -z "$(PRIVATE_KEY)" ]; then \
+		echo "Error: RPC_URL and PRIVATE_KEY must be set as environment variables."; \
+		exit 1; \
+	fi
+	forge script script/Deployment.s.sol:Deployment --rpc-url $(RPC_URL) --private-key $(PRIVATE_KEY) --broadcast --verify -vvvv
 
