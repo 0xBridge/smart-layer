@@ -1,9 +1,9 @@
 # Simple Makefile to execute custom commands
 
+include .env
+
 # Variables
 SHELL := /bin/bash
-RPC_URL := $(shell echo $$SEPOLIA_RPC_URL)
-PRIVATE_KEY := $(shell echo $$PRIVATE_KEY)
 
 # Targets
 all: help
@@ -21,9 +21,14 @@ build:
 
 deploy:
 	@echo "Deploying the project ..."
-	@if [ -z "$(RPC_URL)" ] || [ -z "$(PRIVATE_KEY)" ]; then \
-		echo "Error: RPC_URL and PRIVATE_KEY must be set as environment variables."; \
+	@if [ -z "$(SEPOLIA_RPC_URL)" ] || [ -z "$(PRIVATE_KEY)" ]; then \
+		echo "Error: SEPOLIA_RPC_URL and PRIVATE_KEY must be set as environment variables."; \
 		exit 1; \
 	fi
-	forge script script/Deployment.s.sol:Deployment --rpc-url $(RPC_URL) --private-key $(PRIVATE_KEY) --broadcast --verify -vvvv
+	forge script \
+		script/Deployment.s.sol:Deployment \
+		--rpc-url $(SEPOLIA_RPC_URL) \
+		--private-key $(PRIVATE_KEY) \
+		--broadcast \
+		--verify -vvvv
 
