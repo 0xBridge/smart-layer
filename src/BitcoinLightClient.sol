@@ -5,13 +5,16 @@ import {BitcoinUtils} from "./lib/BitcoinUtils.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract BitcoinLightClient is AccessControl {
+    // Error codes
     error INVALID_HEADER_LENGTH();
     error INVALID_PROOF_OF_WORK();
     error INVALID_HEADER_CHAIN();
     error CHAIN_NOT_CONNECTED();
     error INVALID_TRANSACTION_INDEX();
 
+    // Role for submitting new block headers
     bytes32 private constant BLOCK_SUBMIT_ROLE = keccak256("BLOCK_SUBMIT_ROLE");
+    // Length of a Bitcoin block header
     uint8 private constant HEADER_LENGTH = 80;
 
     // Latest checkpoint header hash
@@ -20,8 +23,8 @@ contract BitcoinLightClient is AccessControl {
     // Mapping of block hash to block header
     mapping(bytes32 => BitcoinUtils.BlockHeader) private headers;
 
+    // Event emitted when a new block header is submitted
     event BlockHeaderSubmitted(bytes32 indexed blockHash, bytes32 indexed prevBlock, uint32 height);
-    event ChainReorg(uint32 prevBlockHeight, bytes32 indexed prevBlockHash, uint32 height, bytes32 indexed blockHash);
 
     constructor(
         uint32 version, // 4 bytes
@@ -32,7 +35,7 @@ contract BitcoinLightClient is AccessControl {
         bytes32 prevBlock, // 32 bytes
         bytes32 merkleRoot // 32 bytes
     ) {
-        _grantRole(BLOCK_SUBMIT_ROLE, msg.sender);
+        _grantRole(BLOCK_SUBMIT_ROLE, msg.sender); // TODO: Check with @satyamakgec which all roles need to be added
         BitcoinUtils.BlockHeader memory header =
             BitcoinUtils.BlockHeader(version, timestamp, difficultyBits, nonce, height, prevBlock, merkleRoot);
         latestCheckpointHeaderHash = BitcoinUtils.getBlockHashFromStruct(header);
@@ -192,11 +195,11 @@ contract BitcoinLightClient is AccessControl {
 
     /**
      * @dev Calculate merkle root in reversed byte order
-     * @param txids bytes32 txn ids
+     * @param transactions Array of transaction hashes in reverse byte in tree order
      * @return bytes32 merkle root
      */
-    function calculateMerkleRoot(bytes32[] calldata txids) external view returns (bytes32) {
-        bytes32[] memory txIdsInNaturalBytesOrder = BitcoinUtils.reverseBytes32Array(txids);
+    function calculateMerkleRoot(bytes32[] calldata transactions) external view returns (bytes32) {
+        bytes32[] memory txIdsInNaturalBytesOrder = BitcoinUtils.reverseBytes32Array(transactions);
         // First get the double SHA256 hash
         bytes32 hash = BitcoinUtils.calculateMerkleRootInNaturalByteOrder(txIdsInNaturalBytesOrder);
 
