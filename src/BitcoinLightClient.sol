@@ -10,7 +10,6 @@ contract BitcoinLightClient is AccessControl {
     error INVALID_HEADER_CHAIN();
     error CHAIN_NOT_CONNECTED();
     error INVALID_TRANSACTION_INDEX();
-    error INVALID_INPUT();
 
     bytes32 private constant BLOCK_SUBMIT_ROLE = keccak256("BLOCK_SUBMIT_ROLE");
     uint8 private constant HEADER_LENGTH = 80;
@@ -199,51 +198,9 @@ contract BitcoinLightClient is AccessControl {
     function calculateMerkleRoot(bytes32[] calldata txids) external view returns (bytes32) {
         bytes32[] memory txIdsInNaturalBytesOrder = BitcoinUtils.reverseBytes32Array(txids);
         // First get the double SHA256 hash
-        bytes32 hash = _calculateMerkleRootInNaturalByteOrder(txIdsInNaturalBytesOrder);
+        bytes32 hash = BitcoinUtils.calculateMerkleRootInNaturalByteOrder(txIdsInNaturalBytesOrder);
 
         // Then reverse it
         return BitcoinUtils.reverseBytes32(hash);
-    }
-
-    /**
-     * @dev Calculate merkle root in natural byte order from transaction ids (in natural byte order)
-     * @param txids Merkle proof nodes
-     * @return bytes32 Calculated merkle root in natural byte order
-     */
-    function _calculateMerkleRootInNaturalByteOrder(bytes32[] memory txids) internal view returns (bytes32) {
-        require(txids.length != 0, INVALID_INPUT());
-        if (txids.length == 1) return txids[0];
-
-        // Create a memory array to store the current level's hashes
-        uint256 currentLevelLength = txids.length;
-        bytes32[] memory currentLevel = new bytes32[](currentLevelLength);
-
-        // Copy initial txids to currentLevel
-        for (uint256 i = 0; i < currentLevelLength; i++) {
-            currentLevel[i] = txids[i];
-        }
-
-        // Continue until we reach the root
-        while (currentLevelLength > 1) {
-            // Calculate new level length (round up division)
-            uint256 nextLevelLength = (currentLevelLength + 1) / 2;
-            bytes32[] memory nextLevel = new bytes32[](nextLevelLength);
-
-            // Process pairs and compute parent nodes
-            for (uint256 i = 0; i < currentLevelLength; i += 2) {
-                uint256 index = i / 2;
-                bytes32 left = currentLevel[i];
-                bytes32 right = i + 1 < currentLevelLength ? currentLevel[i + 1] : left;
-
-                // Hash the concatenated pair
-                nextLevel[index] = BitcoinUtils.hashPair(left, right);
-            }
-
-            // Update currentLevel for next iteration
-            currentLevel = nextLevel;
-            currentLevelLength = nextLevelLength;
-        }
-
-        return currentLevel[0];
     }
 }

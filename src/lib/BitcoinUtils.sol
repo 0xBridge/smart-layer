@@ -4,11 +4,11 @@ pragma solidity ^0.8.28;
 library BitcoinUtils {
     error SHA256_FAILED();
     error EXPONENT_TOO_LARGE();
-    error INVALID_LENGTH();
+    error INVALID_HEADER_LENGTH();
     error INVALID_HEX_CHARACTER();
     error EMPTY_TXN_LIST();
     error INDEX_OUT_OF_BOUNDS();
-    error LENGTHS_MISMATCH();
+    error INVALID_INPUT();
 
     struct BlockHeader {
         uint32 version; // 4 bytes
@@ -39,7 +39,7 @@ library BitcoinUtils {
     /// @param rawHeader The 80-byte Bitcoin block header
     /// @return header The parsed BlockHeader struct
     function parseBlockHeader(bytes calldata rawHeader) internal pure returns (BlockHeader memory header) {
-        require(rawHeader.length == 80, INVALID_LENGTH());
+        require(rawHeader.length == 80, INVALID_HEADER_LENGTH());
 
         // Version (4 bytes) - Convert from LE to BE
         header.version = uint32(bytesToUint256(reverseBytes(rawHeader[0:4])));
@@ -130,7 +130,7 @@ library BitcoinUtils {
     /// @return The decoded bytes
     function hexToBytes(string memory hexStr) internal pure returns (bytes memory) {
         bytes memory hexBytes = bytes(hexStr);
-        require(hexBytes.length % 2 == 0, INVALID_LENGTH());
+        require(hexBytes.length % 2 == 0, INVALID_HEADER_LENGTH());
 
         bytes memory result = new bytes(hexBytes.length / 2);
 
@@ -265,6 +265,47 @@ library BitcoinUtils {
 
         // Valid if hash is less than target
         return hashNum < target;
+    }
+
+
+    /// @dev Calculate merkle root in natural byte order from transaction ids (in natural byte order)
+    /// @param txids Merkle proof nodes
+    /// @return bytes32 Calculated merkle root in natural byte order
+    function calculateMerkleRootInNaturalByteOrder(bytes32[] memory txids) internal view returns (bytes32) {
+        require(txids.length != 0, INVALID_INPUT());
+        if (txids.length == 1) return txids[0];
+
+        // Create a memory array to store the current level's hashes
+        uint256 currentLevelLength = txids.length;
+        bytes32[] memory currentLevel = new bytes32[](currentLevelLength);
+
+        // Copy initial txids to currentLevel
+        for (uint256 i = 0; i < currentLevelLength; i++) {
+            currentLevel[i] = txids[i];
+        }
+
+        // Continue until we reach the root
+        while (currentLevelLength > 1) {
+            // Calculate new level length (round up division)
+            uint256 nextLevelLength = (currentLevelLength + 1) / 2;
+            bytes32[] memory nextLevel = new bytes32[](nextLevelLength);
+
+            // Process pairs and compute parent nodes
+            for (uint256 i = 0; i < currentLevelLength; i += 2) {
+                uint256 index = i / 2;
+                bytes32 left = currentLevel[i];
+                bytes32 right = i + 1 < currentLevelLength ? currentLevel[i + 1] : left;
+
+                // Hash the concatenated pair
+                nextLevel[index] = BitcoinUtils.hashPair(left, right);
+            }
+
+            // Update currentLevel for next iteration
+            currentLevel = nextLevel;
+            currentLevelLength = nextLevelLength;
+        }
+
+        return currentLevel[0];
     }
 
     /// @notice Verify if a transaction is included in a block using a Merkle proof
