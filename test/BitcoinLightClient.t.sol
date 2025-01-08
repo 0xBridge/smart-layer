@@ -81,26 +81,6 @@ contract BitcoinLightClientTest is Test {
         vm.stopPrank();
     }
 
-    // function testSubmitMultipleBlocks() public {
-    //     vm.startPrank(SUBMITTER);
-
-    //     // First submit block 1
-    //     client.submitBlockHeader(BLOCK_11_HEADER, new bytes[](0));
-
-    //     // Then submit block 2 with block 1 as intermediate
-    //     bytes[] memory intermediateHeaders = new bytes[](1);
-    //     intermediateHeaders[0] = BLOCK_11_HEADER;
-
-    //     bool success = client.submitBlockHeader(BLOCK_12_HEADER, intermediateHeaders);
-    //     assertTrue(success);
-
-    //     assertEq(client.getLatestHeaderHash(), BLOCK_12_HASH);
-
-    //     BitcoinUtils.BlockHeader memory checkpoint = client.getLatestCheckpoint();
-    //     assertEq(checkpoint.height, 12);
-    //     vm.stopPrank();
-    // }
-
     function testFailInvalidPoW() public {
         vm.startPrank(SUBMITTER);
 
@@ -121,7 +101,7 @@ contract BitcoinLightClientTest is Test {
     function testFailInvalidChain() public {
         vm.startPrank(SUBMITTER);
 
-        // Try to submit block 2 directly without block 1
+        // Try to submit block 12 directly without block 11
         client.submitBlockHeader(BLOCK_12_HEADER, new bytes[](0));
         vm.stopPrank();
     }
