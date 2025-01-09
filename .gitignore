@@ -13,3 +13,6 @@ docs/
 # Dotenv file
 .env
 broadcast/*
+
+# Gas files
+gas-report.txt
