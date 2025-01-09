@@ -125,24 +125,6 @@ library BitcoinUtils {
         return output;
     }
 
-    /// @notice Decode a hex string into bytes
-    /// @param hexStr The hex string (without 0x prefix)
-    /// @return The decoded bytes
-    function hexToBytes(string memory hexStr) internal pure returns (bytes memory) {
-        bytes memory hexBytes = bytes(hexStr);
-        require(hexBytes.length % 2 == 0, INVALID_HEADER_LENGTH());
-
-        bytes memory result = new bytes(hexBytes.length / 2);
-
-        for (uint256 i = 0; i < hexBytes.length; i += 2) {
-            uint8 hi = uint8(hexDigitToVal(hexBytes[i]));
-            uint8 lo = uint8(hexDigitToVal(hexBytes[i + 1]));
-            result[i / 2] = bytes1(hi << 4 | lo);
-        }
-
-        return result;
-    }
-
     /// @notice Convert a hex character to its decimal value
     function hexDigitToVal(bytes1 c) internal pure returns (uint8) {
         if (bytes1("0") <= c && c <= bytes1("9")) {
@@ -226,7 +208,7 @@ library BitcoinUtils {
     /// @notice Expand compressed difficulty bits to full target
     /// @param header BlockHeader struct
     /// @return bytes32 Block hash
-    function getBlockHashFromStruct(BlockHeader memory header) internal view returns (bytes32) {
+    function getBlockHashFromParams(BlockHeader memory header) internal view returns (bytes32) {
         // Serialise
         bytes memory serialisedBlockHeader = serializeBlockHeader(
             header.version, header.timestamp, header.difficultyBits, header.nonce, header.prevBlock, header.merkleRoot

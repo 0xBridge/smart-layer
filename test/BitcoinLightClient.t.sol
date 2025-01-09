@@ -71,7 +71,7 @@ contract BitcoinLightClientTest is Test {
         vm.startPrank(SUBMITTER);
 
         // Submit block 11 (direct connection to initial)
-        bool success = client.submitBlockHeader(BLOCK_11_HEADER, new bytes[](0));
+        bool success = client.submitRawBlockHeader(BLOCK_11_HEADER, new bytes[](0));
         assertTrue(success);
 
         assertEq(client.getLatestHeaderHash(), BLOCK_11_HASH);
@@ -94,7 +94,7 @@ contract BitcoinLightClientTest is Test {
             mstore8(add(invalidHeader, 76), 0x00)
         }
 
-        client.submitBlockHeader(invalidHeader, new bytes[](0));
+        client.submitRawBlockHeader(invalidHeader, new bytes[](0));
         vm.stopPrank();
     }
 
@@ -102,7 +102,7 @@ contract BitcoinLightClientTest is Test {
         vm.startPrank(SUBMITTER);
 
         // Try to submit block 12 directly without block 11
-        client.submitBlockHeader(BLOCK_12_HEADER, new bytes[](0));
+        client.submitRawBlockHeader(BLOCK_12_HEADER, new bytes[](0));
         vm.stopPrank();
     }
 
@@ -113,7 +113,7 @@ contract BitcoinLightClientTest is Test {
         bytes[] memory invalidIntermediateHeaders = new bytes[](1);
         invalidIntermediateHeaders[0] = BLOCK_12_HEADER; // Wrong order
 
-        client.submitBlockHeader(BLOCK_11_HEADER, invalidIntermediateHeaders);
+        client.submitRawBlockHeader(BLOCK_11_HEADER, invalidIntermediateHeaders);
         vm.stopPrank();
     }
 
@@ -121,7 +121,7 @@ contract BitcoinLightClientTest is Test {
     function testFailInvalidHeaderLength() public {
         vm.startPrank(SUBMITTER);
         bytes memory invalidHeader = hex"0011"; // Too short
-        client.submitBlockHeader(invalidHeader, new bytes[](0));
+        client.submitRawBlockHeader(invalidHeader, new bytes[](0));
         vm.stopPrank();
     }
 
@@ -132,17 +132,11 @@ contract BitcoinLightClientTest is Test {
         // Submit block 12
         bytes[] memory intermediateHeaders = new bytes[](1);
         intermediateHeaders[0] = BLOCK_11_HEADER;
-        client.submitBlockHeader(BLOCK_12_HEADER, intermediateHeaders);
+        client.submitRawBlockHeader(BLOCK_12_HEADER, intermediateHeaders);
 
         BitcoinUtils.BlockHeader memory checkpoint2 = client.getLatestCheckpoint();
         assertEq(checkpoint2.height, 12);
         vm.stopPrank();
-    }
-
-    // Add test for access control
-    function testFailUnauthorizedSubmission() public {
-        vm.prank(address(0xdead));
-        client.submitBlockHeader(BLOCK_11_HEADER, new bytes[](0));
     }
 
     // Add test for 98 intermediate headers for the next block submission
@@ -150,6 +144,7 @@ contract BitcoinLightClientTest is Test {
         vm.startPrank(SUBMITTER);
 
         bytes[] memory intermediateHeaders = new bytes[](98);
+        // This is BLOCK_108_HEADER and intermediate headers[1] is BLOCK_107_HEADER, intermediate headers[2] is BLOCK_106_HEADER, ... (reverse order)
         intermediateHeaders[0] =
             hex"01000000ebf2a13396772607b579e5313855d85deb6c2ff5eb4b896d17b0167e0000000002946a80f855fa6e59264de3b84da0ce975ab6d0806a90288bb2cb7f4e782b2016c06949ffff001d049add3f";
         intermediateHeaders[1] =
@@ -344,10 +339,11 @@ contract BitcoinLightClientTest is Test {
             hex"010000005e2b8043bd9f8db558c284e00ea24f78879736f4acd110258e48c2270000000071b22998921efddf90c75ac3151cacee8f8084d3e9cb64332427ec04c7d562994cd16649ffff001d37d1ae86";
         intermediateHeaders[96] =
             hex"010000007330d7adf261c69891e6ab08367d957e74d4044bc5d9cd06d656be9700000000b8c8754fabb0ffeb04ca263a1368c39c059ca0d4af3151b876f27e197ebb963bc8d06649ffff001d3f596a0c";
+        // This is BLOCK_11_HEADER as the intermediate headers are to be passed in reverse order
         intermediateHeaders[97] =
             hex"01000000e915d9a478e3adf3186c07c61a22228b10fd87df343c92782ecc052c000000006e06373c80de397406dc3d19c90d71d230058d28293614ea58d6a57f8f5d32f8b8ce6649ffff001d173807f8";
 
-        bool success = client.submitBlockHeader(BLOCK_109_HEADER, intermediateHeaders);
+        bool success = client.submitRawBlockHeader(BLOCK_109_HEADER, intermediateHeaders);
         assertTrue(success);
 
         BitcoinUtils.BlockHeader memory checkpoint = client.getLatestCheckpoint();

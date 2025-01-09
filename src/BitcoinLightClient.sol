@@ -36,8 +36,37 @@ contract BitcoinLightClient {
     ) {
         BitcoinUtils.BlockHeader memory header =
             BitcoinUtils.BlockHeader(version, timestamp, difficultyBits, nonce, height, prevBlock, merkleRoot);
-        latestCheckpointHeaderHash = BitcoinUtils.getBlockHashFromStruct(header);
+        latestCheckpointHeaderHash = BitcoinUtils.getBlockHashFromParams(header);
         headers[latestCheckpointHeaderHash] = header;
+    }
+
+    /**
+     * @notice Submit a new block header fields along with intermediate headers connecting to last checkpoint
+     * @param version Block version
+     * @param timestamp Block timestamp
+     * @param difficultyBits Block difficulty bits
+     * @param nonce Block nonce
+     * @param height Block height
+     * @param prevBlock Previous block hash
+     * @param merkleRoot Block merkle root
+     * @param intermediateHeaders Array of intermediate headers connecting to last checkpoint (in reverse order)
+     * @dev intermediateHeaders should be ordered from newest to oldest (connecting to checkpoint)
+     */
+    function submitBlockHeader(
+        uint32 version,
+        uint32 timestamp,
+        uint32 difficultyBits,
+        uint32 nonce,
+        uint32 height,
+        bytes32 prevBlock,
+        bytes32 merkleRoot,
+        bytes[] calldata intermediateHeaders
+    ) external returns (bool) {
+        // Put together the fields of the block header into BitcoinUtils.BlockHeader and get the block hash from params
+        BitcoinUtils.BlockHeader memory header =
+            BitcoinUtils.BlockHeader(version, timestamp, difficultyBits, nonce, height, prevBlock, merkleRoot);
+        bytes32 blockHash = BitcoinUtils.getBlockHashFromParams(header);
+        return _submitBlockHeader(blockHash, header, intermediateHeaders);
     }
 
     /**
@@ -46,13 +75,27 @@ contract BitcoinLightClient {
      * @param intermediateHeaders Array of intermediate headers connecting to last checkpoint (in reverse order)
      * @dev intermediateHeaders should be ordered from newest to oldest (connecting to checkpoint)
      */
-    function submitBlockHeader(bytes calldata rawHeader, bytes[] calldata intermediateHeaders)
+    function submitRawBlockHeader(bytes calldata rawHeader, bytes[] calldata intermediateHeaders)
         external
         returns (bool)
     {
         bytes32 blockHash = getBlockHash(rawHeader);
         BitcoinUtils.BlockHeader memory header = BitcoinUtils.parseBlockHeader(rawHeader);
+        return _submitBlockHeader(blockHash, header, intermediateHeaders);
+    }
 
+    /**
+     * @notice Submit a new block header along with intermediate headers connecting to last checkpoint
+     * @param blockHash bytes32 Block hash in reverse byte order
+     * @param header BitcoinUtils.BlockHeader Block header struct
+     * @param intermediateHeaders Array of intermediate headers connecting to last checkpoint (in reverse order)
+     * @dev intermediateHeaders should be ordered from latest to oldest header (connecting to checkpoint header)
+     */
+    function _submitBlockHeader(
+        bytes32 blockHash,
+        BitcoinUtils.BlockHeader memory header,
+        bytes[] calldata intermediateHeaders
+    ) internal returns (bool) {
         // Verify POW for new header
         if (!BitcoinUtils.verifyProofOfWork(blockHash, header.difficultyBits)) {
             revert INVALID_PROOF_OF_WORK();
@@ -79,7 +122,7 @@ contract BitcoinLightClient {
 
     /**
      * @notice Verify a chain of headers connects properly from latest checkpoint to new block
-     * @param currentPrevHash Previous hash of the current header
+     * @param currentPrevHash Previous hash of the latest header being submitted
      * @param intermediateHeaders Array of intermediate headers
      * @return bool True if chain is valid
      */
