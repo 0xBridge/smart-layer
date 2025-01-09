@@ -50,7 +50,6 @@ contract BitcoinLightClient {
         external
         returns (bool)
     {
-        if (rawHeader.length != HEADER_LENGTH) revert INVALID_HEADER_LENGTH();
         bytes32 blockHash = getBlockHash(rawHeader);
         BitcoinUtils.BlockHeader memory header = BitcoinUtils.parseBlockHeader(rawHeader);
 
@@ -61,7 +60,7 @@ contract BitcoinLightClient {
 
         // If there are intermediate headers, verify the continuity
         if (intermediateHeaders.length > 0) {
-            bool isValid = _verifyHeaderChain(header.prevBlock, intermediateHeaders);
+            bool isValid = verifyHeaderChain(header.prevBlock, intermediateHeaders);
             if (!isValid) revert INVALID_HEADER_CHAIN();
         } else {
             // If no intermediate headers, verify direct connection to checkpoint
@@ -84,15 +83,13 @@ contract BitcoinLightClient {
      * @param intermediateHeaders Array of intermediate headers
      * @return bool True if chain is valid
      */
-    function _verifyHeaderChain(bytes32 currentPrevHash, bytes[] calldata intermediateHeaders)
-        private
+    function verifyHeaderChain(bytes32 currentPrevHash, bytes[] calldata intermediateHeaders)
+        public
         view
         returns (bool)
     {
         // Verify each intermediate header
         for (uint256 i = 0; i < intermediateHeaders.length; i++) {
-            if (intermediateHeaders[i].length != HEADER_LENGTH) revert INVALID_HEADER_LENGTH();
-
             // Parse and verify the header
             BitcoinUtils.BlockHeader memory intermediateHeader = BitcoinUtils.parseBlockHeader(intermediateHeaders[i]);
 
