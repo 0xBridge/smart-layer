@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, light-client]
   pull_request:
-    branches: [main]
+    branches: [main, light-client]
 
 env:
   FOUNDRY_PROFILE: ci
