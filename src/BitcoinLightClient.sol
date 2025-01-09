@@ -2,9 +2,8 @@
 pragma solidity ^0.8.28;
 
 import {BitcoinUtils} from "./lib/BitcoinUtils.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract BitcoinLightClient is AccessControl {
+contract BitcoinLightClient {
     // Error codes
     error INVALID_HEADER_LENGTH();
     error INVALID_PROOF_OF_WORK();
@@ -35,7 +34,6 @@ contract BitcoinLightClient is AccessControl {
         bytes32 prevBlock, // 32 bytes
         bytes32 merkleRoot // 32 bytes
     ) {
-        _grantRole(BLOCK_SUBMIT_ROLE, msg.sender); // TODO: Check with @satyamakgec which all roles need to be added
         BitcoinUtils.BlockHeader memory header =
             BitcoinUtils.BlockHeader(version, timestamp, difficultyBits, nonce, height, prevBlock, merkleRoot);
         latestCheckpointHeaderHash = BitcoinUtils.getBlockHashFromStruct(header);
@@ -50,7 +48,6 @@ contract BitcoinLightClient is AccessControl {
      */
     function submitBlockHeader(bytes calldata rawHeader, bytes[] calldata intermediateHeaders)
         external
-        onlyRole(BLOCK_SUBMIT_ROLE)
         returns (bool)
     {
         if (rawHeader.length != HEADER_LENGTH) revert INVALID_HEADER_LENGTH();
@@ -62,7 +59,7 @@ contract BitcoinLightClient is AccessControl {
             revert INVALID_PROOF_OF_WORK();
         }
 
-        // If there are intermediate headers, verify the chain
+        // If there are intermediate headers, verify the continuity
         if (intermediateHeaders.length > 0) {
             bool isValid = _verifyHeaderChain(header.prevBlock, intermediateHeaders);
             if (!isValid) revert INVALID_HEADER_CHAIN();
