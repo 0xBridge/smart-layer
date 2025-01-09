@@ -267,7 +267,6 @@ library BitcoinUtils {
         return hashNum < target;
     }
 
-
     /// @dev Calculate merkle root in natural byte order from transaction ids (in natural byte order)
     /// @param txids Merkle proof nodes
     /// @return bytes32 Calculated merkle root in natural byte order
