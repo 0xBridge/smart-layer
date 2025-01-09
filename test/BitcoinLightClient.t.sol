@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 import {BitcoinUtils} from "../src/lib/BitcoinUtils.sol";
 
@@ -370,15 +370,12 @@ contract BitcoinLightClientTest is Test {
         txids[2] = 0x6359f0868171b1d194cbee1af2f16ea598ae8fad666d9b012c8ed2b79a236ec4;
         txids[3] = 0xe9a66845e05d5abc0ad04ec80f774a7e585c6e8db975962d069a522137b80c1d;
         bytes32 merkleRoot = client.calculateMerkleRoot(txids);
-        console.logBytes32(merkleRoot);
 
         // Test Case 1: Valid inclusion for first transaction
         {
             // Generate proof for the first transaction (index 0)
             uint256 index = 1;
             (bytes32[] memory proof,) = client.generateMerkleProof(txids, index);
-            console.logBytes32(proof[0]);
-            console.logBytes32(proof[1]);
 
             // Verify the transaction is included
             bool isIncluded = client.verifyTxInclusion(txids[index], merkleRoot, proof, index);
@@ -434,8 +431,6 @@ contract BitcoinLightClientTest is Test {
             // Generate proof for the first transaction (index 0)
             uint256 index = 1;
             (bytes32[] memory proof,) = client.generateMerkleProof(txids, index);
-            console.logBytes32(proof[0]);
-            console.logBytes32(proof[1]);
 
             // Verify the transaction is included
             bool isIncluded = client.verifyTxInclusion(txids[index], merkleRoot, proof, index);
