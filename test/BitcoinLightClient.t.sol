@@ -129,11 +129,6 @@ contract BitcoinLightClientTest is Test {
     function testSubmitWithIntermediateBlock() public {
         vm.startPrank(SUBMITTER);
 
-        // Submit block 11
-        // client.submitBlockHeader(BLOCK_11_HEADER, new bytes[](0));
-        // BitcoinUtils.BlockHeader memory checkpoint1 = client.getLatestCheckpoint();
-        // assertEq(checkpoint1.height, 11);
-
         // Submit block 12
         bytes[] memory intermediateHeaders = new bytes[](1);
         intermediateHeaders[0] = BLOCK_11_HEADER;
@@ -151,7 +146,7 @@ contract BitcoinLightClientTest is Test {
     }
 
     // Add test for 98 intermediate headers for the next block submission
-    function testMultipleIntermediateHeaders() public {
+    function testBlockchainContinuity() public {
         vm.startPrank(SUBMITTER);
 
         bytes[] memory intermediateHeaders = new bytes[](98);
@@ -407,7 +402,7 @@ contract BitcoinLightClientTest is Test {
     }
 
     // Another test case to verify the inclusion of a transaction in a block
-    function testVerifyMerkleProof() public view {
+    function testVerifyTxInclusionWithMoreTxns() public view {
         // Using real Bitcoin block #100001 data
         // https://btcscan.org/block/00000000000080b66c911bd5ba14a74260057311eaeb1982802f7010f1a9f090
         bytes32[] memory txids = new bytes32[](12);
