@@ -2,12 +2,16 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
+import {UpgradableBitcoinLightClient} from "../src/UpgradableBitcoinLightClient.sol";
 import {BitcoinUtils} from "../src/lib/BitcoinUtils.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract BitcoinLightClientTest is Test {
-    BitcoinLightClient public client;
+    UpgradableBitcoinLightClient public upgradableBitcoinLightClient;
+    UpgradableBitcoinLightClient public client;
     address public constant SUBMITTER = address(0x1234);
+    address public constant ADMIN = address(0x5678);
+    // address public constant ADMIN = vm.envAddress("ADMIN_ADDRESS");
 
     // Block 10 data (real Bitcoin block after initial)
     bytes constant BLOCK_10_HEADER =
@@ -32,8 +36,15 @@ contract BitcoinLightClientTest is Test {
     function setUp() public {
         BitcoinUtils.BlockHeader memory initialHeader = _getInitialHeader();
         // Deploy with correct constructor parameters
-        vm.prank(SUBMITTER);
-        client = new BitcoinLightClient(
+        vm.startPrank(SUBMITTER);
+
+        // Deploy implementation
+        upgradableBitcoinLightClient = new UpgradableBitcoinLightClient();
+
+        // Deploy proxy
+        bytes memory initData = abi.encodeWithSelector(
+            UpgradableBitcoinLightClient.initialize.selector,
+            ADMIN,
             initialHeader.version,
             initialHeader.timestamp,
             initialHeader.difficultyBits,
@@ -42,6 +53,11 @@ contract BitcoinLightClientTest is Test {
             initialHeader.prevBlock,
             initialHeader.merkleRoot
         );
+
+        ERC1967Proxy proxyContract = new ERC1967Proxy(address(upgradableBitcoinLightClient), initData);
+
+        client = UpgradableBitcoinLightClient(address(proxyContract));
+        vm.stopPrank();
     }
 
     function _getInitialHeader() private pure returns (BitcoinUtils.BlockHeader memory) {

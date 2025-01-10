@@ -36,8 +36,8 @@ contract UpgradableBitcoinLightClient is Initializable, UUPSUpgradeable, AccessC
     /**
      * @notice Initialize the contract (replaces constructor)
      * @param admin Address that will have admin role
-     * @param version Initial block version
-     * @param timestamp Initial block timestamp
+     * @param blockVersion Initial block version
+     * @param blockTimestamp Initial block timestamp
      * @param difficultyBits Initial block difficulty bits
      * @param nonce Initial block nonce
      * @param height Initial block height
@@ -46,8 +46,8 @@ contract UpgradableBitcoinLightClient is Initializable, UUPSUpgradeable, AccessC
      */
     function initialize(
         address admin,
-        uint32 version,
-        uint32 timestamp,
+        uint32 blockVersion,
+        uint32 blockTimestamp,
         uint32 difficultyBits,
         uint32 nonce,
         uint32 height,
@@ -63,8 +63,8 @@ contract UpgradableBitcoinLightClient is Initializable, UUPSUpgradeable, AccessC
 
         // Initialize first checkpoint
         BitcoinUtils.BlockHeader memory header = BitcoinUtils.BlockHeader({
-            version: version,
-            timestamp: timestamp,
+            version: blockVersion,
+            timestamp: blockTimestamp,
             difficultyBits: difficultyBits,
             nonce: nonce,
             height: height,
@@ -78,8 +78,8 @@ contract UpgradableBitcoinLightClient is Initializable, UUPSUpgradeable, AccessC
 
     /**
      * @notice Submit a new block header fields along with intermediate headers
-     * @param version Block version
-     * @param timestamp Block timestamp
+     * @param blockVersion Block version
+     * @param blockTimestamp Block timestamp
      * @param difficultyBits Block difficulty bits
      * @param nonce Block nonce
      * @param height Block height
@@ -89,8 +89,8 @@ contract UpgradableBitcoinLightClient is Initializable, UUPSUpgradeable, AccessC
      * @dev Only accounts with BLOCK_SUBMIT_ROLE can submit headers
      */
     function submitBlockHeader(
-        uint32 version,
-        uint32 timestamp,
+        uint32 blockVersion,
+        uint32 blockTimestamp,
         uint32 difficultyBits,
         uint32 nonce,
         uint32 height,
@@ -99,8 +99,8 @@ contract UpgradableBitcoinLightClient is Initializable, UUPSUpgradeable, AccessC
         bytes[] calldata intermediateHeaders
     ) external returns (bool) {
         BitcoinUtils.BlockHeader memory header = BitcoinUtils.BlockHeader({
-            version: version,
-            timestamp: timestamp,
+            version: blockVersion,
+            timestamp: blockTimestamp,
             difficultyBits: difficultyBits,
             nonce: nonce,
             height: height,

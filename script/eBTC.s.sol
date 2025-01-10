@@ -8,7 +8,7 @@ import {eBTC} from "../src/eBTC.sol";
 contract DeployEBTC is Script {
     function run() external returns (address proxy_, address implementation_) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address minter = vm.envAddress("MINTER_ADDRESS");
+        address minter = vm.envAddress("ADMIN_ADDRESS");
 
         vm.startBroadcast(deployerPrivateKey);
 

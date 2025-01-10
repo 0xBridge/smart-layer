@@ -2,19 +2,19 @@
 pragma solidity ^0.8.24;
 
 import {Script} from "forge-std/Script.sol";
-import {eBTC} from "../src/eBTC.sol";
+import {UpgradableBitcoinLightClient} from "../src/UpgradableBitcoinLightClient.sol";
 
-contract UpgradeEBTC is Script {
+contract DeployUpgradableBitcoinLightClient is Script {
     function run(address proxyAddress) external returns (address) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
         vm.startBroadcast(deployerPrivateKey);
 
         // Deploy new implementation
-        eBTC newImplementation = new eBTC();
+        UpgradableBitcoinLightClient newImplementation = new UpgradableBitcoinLightClient();
 
         // Get proxy instance
-        eBTC proxy = eBTC(proxyAddress);
+        UpgradableBitcoinLightClient proxy = UpgradableBitcoinLightClient(proxyAddress);
 
         // Upgrade to new implementation
         proxy.upgradeTo(address(newImplementation));
