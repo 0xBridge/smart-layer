@@ -2,8 +2,11 @@
 pragma solidity ^0.8.28;
 
 import {BitcoinUtils} from "./lib/BitcoinUtils.sol";
+import {UUPSUpgradeable} from "@openzeppelin-upgrades/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin-upgrades/contracts/access/AccessControlUpgradeable.sol";
+import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 
-contract BitcoinLightClient {
+contract UpgradableBitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgradeable {
     // Error codes
     error INVALID_HEADER_LENGTH();
     error INVALID_PROOF_OF_WORK();
@@ -11,35 +14,70 @@ contract BitcoinLightClient {
     error CHAIN_NOT_CONNECTED();
     error INVALID_TRANSACTION_INDEX();
 
+    // Roles
+    bytes32 private constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+
     // Length of a Bitcoin block header
     uint8 private constant HEADER_LENGTH = 80;
 
-    // Latest checkpoint header hash
+    // State variables (Ensure the storage layout is maintained)
     bytes32 private latestCheckpointHeaderHash;
-
-    // Mapping of block hash to block header
     mapping(bytes32 => BitcoinUtils.BlockHeader) private headers;
 
-    // Event emitted when a new block header is submitted
+    // Events
     event BlockHeaderSubmitted(bytes32 indexed blockHash, bytes32 indexed prevBlock, uint32 height);
+    event ContractUpgraded(address indexed implementation);
 
-    constructor(
-        uint32 version, // 4 bytes
-        uint32 timestamp, // 4 bytes
-        uint32 difficultyBits, // 4 bytes
-        uint32 nonce, // 4 bytes
-        uint32 height, // 4 bytes
-        bytes32 prevBlock, // 32 bytes
-        bytes32 merkleRoot // 32 bytes
-    ) {
-        BitcoinUtils.BlockHeader memory header =
-            BitcoinUtils.BlockHeader(version, timestamp, difficultyBits, nonce, height, prevBlock, merkleRoot);
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @notice Initialize the contract (replaces constructor)
+     * @param admin Address that will have admin role
+     * @param version Initial block version
+     * @param timestamp Initial block timestamp
+     * @param difficultyBits Initial block difficulty bits
+     * @param nonce Initial block nonce
+     * @param height Initial block height
+     * @param prevBlock Initial previous block hash
+     * @param merkleRoot Initial merkle root
+     */
+    function initialize(
+        address admin,
+        uint32 version,
+        uint32 timestamp,
+        uint32 difficultyBits,
+        uint32 nonce,
+        uint32 height,
+        bytes32 prevBlock,
+        bytes32 merkleRoot
+    ) public initializer {
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+
+        // Setup roles
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(UPGRADER_ROLE, admin);
+
+        // Initialize first checkpoint
+        BitcoinUtils.BlockHeader memory header = BitcoinUtils.BlockHeader({
+            version: version,
+            timestamp: timestamp,
+            difficultyBits: difficultyBits,
+            nonce: nonce,
+            height: height,
+            prevBlock: prevBlock,
+            merkleRoot: merkleRoot
+        });
+
         latestCheckpointHeaderHash = BitcoinUtils.getBlockHashFromParams(header);
         headers[latestCheckpointHeaderHash] = header;
     }
 
     /**
-     * @notice Submit a new block header fields along with intermediate headers connecting to last checkpoint
+     * @notice Submit a new block header fields along with intermediate headers
      * @param version Block version
      * @param timestamp Block timestamp
      * @param difficultyBits Block difficulty bits
@@ -47,8 +85,8 @@ contract BitcoinLightClient {
      * @param height Block height
      * @param prevBlock Previous block hash
      * @param merkleRoot Block merkle root
-     * @param intermediateHeaders Array of intermediate headers connecting to last checkpoint (in reverse order)
-     * @dev intermediateHeaders should be ordered from newest to oldest (connecting to checkpoint)
+     * @param intermediateHeaders Array of intermediate headers
+     * @dev Only accounts with BLOCK_SUBMIT_ROLE can submit headers
      */
     function submitBlockHeader(
         uint32 version,
@@ -60,18 +98,24 @@ contract BitcoinLightClient {
         bytes32 merkleRoot,
         bytes[] calldata intermediateHeaders
     ) external returns (bool) {
-        // Put together the fields of the block header into BitcoinUtils.BlockHeader and get the block hash from params
-        BitcoinUtils.BlockHeader memory header =
-            BitcoinUtils.BlockHeader(version, timestamp, difficultyBits, nonce, height, prevBlock, merkleRoot);
+        BitcoinUtils.BlockHeader memory header = BitcoinUtils.BlockHeader({
+            version: version,
+            timestamp: timestamp,
+            difficultyBits: difficultyBits,
+            nonce: nonce,
+            height: height,
+            prevBlock: prevBlock,
+            merkleRoot: merkleRoot
+        });
         bytes32 blockHash = BitcoinUtils.getBlockHashFromParams(header);
         return _submitBlockHeader(blockHash, header, intermediateHeaders);
     }
 
     /**
-     * @notice Submit a new block header along with intermediate headers connecting to last checkpoint
-     * @param rawHeader bytes header
-     * @param intermediateHeaders Array of intermediate headers connecting to last checkpoint (in reverse order)
-     * @dev intermediateHeaders should be ordered from newest to oldest (connecting to checkpoint)
+     * @notice Submit a new raw block header along with intermediate headers
+     * @param rawHeader Raw block header bytes
+     * @param intermediateHeaders Array of intermediate headers
+     * @dev Only accounts with BLOCK_SUBMIT_ROLE can submit headers
      */
     function submitRawBlockHeader(bytes calldata rawHeader, bytes[] calldata intermediateHeaders)
         external
@@ -83,32 +127,27 @@ contract BitcoinLightClient {
     }
 
     /**
-     * @notice Submit a new block header along with intermediate headers connecting to last checkpoint
-     * @param blockHash bytes32 Block hash in reverse byte order
-     * @param header BitcoinUtils.BlockHeader Block header struct
-     * @param intermediateHeaders Array of intermediate headers connecting to last checkpoint (in reverse order)
-     * @dev intermediateHeaders should be ordered from latest to oldest header (connecting to checkpoint header)
+     * @notice Internal function to submit block header
+     * @param blockHash Block hash
+     * @param header Block header
+     * @param intermediateHeaders Array of intermediate headers
      */
     function _submitBlockHeader(
         bytes32 blockHash,
         BitcoinUtils.BlockHeader memory header,
         bytes[] calldata intermediateHeaders
     ) internal returns (bool) {
-        // Verify POW for new header
         if (!BitcoinUtils.verifyProofOfWork(blockHash, header.difficultyBits)) {
             revert INVALID_PROOF_OF_WORK();
         }
 
-        // If there are intermediate headers, verify the continuity
         if (intermediateHeaders.length > 0) {
             bool isValid = verifyHeaderChain(header.prevBlock, intermediateHeaders);
             if (!isValid) revert INVALID_HEADER_CHAIN();
         } else {
-            // If no intermediate headers, verify direct connection to checkpoint
             if (header.prevBlock != latestCheckpointHeaderHash) revert CHAIN_NOT_CONNECTED();
         }
 
-        // Update the checkpoint
         uint32 latestHeaderHeight = headers[latestCheckpointHeaderHash].height;
         header.height = latestHeaderHeight + uint32(intermediateHeaders.length) + 1;
         latestCheckpointHeaderHash = blockHash;
@@ -119,106 +158,86 @@ contract BitcoinLightClient {
     }
 
     /**
-     * @notice Verify a chain of headers connects properly from latest checkpoint to new block
-     * @param currentPrevHash Previous hash of the latest header being submitted
+     * @notice Verify a chain of headers connects properly
+     * @param currentPrevHash Previous hash of the latest header
      * @param intermediateHeaders Array of intermediate headers
-     * @return bool True if chain is valid
      */
     function verifyHeaderChain(bytes32 currentPrevHash, bytes[] calldata intermediateHeaders)
         public
         view
         returns (bool)
     {
-        // Verify each intermediate header
         for (uint256 i = 0; i < intermediateHeaders.length; i++) {
-            // Parse and verify the header
             BitcoinUtils.BlockHeader memory intermediateHeader = BitcoinUtils.parseBlockHeader(intermediateHeaders[i]);
 
-            // Calculate hash of this intermediate header
             bytes32 intermediateHash = BitcoinUtils.sha256DoubleHash(intermediateHeaders[i]);
             intermediateHash = BitcoinUtils.reverseBytes32(intermediateHash);
 
-            // Verify the hash chain
             if (currentPrevHash != intermediateHash) revert INVALID_HEADER_CHAIN();
 
-            // Verify POW for intermediate header
             if (!BitcoinUtils.verifyProofOfWork(intermediateHash, intermediateHeader.difficultyBits)) {
                 revert INVALID_PROOF_OF_WORK();
             }
 
-            // Move to next header
             currentPrevHash = intermediateHeader.prevBlock;
         }
 
-        // Final verification - connect to checkpoint
-        return currentPrevHash == latestCheckpointHeaderHash; // Evaluate till how many blocks does this not return OOG error
+        return currentPrevHash == latestCheckpointHeaderHash;
     }
 
     /**
-     * @dev Calculate bitcoin block hash in reverse byte order
+     * @notice Get block hash from header
      * @param blockHeader Raw block header bytes
-     * @return bytes32 Block hash in reverse byte order
+     * @return Block hash in reverse byte order
      */
     function getBlockHash(bytes memory blockHeader) public view returns (bytes32) {
-        require(blockHeader.length == HEADER_LENGTH, INVALID_HEADER_LENGTH());
-        // First get the double SHA256 hash
+        if (blockHeader.length != HEADER_LENGTH) revert INVALID_HEADER_LENGTH();
         bytes32 hash = BitcoinUtils.sha256DoubleHash(blockHeader);
-
-        // Then reverse it
         return BitcoinUtils.reverseBytes32(hash);
     }
 
     /**
-     * @dev Get blocj header struct for a given block hash
-     * @param blockHash bytes32 Block hash in reverse byte order
-     * @return BitcoinUtils.BlockHeader Block header struct
+     * @notice Get block header for a given block hash
+     * @param blockHash Block hash in reverse byte order
      */
     function getHeader(bytes32 blockHash) external view returns (BitcoinUtils.BlockHeader memory) {
         return headers[blockHash];
     }
 
     /**
-     * @dev Get the latest block hash
-     * @return bytes32 Latest block hash
+     * @notice Get the latest block hash
      */
     function getLatestHeaderHash() external view returns (bytes32) {
         return latestCheckpointHeaderHash;
     }
 
     /**
-     * @dev Get the latest block header
-     * @return BitcoinUtils.BlockHeader Latest block header
+     * @notice Get the latest block header
      */
     function getLatestCheckpoint() external view returns (BitcoinUtils.BlockHeader memory) {
         return headers[latestCheckpointHeaderHash];
     }
 
     /**
-     * @notice Generate merkle proof for a transaction using binary index path
-     * @dev Index is provided as uint but represents binary path in the tree
-     *      The maximum value of the index is checked against array length
-     * @param transactions Array of transaction hashes in reverse byte in tree order
-     * @param index Binary path index to the target transaction
-     * @return proof Array of proof hashes inn natural byte order
-     * @return directions Array of boolean values indicating left (false) or right (true) placements
+     * @notice Generate merkle proof for a transaction
+     * @param transactions Array of transaction hashes
+     * @param index Binary path index
      */
     function generateMerkleProof(bytes32[] memory transactions, uint256 index)
         public
         view
         returns (bytes32[] memory proof, bool[] memory directions)
     {
-        require(index < transactions.length, INVALID_TRANSACTION_INDEX());
+        if (index >= transactions.length) revert INVALID_TRANSACTION_INDEX();
         return BitcoinUtils.generateMerkleProof(transactions, index);
     }
 
     /**
-     * @notice Verify if a transaction is included in a block using a Merkle proof
-     * @dev All inputs should be in Bitcoin's display format (reversed byte order)
-     * @param txId Transaction ID to verify (in Bitcoin's reversed byte order)
-     * @param merkleRoot Expected Merkle root (in Bitcoin's reversed byte order)
-     * @param proof Array of proof hashes (in Bitcoin's reversed byte order)
-     * @param index Index of the transaction in the block (0-based)
-     * @return bool True if the proof is valid
+     * @notice Verify transaction inclusion using Merkle proof
+     * @param txId Transaction ID
+     * @param merkleRoot Merkle root
+     * @param proof Proof hashes
+     * @param index Transaction index
      */
     function verifyTxInclusion(bytes32 txId, bytes32 merkleRoot, bytes32[] calldata proof, uint256 index)
         external
@@ -229,16 +248,26 @@ contract BitcoinLightClient {
     }
 
     /**
-     * @dev Calculate merkle root in reversed byte order
-     * @param transactions Array of transaction hashes in reverse byte in tree order
-     * @return bytes32 merkle root
+     * @notice Calculate merkle root
+     * @param transactions Array of transaction hashes
      */
     function calculateMerkleRoot(bytes32[] calldata transactions) external view returns (bytes32) {
         bytes32[] memory txIdsInNaturalBytesOrder = BitcoinUtils.reverseBytes32Array(transactions);
-        // First get the double SHA256 hash
         bytes32 hash = BitcoinUtils.calculateMerkleRootInNaturalByteOrder(txIdsInNaturalBytesOrder);
-
-        // Then reverse it
         return BitcoinUtils.reverseBytes32(hash);
+    }
+
+    /**
+     * @dev Required override for UUPS proxy upgrade authorization
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {
+        emit ContractUpgraded(newImplementation);
+    }
+
+    /**
+     * @dev Version number for this contract implementation
+     */
+    function version() external pure returns (string memory) {
+        return "1.0.0";
     }
 }
