@@ -8,6 +8,8 @@ on:
 
 env:
   FOUNDRY_PROFILE: ci
+  RPC_URL: ${{ secrets.RPC_URL }}
+  PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
 
 jobs:
   check:
