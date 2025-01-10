@@ -2,16 +2,15 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {UpgradableBitcoinLightClient} from "../src/UpgradableBitcoinLightClient.sol";
+import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 import {BitcoinUtils} from "../src/lib/BitcoinUtils.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract BitcoinLightClientTest is Test {
-    UpgradableBitcoinLightClient public upgradableBitcoinLightClient;
-    UpgradableBitcoinLightClient public client;
+    BitcoinLightClient public bitcoinLightClient;
+    BitcoinLightClient public client;
     address public constant SUBMITTER = address(0x1234);
     address public constant ADMIN = address(0x5678);
-    // address public constant ADMIN = vm.envAddress("ADMIN_ADDRESS");
 
     // Block 10 data (real Bitcoin block after initial)
     bytes constant BLOCK_10_HEADER =
@@ -39,11 +38,11 @@ contract BitcoinLightClientTest is Test {
         vm.startPrank(SUBMITTER);
 
         // Deploy implementation
-        upgradableBitcoinLightClient = new UpgradableBitcoinLightClient();
+        bitcoinLightClient = new BitcoinLightClient();
 
         // Deploy proxy
         bytes memory initData = abi.encodeWithSelector(
-            UpgradableBitcoinLightClient.initialize.selector,
+            BitcoinLightClient.initialize.selector,
             ADMIN,
             initialHeader.version,
             initialHeader.timestamp,
@@ -54,9 +53,9 @@ contract BitcoinLightClientTest is Test {
             initialHeader.merkleRoot
         );
 
-        ERC1967Proxy proxyContract = new ERC1967Proxy(address(upgradableBitcoinLightClient), initData);
+        ERC1967Proxy proxyContract = new ERC1967Proxy(address(bitcoinLightClient), initData);
 
-        client = UpgradableBitcoinLightClient(address(proxyContract));
+        client = BitcoinLightClient(address(proxyContract));
         vm.stopPrank();
     }
 

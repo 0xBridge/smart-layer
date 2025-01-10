@@ -2,14 +2,15 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {console2} from "forge-std/console2.sol";
-import {eBTC} from "../src/eBTC.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {eBTC} from "../src/eBTC.sol";
+import {eBTCV2, MockNonUUPS, ReentrantUpgrader} from "./mocks/eBTCV2.sol";
 
 contract eBTCTest is Test {
     eBTC public implementation;
     eBTC public proxy;
+    eBTCV2 public implementationV2;
 
     address public admin;
     address public minter;
@@ -42,6 +43,10 @@ contract eBTCTest is Test {
         ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
 
         proxy = eBTC(address(proxyContract));
+
+        // Deploy V2 (but don't upgrade yet)
+        implementationV2 = new eBTCV2();
+
         vm.stopPrank();
     }
 
@@ -173,21 +178,52 @@ contract eBTCTest is Test {
         assertEq(proxy.allowance(user1, user2), value);
     }
 
-    // Upgrade Tests
-    function test_AdminCanUpgrade() public {
-        eBTC newImplementation = new eBTC();
-
+    // Basic Upgrade Tests
+    function test_SuccessfulUpgrade() public {
         vm.prank(admin);
-        proxy.upgradeTo(address(newImplementation));
+        proxy.upgradeTo(address(implementationV2));
 
-        assertEq(proxy.name(), "0xBitcoin Token"); // Verify state is preserved
+        // Test V1 functionality still works
+        vm.prank(minter);
+        proxy.mint(user1, 1000);
+        assertEq(proxy.balanceOf(user1), 1000);
+
+        // Test V2 functionality
+        eBTCV2(address(proxy)).setNewVariable(42);
+        assertEq(eBTCV2(address(proxy)).newVariable(), 42);
     }
 
-    function testFail_NonAdminCannotUpgrade() public {
-        eBTC newImplementation = new eBTC();
+    function testFail_UpgradeByNonAdmin() public {
+        vm.prank(user1);
+        proxy.upgradeTo(address(implementationV2));
+    }
+
+    function test_StatePreservationAfterUpgrade() public {
+        // Set initial state
+        vm.prank(minter);
+        proxy.mint(user1, 1000);
+
+        // Upgrade
+        vm.prank(admin);
+        proxy.upgradeTo(address(implementationV2));
+
+        // Verify state is preserved
+        assertEq(proxy.balanceOf(user1), 1000);
+        assertTrue(proxy.hasRole(MINTER_ROLE, minter));
+        assertTrue(proxy.hasRole(DEFAULT_ADMIN_ROLE, admin));
+    }
+
+    function testFail_UpgradeToZeroAddress() public {
+        vm.prank(admin);
+        proxy.upgradeTo(address(0));
+    }
+
+    function testFail_UnauthorizedInitializeAfterUpgrade() public {
+        vm.prank(admin);
+        proxy.upgradeTo(address(implementationV2));
 
         vm.prank(user1);
-        proxy.upgradeTo(address(newImplementation));
+        eBTCV2(address(proxy)).initialize(minter);
     }
 
     // Events Tests
@@ -236,5 +272,38 @@ contract eBTCTest is Test {
         proxy.transfer(user2, 100);
         uint256 gasUsed = gasBefore - gasleft();
         assertTrue(gasUsed < 60000); // Adjust threshold as needed
+    }
+
+    // Complex Scenarios
+    function test_UpgradeUnderLoad() public {
+        // Simulate heavy contract usage
+        for (uint256 i = 0; i < 100; i++) {
+            vm.prank(minter);
+            proxy.mint(user1, 1);
+        }
+
+        // Perform upgrade during heavy usage
+        vm.prank(admin);
+        proxy.upgradeTo(address(implementationV2));
+
+        // Verify state after upgrade
+        assertEq(proxy.balanceOf(user1), 100);
+    }
+
+    function test_UpgradeWithPendingTransactions() public {
+        // Setup initial state
+        vm.prank(minter);
+        proxy.mint(user1, 1000);
+
+        // Approve spending
+        vm.prank(user1);
+        proxy.approve(address(0x3), 500);
+
+        // Perform upgrade
+        vm.prank(admin);
+        proxy.upgradeTo(address(implementationV2));
+
+        // Verify allowances are preserved
+        assertEq(proxy.allowance(user1, address(0x3)), 500);
     }
 }

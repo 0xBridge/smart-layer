@@ -6,7 +6,7 @@ import {UUPSUpgradeable} from "@openzeppelin-upgrades/contracts/proxy/utils/UUPS
 import {AccessControlUpgradeable} from "@openzeppelin-upgrades/contracts/access/AccessControlUpgradeable.sol";
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
 
-contract UpgradableBitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgradeable {
+contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgradeable {
     // Error codes
     error INVALID_HEADER_LENGTH();
     error INVALID_PROOF_OF_WORK();
