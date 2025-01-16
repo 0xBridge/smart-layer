@@ -9,7 +9,7 @@ import {SafeTransferLib} from "lib/solady/src/utils/SafeTransferLib.sol";
 import {IStargate} from "./interfaces/IStargate.sol";
 import {MessagingFee, OFTReceipt, SendParam} from "./interfaces/IOFT.sol";
 import {ILayerZeroComposer} from "./interfaces/ILayerZeroComposer.sol";
-import {OFTComposeMsgCodec} from "../libs/OFTComposeMsgCodec.sol";
+import {OFTComposeMsgCodec} from "./libs/OFTComposeMsgCodec.sol";
 import {IUniswapV2Router02} from "./interfaces/IUniswapV2Router02.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -68,12 +68,12 @@ contract CrossChainDexReceiver is Ownable, ReentrancyGuard, Pausable, ILayerZero
         address _executor,
         bytes calldata _extraData
     ) external payable whenNotPaused nonReentrant {
-        // if (_from != address(stargatePoolUSDC)) {
-        //     revert InvalidFromAddress(_from);
-        // }
-        // if (msg.sender != endpoint) {
-        //     revert UnauthorisedAccess(msg.sender);
-        // }
+        if (_from != address(stargatePoolUSDC)) {
+            revert InvalidFromAddress(_from);
+        }
+        if (msg.sender != endpoint) {
+            revert UnauthorisedAccess(msg.sender);
+        }
 
         uint256 amountLD = OFTComposeMsgCodec.amountLD(_message);
         bytes memory _composeMessage = OFTComposeMsgCodec.composeMsg(_message);

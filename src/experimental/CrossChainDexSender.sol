@@ -8,7 +8,7 @@ import {SafeTransferLib} from "lib/solady/src/utils/SafeTransferLib.sol";
 
 import {IStargate} from "./interfaces/IStargate.sol";
 import {MessagingFee, OFTReceipt, SendParam} from "./interfaces/IOFT.sol";
-import {OptionsBuilder} from "../libs/OptionsBuilder.sol";
+import {OptionsBuilder} from "./libs/OptionsBuilder.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract CrossChainDexSender is Ownable, ReentrancyGuard, Pausable {

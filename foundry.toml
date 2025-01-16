@@ -18,10 +18,16 @@ solc = "0.8.28"
 [etherscan]
 mainnet = {key = "${ETHERSCAN_API_KEY}"}
 optimism = {key = "${ETHERSCAN_OPTIMISM_KEY}"}
-sepolia = {key = "${ETHERSCAN_API_KEY}"}
+sepolia = {key = "${ETHERSCAN_SEPOLIA_KEY}"}
+polygon = { key = "${ETHERSCAN_POLYGON_KEY}" }
+arbitrum = { key = "${ETHERSCAN_ARBITURM_KEY}" }
+base = { key = "${ETHERSCAN_BASE_KEY}" }
 
 [rpc_endpoints]
 mainnet = "${MAINNET_RPC_URL}"
 op-sepolia = "${OP_SEPOLIA_RPC_URL}"
-optimism = "${OP_MAINNET_RPC_URL}"
+optimism = "${OPTIMISM_RPC_URL}"
 sepolia = "${SEPOLIA_RPC_URL}"
+polygon = "${POLYGON_RPC_URL}"
+arbitrum = "${ARBITRUM_RPC_URL}"
+base = "${BASE_RPC_URL}"
