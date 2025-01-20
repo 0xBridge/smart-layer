@@ -23,10 +23,10 @@ contract eBTC is
     }
 
     function initialize(address minter_) public initializer {
-        __ERC20_init("0xBitcoin Token", "eBTC");
+        __ERC20_init("Extended Bitcoin Token", "eBTC");
         __ERC20Burnable_init();
         __AccessControl_init();
-        __ERC20Permit_init("0xBitcoin Token");
+        __ERC20Permit_init("Extended Bitcoin Token");
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(MINTER_ROLE, minter_);
     }
