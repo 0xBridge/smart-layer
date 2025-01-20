@@ -2,11 +2,14 @@ name: CI
 
 on:
   push:
+    branches: [main, light-client]
   pull_request:
-  workflow_dispatch:
+    branches: [main, light-client]
 
 env:
   FOUNDRY_PROFILE: ci
+  RPC_URL: ${{ secrets.RPC_URL }}
+  PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
 
 jobs:
   check:
