@@ -10,6 +10,7 @@ import {SafeTransferLib} from "lib/solady/src/utils/SafeTransferLib.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {LayerZeroV2Helper} from "lib/pigeon/src/layerzero-v2/LayerZeroV2Helper.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract CrossChainDexSenderTest is Test {
     using SafeTransferLib for address;
@@ -29,7 +30,7 @@ contract CrossChainDexSenderTest is Test {
     uint256 public destForkId;
     uint256 public constant DEST_CHAIN_ID = 8453;
     address public constant BASE_OFT_TOKEN_USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
-    address public constant BASE_STARGATE_ENDPOINT_V2 = 0x2CCA08ae69E0C44b18a57Ab2A87644234dAebaE4;
+    address public constant BASE_STARGATE_ENDPOINT_V2 = 0x1a44076050125825900e736c501f859c50fE728c;
     address public constant BASE_UNISWAP_ROUTER_V2 = 0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24;
     address public constant WETH = 0x4200000000000000000000000000000000000006;
 
@@ -110,8 +111,11 @@ contract CrossChainDexSenderTest is Test {
         // Verify token transfer
         assertEq(usdc.balanceOf(user), INITIAL_BALANCE - AMOUNT_TO_BRIDGE);
         console2.log("Balance of receiver: ", usdc.balanceOf(receiver));
-        // console2.log("Balance of crossChainDexReceiver: ", usdc.balanceOf(address(crossChainDexReceiver)));
-        // assertEq(usdc.balanceOf(receiver), AMOUNT_TO_BRIDGE);
+        vm.selectFork(destForkId);
+        console2.log(
+            "Balance of crossChainDexReceiver: ", IERC20(BASE_OFT_TOKEN_USDC).balanceOf(address(crossChainDexReceiver))
+        );
+        assertApproxEqRel(IERC20(BASE_OFT_TOKEN_USDC).balanceOf(address(crossChainDexReceiver)), AMOUNT_TO_BRIDGE, 1e16); // 1e16 implies 1%
     }
 
     function testRevertsOnInsufficientNativeFee() public {
