@@ -77,7 +77,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
     }
 
     /**
-     * @notice Submit a new block header fields along with intermediate headers
+     * @notice Submit a new block header fields along with intermediate headers (in reverse array order)
      * @param blockVersion Block version
      * @param blockTimestamp Block timestamp
      * @param difficultyBits Block difficulty bits
@@ -112,7 +112,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
     }
 
     /**
-     * @notice Submit a new raw block header along with intermediate headers
+     * @notice Submit a new raw block header along with intermediate headers (in reverse array order)
      * @param rawHeader Raw block header bytes
      * @param intermediateHeaders Array of intermediate headers
      * @dev Only accounts with BLOCK_SUBMIT_ROLE can submit headers
