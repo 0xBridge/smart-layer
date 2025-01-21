@@ -11,6 +11,7 @@ remapping = [
     "@openzeppelin=lib/eigenlayer-middleware/lib/openzeppelin-contracts",
     "@layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/",
     "@layerzerolabs/lz-evm-protocol-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol",
+    "isolmate/=lib/isolmate/src",
 ]
 solc = "0.8.28"
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

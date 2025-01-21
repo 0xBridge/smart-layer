@@ -16,3 +16,6 @@
 [submodule "lib/solady"]
 	path = lib/solady
 	url = https://github.com/Vectorized/solady
+[submodule "lib/isolmate"]
+	path = lib/isolmate
+	url = https://github.com/defi-wonderland/isolmate
