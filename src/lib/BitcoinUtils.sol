@@ -25,14 +25,14 @@ library BitcoinUtils {
     /// @return bytes32 sha256 double hashed
     function sha256DoubleHash(bytes memory bytesData) internal view returns (bytes32) {
         // First SHA256
-        (bool success1, bytes memory result1) = address(0x2).staticcall(abi.encodePacked(bytesData));
-        require(success1, SHA256_FAILED());
+        (bool success, bytes memory result) = address(0x2).staticcall(abi.encodePacked(bytesData));
+        require(success, SHA256_FAILED());
 
         // Second SHA256
-        (bool success2, bytes memory result2) = address(0x2).staticcall(result1);
-        require(success2, SHA256_FAILED());
+        (success, result) = address(0x2).staticcall(result);
+        require(success, SHA256_FAILED());
 
-        return bytes32(result2);
+        return bytes32(result);
     }
 
     /// @notice Parses raw Bitcoin block header bytes into a structured format
