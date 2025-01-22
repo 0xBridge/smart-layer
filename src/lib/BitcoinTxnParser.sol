@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract BitcoinTxnParser {
+library BitcoinTxnParser {
     struct Output {
         uint64 value;
         bytes script;
@@ -20,7 +20,10 @@ contract BitcoinTxnParser {
         uint256 baseTokenAmount;
     }
 
-    function decodeMetadata(bytes calldata data) public pure returns (TransactionMetadata memory) {
+    /// @notice Decodes metadata from OP_RETURN data into a structured format
+    /// @param data The raw metadata bytes from OP_RETURN output
+    /// @return TransactionMetadata Structured metadata containing receiver address, amounts, and chain ID
+    function decodeMetadata(bytes calldata data) internal pure returns (TransactionMetadata memory) {
         uint256 offset = 0;
 
         // Read receiver address
@@ -66,8 +69,11 @@ contract BitcoinTxnParser {
         });
     }
 
-    // Main function to extract OP_RETURN data from raw transaction
-    function decodeBitcoinTxn(bytes calldata rawTxn) public pure returns (bytes memory) {
+    /// @notice Extracts OP_RETURN data from a raw Bitcoin transaction
+    /// @param rawTxn The raw Bitcoin transaction bytes
+    /// @return bytes The extracted OP_RETURN data
+    /// @dev Searches through transaction outputs for OP_RETURN (0x6a) and handles different push operations
+    function decodeBitcoinTxn(bytes calldata rawTxn) internal pure returns (bytes memory) {
         Transaction memory txn = parseTransaction(rawTxn);
 
         // Find OP_RETURN output
@@ -116,7 +122,11 @@ contract BitcoinTxnParser {
         return opReturnData;
     }
 
-    // Helper function to extract bytes from calldata
+    /// @notice Helper function to extract bytes from calldata
+    /// @param data Source calldata bytes
+    /// @param start Starting position in the source data
+    /// @param length Number of bytes to extract
+    /// @return bytes The extracted bytes
     function extractBytes(bytes calldata data, uint256 start, uint256 length) internal pure returns (bytes memory) {
         bytes memory result = new bytes(length);
         for (uint256 i = 0; i < length; i++) {
@@ -125,7 +135,10 @@ contract BitcoinTxnParser {
         return result;
     }
 
-    // Parse raw Bitcoin transaction
+    /// @notice Parses a raw Bitcoin transaction into a structured format
+    /// @param rawTxn The raw Bitcoin transaction bytes
+    /// @return Transaction Structured transaction data containing version, outputs, and locktime
+    /// @dev Handles both legacy and segwit transaction formats
     function parseTransaction(bytes calldata rawTxn) internal pure returns (Transaction memory) {
         uint256 offset = 0;
         Transaction memory txn;
@@ -199,7 +212,11 @@ contract BitcoinTxnParser {
         return txn;
     }
 
-    // Parse Bitcoin VarInt
+    /// @notice Parses Bitcoin's variable integer format
+    /// @param data The raw bytes containing a VarInt
+    /// @return value The parsed integer value
+    /// @return offset The number of bytes consumed by the VarInt
+    /// @dev Handles all VarInt formats: uint8, uint16, uint32, and uint64
     function parseVarInt(bytes calldata data) internal pure returns (uint256 value, uint256 offset) {
         require(data.length >= 1, "Invalid VarInt");
         uint8 first = uint8(data[0]);
@@ -218,6 +235,21 @@ contract BitcoinTxnParser {
             require(data.length >= 9, "Invalid VarInt");
             bytes memory lengthBytes = extractBytes(data, 1, 8);
             return (uint64(bytes8(lengthBytes)), 9);
+        }
+    }
+
+    function memoryToCalldata(bytes memory data) internal pure returns (bytes calldata ret) {
+        assembly {
+            // Get the length of the memory bytes
+            let len := mload(data)
+
+            // Get the pointer to the content of the memory bytes
+            let content := add(data, 0x20)
+
+            // Set the return value (ret) to be of type bytes calldata
+            // pointing to the same memory location
+            ret.offset := content
+            ret.length := len
         }
     }
 }

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {BitcoinUtils} from "./lib/BitcoinUtils.sol";
+import {BitcoinTxnParser} from "./lib/BitcoinTxnParser.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgrades/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin-upgrades/contracts/access/AccessControlUpgradeable.sol";
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
@@ -269,5 +270,22 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
      */
     function version() external pure returns (string memory) {
         return "1.0.0";
+    }
+
+    /**
+     * @notice Extracts OP_RETURN data from a raw Bitcoin transaction
+     * @param rawTxnHex The raw Bitcoin transaction bytes
+     * @return metadata Structured metadata containing receiver address, amounts, and chain ID
+     */
+    function decodeTransactionMetadata(bytes calldata rawTxnHex)
+        public
+        pure
+        returns (BitcoinTxnParser.TransactionMetadata memory metadata)
+    {
+        // Parse transaction outputs
+        bytes memory opReturnData = BitcoinTxnParser.decodeBitcoinTxn(rawTxnHex);
+        bytes calldata opReturnDataCalldata = BitcoinTxnParser.memoryToCalldata(opReturnData);
+        // Decode metadata from OP_RETURN data
+        return BitcoinTxnParser.decodeMetadata(opReturnDataCalldata);
     }
 }
