@@ -52,7 +52,7 @@ contract eBTCTest is Test {
 
     // Initialization Tests
     function test_Initialization() public {
-        assertEq(proxy.name(), "0xBitcoin Token");
+        assertEq(proxy.name(), "Extended Bitcoin Token");
         assertEq(proxy.symbol(), "eBTC");
         assertTrue(proxy.hasRole(DEFAULT_ADMIN_ROLE, admin));
         assertTrue(proxy.hasRole(MINTER_ROLE, minter));
