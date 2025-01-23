@@ -23,46 +23,40 @@ library BitcoinTxnParser {
     /// @notice Decodes metadata from OP_RETURN data into a structured format
     /// @param data The raw metadata bytes from OP_RETURN output
     /// @return TransactionMetadata Structured metadata containing receiver address, amounts, and chain ID
-    function decodeMetadata(bytes calldata data) internal pure returns (TransactionMetadata memory) {
-        uint256 offset = 0;
+    function decodeMetadata(bytes memory data) internal pure returns (TransactionMetadata memory) {
+        address receiverAddress;
+        uint256 lockedAmount;
+        uint32 chainId;
+        uint256 baseTokenAmount;
 
-        // Read receiver address
-        uint16 addrLength = uint16(bytes2(data[offset:offset + 2]));
-        offset += 2;
-        bytes20 receiverBytes = bytes20(data[offset:offset + addrLength]);
-        offset += addrLength;
+        assembly {
+            let ptr := add(data, 32)
 
-        // Read locked amount (8 bytes)
-        uint16 lockedAmountLength = uint16(bytes2(data[offset:offset + 2]));
-        offset += 2;
-        bytes memory lockedAmountBytes = new bytes(8);
-        for (uint256 i = 0; i < 8; i++) {
-            lockedAmountBytes[i] = data[offset + i];
+            // Read receiver address
+            let addrLength := shr(240, mload(ptr))
+            ptr := add(ptr, 2)
+            receiverAddress := shr(96, mload(ptr))
+            ptr := add(ptr, addrLength)
+
+            // Read locked amount
+            let lockedAmountLength := shr(240, mload(ptr))
+            ptr := add(ptr, 2)
+            lockedAmount := shr(192, mload(ptr))
+            ptr := add(ptr, lockedAmountLength)
+
+            // Read chain ID
+            let chainIdLength := shr(240, mload(ptr))
+            ptr := add(ptr, 2)
+            chainId := shr(224, mload(ptr))
+            ptr := add(ptr, chainIdLength)
+
+            // Read base token amount
+            ptr := add(ptr, 2) // Skip length bytes
+            baseTokenAmount := shr(192, mload(ptr))
         }
-        uint256 lockedAmount = uint64(bytes8(lockedAmountBytes)); // Use uint64 for proper conversion
-        offset += lockedAmountLength;
-
-        // Read chain ID (4 bytes)
-        uint16 chainIdLength = uint16(bytes2(data[offset:offset + 2]));
-        offset += 2;
-        bytes memory chainIdBytes = new bytes(4);
-        for (uint256 i = 0; i < 4; i++) {
-            chainIdBytes[i] = data[offset + i];
-        }
-        uint32 chainId = uint32(bytes4(chainIdBytes));
-        offset += chainIdLength;
-
-        // Read base token amount (8 bytes)
-        // uint16 baseTokenLength = uint16(bytes2(data[offset:offset + 2]));
-        offset += 2;
-        bytes memory baseTokenBytes = new bytes(8);
-        for (uint256 i = 0; i < 8; i++) {
-            baseTokenBytes[i] = data[offset + i];
-        }
-        uint256 baseTokenAmount = uint64(bytes8(baseTokenBytes)); // Use uint64 for proper conversion
 
         return TransactionMetadata({
-            receiverAddress: address(uint160(uint256(uint160(receiverBytes)))),
+            receiverAddress: receiverAddress,
             lockedAmount: lockedAmount,
             chainId: chainId,
             baseTokenAmount: baseTokenAmount
@@ -235,21 +229,6 @@ library BitcoinTxnParser {
             require(data.length >= 9, "Invalid VarInt");
             bytes memory lengthBytes = extractBytes(data, 1, 8);
             return (uint64(bytes8(lengthBytes)), 9);
-        }
-    }
-
-    function memoryToCalldata(bytes memory data) internal pure returns (bytes calldata ret) {
-        assembly {
-            // Get the length of the memory bytes
-            let len := mload(data)
-
-            // Get the pointer to the content of the memory bytes
-            let content := add(data, 0x20)
-
-            // Set the return value (ret) to be of type bytes calldata
-            // pointing to the same memory location
-            ret.offset := content
-            ret.length := len
         }
     }
 }

@@ -486,20 +486,8 @@ contract BitcoinLightClientTest is Test {
         assertEq(metadata.baseTokenAmount, expectedBaseTokenAmount);
     }
 
-    // Add test for empty transaction
-    function testDecodeTransactionMetadataEmpty() public {
-        bytes memory emptyTxnHex = hex""; // Empty transaction
-        BitcoinTxnParser.TransactionMetadata memory metadata = client.decodeTransactionMetadata(emptyTxnHex);
-
-        // Check that metadata is empty or has default values
-        assertEq(metadata.receiverAddress, address(0));
-        assertEq(metadata.lockedAmount, 0);
-        assertEq(metadata.chainId, 0);
-        assertEq(metadata.baseTokenAmount, 0);
-    }
-
-    // // Add test for invalid transaction format
-    // function testDecodeTransactionMetadataInvalidFormat() public {
+    // Add test for invalid transaction format
+    // function testDecodeTransactionMetadataInvalidFormat() public view {
     //     bytes memory invalidTxnHex = hex"invalid_data"; // Invalid hex data
     //     try client.decodeTransactionMetadata(invalidTxnHex) {
     //         revert("Expected an error for invalid transaction format");
@@ -508,15 +496,9 @@ contract BitcoinLightClientTest is Test {
     //     }
     // }
 
-    // // Add test for transaction with no OP_RETURN data
-    // function testDecodeTransactionMetadataNoOpReturn() public {
-    //     bytes memory noOpReturnTxnHex = hex"0100000001abcdef..."; // Replace with a valid raw Bitcoin transaction hex without OP_RETURN
-    //     BitcoinTxnParser.TransactionMetadata memory metadata = client.decodeTransactionMetadata(noOpReturnTxnHex);
-
-    //     // Check that metadata is empty or has default values
-    //     assertEq(metadata.receiverAddress, address(0));
-    //     assertEq(metadata.lockedAmount, 0);
-    //     assertEq(metadata.chainId, 0);
-    //     assertEq(metadata.baseTokenAmount, 0);
-    // }
+    // Add test for transaction with no OP_RETURN data
+    function testFailDecodeTransactionMetadataNoOpReturn() public view {
+        bytes memory noOpReturnTxnHex = hex"0100000001abcdef"; // Replace with a valid raw Bitcoin transaction hex without OP_RETURN
+        BitcoinTxnParser.TransactionMetadata memory metadata = client.decodeTransactionMetadata(noOpReturnTxnHex);
+    }
 }

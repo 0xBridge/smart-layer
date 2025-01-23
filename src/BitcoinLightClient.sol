@@ -284,8 +284,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
     {
         // Parse transaction outputs
         bytes memory opReturnData = BitcoinTxnParser.decodeBitcoinTxn(rawTxnHex);
-        bytes calldata opReturnDataCalldata = BitcoinTxnParser.memoryToCalldata(opReturnData);
         // Decode metadata from OP_RETURN data
-        return BitcoinTxnParser.decodeMetadata(opReturnDataCalldata);
+        return BitcoinTxnParser.decodeMetadata(opReturnData);
     }
 }
