@@ -504,16 +504,6 @@ contract BitcoinLightClientTest is Test {
         assertEq(metadata.baseTokenAmount, expectedBaseTokenAmount);
     }
 
-    // Add test for invalid transaction format
-    // function testDecodeTransactionMetadataInvalidFormat() public view {
-    //     bytes memory invalidTxnHex = hex"invalid_data"; // Invalid hex data
-    //     try client.decodeTransactionMetadata(invalidTxnHex) {
-    //         revert("Expected an error for invalid transaction format");
-    //     } catch {
-    //         // Expected to catch an error
-    //     }
-    // }
-
     // Add test for transaction with no OP_RETURN data
     function testFailDecodeTransactionMetadataNoOpReturn() public view {
         bytes memory noOpReturnTxnHex = hex"0100000001abcdef"; // Replace with a valid raw Bitcoin transaction hex without OP_RETURN

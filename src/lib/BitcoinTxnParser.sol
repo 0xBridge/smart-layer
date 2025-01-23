@@ -38,6 +38,10 @@ library BitcoinTxnParser {
     /// @return metadata Structured metadata containing receiver address, amounts, and chain ID
     /// @dev Uses assembly for efficient byte manipulation and data extraction
     function decodeMetadata(bytes memory data) internal pure returns (TransactionMetadata memory) {
+        if (data.length != 48) {
+            // Subject to change based on metadata format
+            revert INVALID_OP_RETURN_DATA_LENGTH();
+        }
         address receiverAddress;
         uint256 lockedAmount;
         uint32 chainId;
