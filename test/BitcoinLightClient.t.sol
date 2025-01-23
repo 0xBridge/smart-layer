@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
-import {BitcoinUtils} from "../src/libs/BitcoinUtils.sol";
+import {BitcoinUtils} from "../src/lib/BitcoinUtils.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {BitcoinTxnParser} from "../src/lib/BitcoinTxnParser.sol";
 
