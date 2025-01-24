@@ -275,7 +275,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
     /**
      * @notice Extracts OP_RETURN data from a raw Bitcoin transaction
      * @param rawTxnHex The raw Bitcoin transaction bytes
-     * @return metadata Structured metadata containing receiver address, amounts, and chain ID
+     * @return metadata Structured metadata containing receiver address, locked Amount, chain ID, and base token amount
      */
     function decodeTransactionMetadata(bytes calldata rawTxnHex)
         public

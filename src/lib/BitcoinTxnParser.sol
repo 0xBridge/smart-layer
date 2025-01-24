@@ -35,7 +35,7 @@ library BitcoinTxnParser {
 
     /// @notice Decodes metadata from OP_RETURN data into a structured format
     /// @param data The raw metadata bytes from OP_RETURN output
-    /// @return metadata Structured metadata containing receiver address, amounts, and chain ID
+    /// @return Structured metadata containing receiver address, locked Amount, chain ID, and base token amount
     /// @dev Uses assembly for efficient byte manipulation and data extraction
     function decodeMetadata(bytes memory data) internal pure returns (TransactionMetadata memory) {
         if (data.length != 48) {
