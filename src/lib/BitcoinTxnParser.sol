@@ -1,7 +1,20 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.28;
 
+/// @title BitcoinTxnParser
+/// @notice Library for parsing Bitcoin transactions and extracting OP_RETURN metadata
+/// @dev Handles both legacy and segwit transaction formats
 library BitcoinTxnParser {
+    // Custom errors
+    error INVALID_OP_RETURN_OUTPUT();
+    error UNSUPPORTED_PUSH_OPERATION();
+    error INVALID_PUSH_DATA_1();
+    error INVALID_PUSH_DATA_2();
+    error INVALID_OP_RETURN_DATA_LENGTH();
+    error NO_OP_RETURN_FOUND();
+    error INVALID_TRANSACTION_FORMAT();
+    error INVALID_VAR_INT_FORMAT();
+
     struct Output {
         uint64 value;
         bytes script;
@@ -22,8 +35,13 @@ library BitcoinTxnParser {
 
     /// @notice Decodes metadata from OP_RETURN data into a structured format
     /// @param data The raw metadata bytes from OP_RETURN output
-    /// @return TransactionMetadata Structured metadata containing receiver address, amounts, and chain ID
+    /// @return Structured metadata containing receiver address, locked Amount, chain ID, and base token amount
+    /// @dev Uses assembly for efficient byte manipulation and data extraction
     function decodeMetadata(bytes memory data) internal pure returns (TransactionMetadata memory) {
+        if (data.length != 48) {
+            // Subject to change based on metadata format
+            revert INVALID_OP_RETURN_DATA_LENGTH();
+        }
         address receiverAddress;
         uint256 lockedAmount;
         uint32 chainId;
@@ -74,36 +92,32 @@ library BitcoinTxnParser {
         bytes memory opReturnData;
         for (uint256 i = 0; i < txn.outputs.length; i++) {
             if (txn.outputs[i].script.length > 0 && txn.outputs[i].script[0] == 0x6a) {
-                // Found OP_RETURN output
                 bytes memory script = txn.outputs[i].script;
-                require(script.length >= 3, "Invalid OP_RETURN output");
+                if (script.length < 3) revert INVALID_OP_RETURN_OUTPUT();
 
                 uint8 pushOpcode = uint8(script[1]);
                 uint256 dataLength;
                 uint256 dataStart;
 
                 if (pushOpcode >= 0x01 && pushOpcode <= 0x4b) {
-                    // Direct push of N bytes where N is the opcode value
                     dataLength = pushOpcode;
                     dataStart = 2;
                 } else if (pushOpcode == 0x4c) {
-                    // OP_PUSHDATA1: next byte contains N
-                    require(script.length >= 4, "Invalid OP_PUSHDATA1");
+                    if (script.length < 4) revert INVALID_PUSH_DATA_1();
                     dataLength = uint8(script[2]);
                     dataStart = 3;
                 } else if (pushOpcode == 0x4d) {
-                    // OP_PUSHDATA2: next 2 bytes contain N
-                    require(script.length >= 5, "Invalid OP_PUSHDATA2");
+                    if (script.length < 5) revert INVALID_PUSH_DATA_2();
                     bytes memory lengthBytes = new bytes(2);
                     lengthBytes[0] = script[2];
                     lengthBytes[1] = script[3];
                     dataLength = uint16(bytes2(lengthBytes));
                     dataStart = 4;
                 } else {
-                    revert("Unsupported push operation in OP_RETURN");
+                    revert UNSUPPORTED_PUSH_OPERATION();
                 }
 
-                require(script.length >= dataStart + dataLength, "Invalid OP_RETURN data length");
+                if (script.length < dataStart + dataLength) revert INVALID_OP_RETURN_DATA_LENGTH();
                 opReturnData = new bytes(dataLength);
                 for (uint256 j = 0; j < dataLength; j++) {
                     opReturnData[j] = script[dataStart + j];
@@ -112,7 +126,7 @@ library BitcoinTxnParser {
             }
         }
 
-        require(opReturnData.length > 0, "No OP_RETURN output found");
+        if (opReturnData.length == 0) revert NO_OP_RETURN_FOUND();
         return opReturnData;
     }
 
@@ -120,9 +134,13 @@ library BitcoinTxnParser {
     /// @param data Source calldata bytes
     /// @param start Starting position in the source data
     /// @param length Number of bytes to extract
-    /// @return bytes The extracted bytes
-    function extractBytes(bytes calldata data, uint256 start, uint256 length) internal pure returns (bytes memory) {
-        bytes memory result = new bytes(length);
+    /// @return result The extracted bytes
+    function extractBytes(bytes calldata data, uint256 start, uint256 length)
+        internal
+        pure
+        returns (bytes memory result)
+    {
+        result = new bytes(length);
         for (uint256 i = 0; i < length; i++) {
             result[i] = data[start + i];
         }
@@ -131,11 +149,10 @@ library BitcoinTxnParser {
 
     /// @notice Parses a raw Bitcoin transaction into a structured format
     /// @param rawTxn The raw Bitcoin transaction bytes
-    /// @return Transaction Structured transaction data containing version, outputs, and locktime
+    /// @return txn Structured transaction data containing version, outputs, and locktime
     /// @dev Handles both legacy and segwit transaction formats
-    function parseTransaction(bytes calldata rawTxn) internal pure returns (Transaction memory) {
+    function parseTransaction(bytes calldata rawTxn) internal pure returns (Transaction memory txn) {
         uint256 offset = 0;
-        Transaction memory txn;
 
         // Parse version (4 bytes)
         bytes memory versionBytes = extractBytes(rawTxn, offset, 4);
@@ -199,7 +216,7 @@ library BitcoinTxnParser {
         }
 
         // Parse locktime (4 bytes)
-        require(offset + 4 <= rawTxn.length, "Invalid transaction format");
+        if (offset + 4 > rawTxn.length) revert INVALID_TRANSACTION_FORMAT();
         bytes memory locktimeBytes = extractBytes(rawTxn, offset, 4);
         txn.locktime = uint32(bytes4(locktimeBytes));
 
@@ -212,21 +229,21 @@ library BitcoinTxnParser {
     /// @return offset The number of bytes consumed by the VarInt
     /// @dev Handles all VarInt formats: uint8, uint16, uint32, and uint64
     function parseVarInt(bytes calldata data) internal pure returns (uint256 value, uint256 offset) {
-        require(data.length >= 1, "Invalid VarInt");
+        if (data.length < 1) revert INVALID_VAR_INT_FORMAT();
         uint8 first = uint8(data[0]);
 
         if (first < 0xfd) {
             return (first, 1);
         } else if (first == 0xfd) {
-            require(data.length >= 3, "Invalid VarInt");
+            if (data.length < 3) revert INVALID_VAR_INT_FORMAT();
             bytes memory lengthBytes = extractBytes(data, 1, 2);
             return (uint16(bytes2(lengthBytes)), 3);
         } else if (first == 0xfe) {
-            require(data.length >= 5, "Invalid VarInt");
+            if (data.length < 5) revert INVALID_VAR_INT_FORMAT();
             bytes memory lengthBytes = extractBytes(data, 1, 4);
             return (uint32(bytes4(lengthBytes)), 5);
         } else {
-            require(data.length >= 9, "Invalid VarInt");
+            if (data.length < 9) revert INVALID_VAR_INT_FORMAT();
             bytes memory lengthBytes = extractBytes(data, 1, 8);
             return (uint64(bytes8(lengthBytes)), 9);
         }
