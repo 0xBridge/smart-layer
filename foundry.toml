@@ -2,7 +2,11 @@
 libs = ["lib"]
 out = "out"
 src = "src"
+<<<<<<< HEAD
 viaIR = true
+=======
+via-ir = true
+>>>>>>> decode-transaction
 
 optimizer = true
 optimizer_runs = 200

@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 import {BitcoinUtils} from "../src/libs/BitcoinUtils.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {BitcoinTxnParser} from "../src/lib/BitcoinTxnParser.sol";
 
 contract BitcoinLightClientTest is Test {
     BitcoinLightClient public bitcoinLightClient;
@@ -465,5 +466,47 @@ contract BitcoinLightClientTest is Test {
             bool isIncluded = client.verifyTxInclusion(txids[3], merkleRoot, proof, index);
             assertFalse(isIncluded, "Incorrect transaction order in the merkle tree");
         }
+    }
+
+    // Add test for valid OP_RETURN data
+    function testDecodeTransactionMetadata() public view {
+        bytes memory validTxnHex =
+            hex"0200000000010198125705e23e351caccd7435b4d41ee3b685b460b7121be3b0f5089dd507a7b50300000000ffffffff04e803000000000000225120c35241ec07fba00f5ea6e81b63f5af8087dc5e329a01d4ef9d8d6b498abcd902881300000000000016001471d044aeb7f41205a9ef0e3d785e7d38a776cfa10000000000000000326a30001441588441c41d5528cc6afa3a2a732afeca9e9452000800000000000003e80004000000050008000000000001869fd72f000000000000160014d6a279dc882b830c5562b49e3e25bf3c5767ab73024730440220398d6577bc7adbe65b23e7ca7819d5bd28ed5b919108a89d3f607ddf8b78ca0e02204085b4547b7555dcf3be79e64ece0dfdc469a21c301bf05c4c36a616b1346f7901210226795246077d56dfbc6730ef3a6833206a34f0ba1bd6a570de14d49c42781ddb00000000"; // Replace with a valid raw Bitcoin transaction hex
+        BitcoinTxnParser.TransactionMetadata memory metadata = client.decodeTransactionMetadata(validTxnHex);
+
+        address expectedReceiverAddress = 0x41588441C41D5528CC6AFa3a2a732afeca9e9452;
+        uint256 expectedAmount = 1000;
+        uint256 expectedChainId = 5;
+        uint256 expectedBaseTokenAmount = 99999;
+
+        // Add assertions to check the expected values in metadata
+        assertEq(metadata.receiverAddress, expectedReceiverAddress);
+        assertEq(metadata.lockedAmount, expectedAmount);
+        assertEq(metadata.chainId, expectedChainId);
+        assertEq(metadata.baseTokenAmount, expectedBaseTokenAmount);
+    }
+
+    // Add test for valid OP_RETURN data
+    function testDecodeAnotherTransactionMetadata() public view {
+        bytes memory validTxnHex =
+            hex"02000000000101f1cfa7732fddc29a1e0fd6fa3b285d651664da483b00ba636a4aaf47e8a3ec210000000000ffffffff04e80300000000000016001471d044aeb7f41205a9ef0e3d785e7d38a776cfa1d00700000000000016001471d044aeb7f41205a9ef0e3d785e7d38a776cfa10000000000000000326a30001403aa93e006fba956cdbafa2b8ef789d0cb63e7b40008000000000000271000040000007b00080000000000004e202e2e000000000000160014d6a279dc882b830c5562b49e3e25bf3c5767ab7302483045022100a6bbe0b8073066cfb3f0b98d7e51b47d030b34745289964efe8835a60e7bdf8602207e9182068f37cff1d8e6ed8f7463c15718544c30e14e8278fd874a14222d7c6901210226795246077d56dfbc6730ef3a6833206a34f0ba1bd6a570de14d49c42781ddb00000000"; // Replace with a valid raw Bitcoin transaction hex
+        BitcoinTxnParser.TransactionMetadata memory metadata = client.decodeTransactionMetadata(validTxnHex);
+
+        address expectedReceiverAddress = 0x03AA93e006fBa956cdBAfa2b8EF789D0Cb63e7b4;
+        uint256 expectedAmount = 10000;
+        uint256 expectedChainId = 123;
+        uint256 expectedBaseTokenAmount = 20000;
+
+        // Add assertions to check the expected values in metadata
+        assertEq(metadata.receiverAddress, expectedReceiverAddress);
+        assertEq(metadata.lockedAmount, expectedAmount);
+        assertEq(metadata.chainId, expectedChainId);
+        assertEq(metadata.baseTokenAmount, expectedBaseTokenAmount);
+    }
+
+    // Add test for transaction with no OP_RETURN data
+    function testFailDecodeTransactionMetadataNoOpReturn() public view {
+        bytes memory noOpReturnTxnHex = hex"0100000001abcdef"; // Replace with a valid raw Bitcoin transaction hex without OP_RETURN
+        BitcoinTxnParser.TransactionMetadata memory metadata = client.decodeTransactionMetadata(noOpReturnTxnHex);
     }
 }
