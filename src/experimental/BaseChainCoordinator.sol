@@ -65,14 +65,6 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable {
         emit MessageSent(_dstEid, _message, receivers[_dstEid], msg.value);
     }
 
-    /**
-     * @dev Allows the owner to withdraw any stuck tokens
-     */
-    function withdraw() external onlyOwner nonReentrant {
-        (bool success,) = msg.sender.call{value: address(this).balance}("");
-        require(success, "Withdrawal failed");
-    }
-
     function _lzReceive(
         Origin calldata _origin,
         bytes32 _guid,
@@ -89,17 +81,17 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable {
         temp_message = _message;
     }
 
-    // function getNativeFeeToSendMessage(uint32 _dstEid, string calldata _message) public view returns (uint256) {
-    //     require(receivers[_dstEid] != bytes32(0), "Receiver not set");
+    function _validateSignature() internal {
+        // Verify contract signature here and set a secondary state variable to mint the eBTC
+    }
 
-    //     // Prepare send payload
-    //     bytes memory payload = abi.encode(_message);
+    /**
+     * @dev Allows the owner to withdraw any stuck tokens
+     */
+    function withdraw() external onlyOwner nonReentrant {
+        (bool success,) = msg.sender.call{value: address(this).balance}("");
+        require(success, "Withdrawal failed");
+    }
 
-    //     // Prepare send parameters
-    //     MessagingParams memory sendParam = MessagingParams(_dstEid, receivers[_dstEid], payload, "", false);
-
-    //     // Calculate fees
-    //     MessagingFee memory messagingFee = endpoint.quote(sendParam, address(this));
-    //     return messagingFee.nativeFee;
-    // }
+    receive() external payable {}
 }
