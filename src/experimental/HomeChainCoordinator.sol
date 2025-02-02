@@ -6,6 +6,7 @@ import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
+import {BitcoinTxnParser} from "../libraries/BitcoinTxnParser.sol";
 
 /**
  * @title HomeChainCoordinator
@@ -17,7 +18,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     mapping(address => bytes) public user_mintData; // TODO: Would require to store user address, AVS address, eBTC amount, chainID (to mint), psbt data (Also, timestamp?)
 
     // Events
-    event MessageSent(uint32 dstEid, string message, bytes32 receiver, uint256 nativeFee);
+    event MessageSent(uint32 dstEid, bytes message, bytes32 receiver, uint256 nativeFee);
     event ReceiverSet(uint32 dstEid, bytes32 receiver);
 
     constructor(address _endpoint, address _owner) OApp(_endpoint, _owner) {
@@ -43,23 +44,28 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
      * @param _message The message to send
      * @param _options Message execution options (e.g., for sending gas to destination)
      */
-    function sendMessage(uint32 _dstEid, string memory _message, bytes calldata _options) external payable {
-        // require(_message.length > 0, "Empty payload");
-        console2.log("Check for require condition");
+    function sendMessage(uint32 _dstEid, bytes memory _message, bytes calldata _options) external payable {
+        require(_message.length > 0, "Empty message");
         // TODO: Setup a trusted destination chain coordinator mapping to which the message can be sent (require here for the same)
         require(receivers[_dstEid] != bytes32(0), "Receiver not set");
 
-        // Prepare send payload
-        bytes memory _payload = abi.encode(_message);
-        console2.log("Sending message");
+        // TODO: Decode message and validate if the message is valid and came from the right source
+        BitcoinTxnParser.TransactionMetadata memory metadata = decodeTransactionMetadata(_message);
+
+        console2.logAddress(metadata.receiverAddress);
+        console2.log("Locked amount: ", metadata.lockedAmount);
+        console2.log("Chain ID: ", metadata.chainId);
+        console2.log("Base token amount: ", metadata.baseTokenAmount);
+
+        // TODO: Create a function to get the correct MessageFee for the user
         _lzSend(
             _dstEid,
-            _payload,
+            _message,
             _options,
             // Fee in native gas and ZRO token.
             MessagingFee(msg.value, 0),
             // Refund address in case of failed source message.
-            payable(msg.sender)
+            payable(msg.sender) // TODO: Check when does the refund happen and how much is refunded | How to know this value in advance?
         );
 
         console2.log("Emit event message sent");
@@ -89,19 +95,16 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         console2.logBytes(_extraData);
     }
 
-    // function getNativeFeeToSendMessage(uint32 _dstEid, string calldata _message) public view returns (uint256) {
-    //     require(receivers[_dstEid] != bytes32(0), "Receiver not set");
-
-    //     // Prepare send payload
-    //     bytes memory payload = abi.encode(_message);
-
-    //     // Prepare send parameters
-    //     MessagingParams memory sendParam = MessagingParams(_dstEid, receivers[_dstEid], payload, "", false);
-
-    //     // Calculate fees
-    //     MessagingFee memory messagingFee = endpoint.quote(sendParam, address(this));
-    //     return messagingFee.nativeFee;
-    // }
+    function decodeTransactionMetadata(bytes memory rawTxnHex)
+        public
+        pure
+        returns (BitcoinTxnParser.TransactionMetadata memory metadata)
+    {
+        // Parse transaction outputs
+        bytes memory opReturnData = BitcoinTxnParser.decodeBitcoinTxn(rawTxnHex);
+        // Decode metadata from OP_RETURN data
+        return BitcoinTxnParser.decodeMetadata(opReturnData);
+    }
 
     fallback() external payable {
         // Fallback function to receive native tokens

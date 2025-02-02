@@ -85,7 +85,7 @@ library BitcoinTxnParser {
     /// @param rawTxn The raw Bitcoin transaction bytes
     /// @return bytes The extracted OP_RETURN data
     /// @dev Searches through transaction outputs for OP_RETURN (0x6a) and handles different push operations
-    function decodeBitcoinTxn(bytes calldata rawTxn) internal pure returns (bytes memory) {
+    function decodeBitcoinTxn(bytes memory rawTxn) internal pure returns (bytes memory) {
         Transaction memory txn = parseTransaction(rawTxn);
 
         // Find OP_RETURN output
@@ -135,7 +135,7 @@ library BitcoinTxnParser {
     /// @param start Starting position in the source data
     /// @param length Number of bytes to extract
     /// @return result The extracted bytes
-    function extractBytes(bytes calldata data, uint256 start, uint256 length)
+    function extractBytes(bytes memory data, uint256 start, uint256 length)
         internal
         pure
         returns (bytes memory result)
@@ -150,8 +150,7 @@ library BitcoinTxnParser {
     /// @notice Parses a raw Bitcoin transaction into a structured format
     /// @param rawTxn The raw Bitcoin transaction bytes
     /// @return txn Structured transaction data containing version, outputs, and locktime
-    /// @dev Handles both legacy and segwit transaction formats
-    function parseTransaction(bytes calldata rawTxn) internal pure returns (Transaction memory txn) {
+    function parseTransaction(bytes memory rawTxn) internal pure returns (Transaction memory txn) {
         uint256 offset = 0;
 
         // Parse version (4 bytes)
@@ -161,13 +160,13 @@ library BitcoinTxnParser {
 
         // Check for segwit flag
         bool isSegwit = false;
-        if (rawTxn[offset] == 0x00 && rawTxn[offset + 1] == 0x01) {
+        if (rawTxn.length > offset + 1 && rawTxn[offset] == 0x00 && rawTxn[offset + 1] == 0x01) {
             isSegwit = true;
             offset += 2;
         }
 
         // Parse input count (VarInt)
-        (uint256 inputCount, uint256 inputCountSize) = parseVarInt(rawTxn[offset:]);
+        (uint256 inputCount, uint256 inputCountSize) = parseVarInt(rawTxn, offset);
         offset += inputCountSize;
 
         // Skip inputs
@@ -175,14 +174,14 @@ library BitcoinTxnParser {
             offset += 36; // Previous output (32 + 4)
 
             // Script length (VarInt)
-            (uint256 scriptLength, uint256 scriptLengthSize) = parseVarInt(rawTxn[offset:]);
+            (uint256 scriptLength, uint256 scriptLengthSize) = parseVarInt(rawTxn, offset);
             offset += scriptLengthSize + scriptLength;
 
             offset += 4; // Sequence
         }
 
         // Parse output count (VarInt)
-        (uint256 outputCount, uint256 outputCountSize) = parseVarInt(rawTxn[offset:]);
+        (uint256 outputCount, uint256 outputCountSize) = parseVarInt(rawTxn, offset);
         offset += outputCountSize;
 
         // Parse outputs
@@ -194,7 +193,7 @@ library BitcoinTxnParser {
             offset += 8;
 
             // Script length (VarInt)
-            (uint256 scriptLength, uint256 scriptLengthSize) = parseVarInt(rawTxn[offset:]);
+            (uint256 scriptLength, uint256 scriptLengthSize) = parseVarInt(rawTxn, offset);
             offset += scriptLengthSize;
 
             // Script
@@ -205,11 +204,11 @@ library BitcoinTxnParser {
         // Skip witness data
         if (isSegwit) {
             for (uint256 i = 0; i < inputCount; i++) {
-                (uint256 witnessCount, uint256 witnessCountSize) = parseVarInt(rawTxn[offset:]);
+                (uint256 witnessCount, uint256 witnessCountSize) = parseVarInt(rawTxn, offset);
                 offset += witnessCountSize;
 
                 for (uint256 j = 0; j < witnessCount; j++) {
-                    (uint256 witnessLength, uint256 witnessLengthSize) = parseVarInt(rawTxn[offset:]);
+                    (uint256 witnessLength, uint256 witnessLengthSize) = parseVarInt(rawTxn, offset);
                     offset += witnessLengthSize + witnessLength;
                 }
             }
@@ -225,26 +224,27 @@ library BitcoinTxnParser {
 
     /// @notice Parses Bitcoin's variable integer format
     /// @param data The raw bytes containing a VarInt
+    /// @param offset The offset value to start parsing from
     /// @return value The parsed integer value
-    /// @return offset The number of bytes consumed by the VarInt
+    /// @return consumed The number of bytes consumed by the VarInt
     /// @dev Handles all VarInt formats: uint8, uint16, uint32, and uint64
-    function parseVarInt(bytes calldata data) internal pure returns (uint256 value, uint256 offset) {
-        if (data.length < 1) revert INVALID_VAR_INT_FORMAT();
-        uint8 first = uint8(data[0]);
+    function parseVarInt(bytes memory data, uint256 offset) internal pure returns (uint256 value, uint256 consumed) {
+        if (data.length < offset + 1) revert INVALID_VAR_INT_FORMAT();
+        uint8 first = uint8(data[offset]);
 
         if (first < 0xfd) {
             return (first, 1);
         } else if (first == 0xfd) {
-            if (data.length < 3) revert INVALID_VAR_INT_FORMAT();
-            bytes memory lengthBytes = extractBytes(data, 1, 2);
+            if (data.length < offset + 3) revert INVALID_VAR_INT_FORMAT();
+            bytes memory lengthBytes = extractBytes(data, offset + 1, 2);
             return (uint16(bytes2(lengthBytes)), 3);
         } else if (first == 0xfe) {
-            if (data.length < 5) revert INVALID_VAR_INT_FORMAT();
-            bytes memory lengthBytes = extractBytes(data, 1, 4);
+            if (data.length < offset + 5) revert INVALID_VAR_INT_FORMAT();
+            bytes memory lengthBytes = extractBytes(data, offset + 1, 4);
             return (uint32(bytes4(lengthBytes)), 5);
         } else {
-            if (data.length < 9) revert INVALID_VAR_INT_FORMAT();
-            bytes memory lengthBytes = extractBytes(data, 1, 8);
+            if (data.length < offset + 9) revert INVALID_VAR_INT_FORMAT();
+            bytes memory lengthBytes = extractBytes(data, offset + 1, 8);
             return (uint64(bytes8(lengthBytes)), 9);
         }
     }
