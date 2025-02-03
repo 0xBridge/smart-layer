@@ -13,29 +13,41 @@ import {BitcoinTxnParser} from "../libraries/BitcoinTxnParser.sol";
  * @dev Contract for coordinating cross-chain messages on the home chain
  */
 contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
-    // Mapping to store corresponding receiver addresses on different chains
-    mapping(uint32 => bytes32) public receivers;
-    mapping(address => bytes) public user_mintData; // TODO: Would require to store user address, AVS address, eBTC amount, chainID (to mint), psbt data (Also, timestamp?)
+    mapping(address => bool) public isOperator; // TODO: Optimise this to store the operator address in a mapping
+    mapping(address => bytes) private user_mintData; // TODO: Would require to store user address, AVS address, eBTC amount, chainID (to mint), psbt data (Also, timestamp?)
 
     // Events
     event MessageSent(uint32 dstEid, bytes message, bytes32 receiver, uint256 nativeFee);
-    event ReceiverSet(uint32 dstEid, bytes32 receiver);
+
+    modifier onlyOperator() {
+        require(isOperator[msg.sender], "Not an operator");
+        _;
+    }
 
     constructor(address _endpoint, address _owner) OApp(_endpoint, _owner) {
         _transferOwnership(_owner);
         // endpoint = ILayerZeroEndpointV2(_endpoint);
     }
 
+    function setOperators(address[] calldata _operator, bool[] calldata _statuses) public onlyOwner {
+        require(_operator.length == _statuses.length, "Invalid input");
+        for (uint256 i = 0; i < _operator.length; i++) {
+            _setOperator(_operator[i], _statuses[i]);
+        }
+    }
+
+    function _setOperator(address _operator, bool _status) internal {
+        isOperator[_operator] = _status;
+    }
+
     /**
-     * @dev Sets the receiver address for a specific chain
+     * @dev Sets the peer address for a specific chain _dstEid
      * @param _dstEid The endpoint ID of the destination chain
-     * @param _receiver The receiver address on the destination chain
+     * @param _peer The receiver address on the destination chain
      */
-    function setReceiver(uint32 _dstEid, bytes32 _receiver) external onlyOwner {
-        require(_receiver != bytes32(0), "Invalid receiver");
-        receivers[_dstEid] = _receiver;
-        setPeer(_dstEid, _receiver);
-        emit ReceiverSet(_dstEid, _receiver);
+    function setPeer(uint32 _dstEid, bytes32 _peer) public override onlyOwner {
+        require(_peer != bytes32(0), "Invalid receiver");
+        super.setPeer(_dstEid, _peer);
     }
 
     /**
@@ -47,7 +59,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     function sendMessage(uint32 _dstEid, bytes memory _message, bytes calldata _options) external payable {
         require(_message.length > 0, "Empty message");
         // TODO: Setup a trusted destination chain coordinator mapping to which the message can be sent (require here for the same)
-        require(receivers[_dstEid] != bytes32(0), "Receiver not set");
+        require(peers[_dstEid] != bytes32(0), "Receiver not set");
 
         // TODO: Decode message and validate if the message is valid and came from the right source
         BitcoinTxnParser.TransactionMetadata memory metadata = decodeTransactionMetadata(_message);
@@ -69,7 +81,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         );
 
         console2.log("Emit event message sent");
-        emit MessageSent(_dstEid, _message, receivers[_dstEid], msg.value);
+        emit MessageSent(_dstEid, _message, peers[_dstEid], msg.value);
     }
 
     /**
@@ -88,6 +100,12 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         bytes calldata _extraData
     ) internal virtual override {
         // Implement the receive logic here
+        // Validate the origin of the message
+        // Validate the message
+        // Decode the message
+        // Execute the message
+        // Emit an event
+
         console2.log("Received message on home chain");
         console2.logBytes32(_guid);
         console2.logAddress(_executor);
