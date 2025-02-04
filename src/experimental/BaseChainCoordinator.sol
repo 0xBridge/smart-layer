@@ -19,9 +19,10 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     error InvalidMessageFormat();
     error MessageAlreadyProcessed(bytes32 messageHash);
     error InvalidSignature();
+    error InvalidMessageSender();
 
     // Mapping to store corresponding receiver addresses on different chains
-    // TODO: Check if isGuidProcessed mapping is required to ensure the same message is not processed twice
+    // TODO: Check if guid to _message hash mapping is required
     mapping(bytes32 => MintData) public messageHash_mintData;
     IERC20 private eBTC;
 
@@ -78,8 +79,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         address _executor,
         bytes calldata _extraData
     ) internal virtual override whenNotPaused {
-        // TODO: If you override the external function, ensure endpoint() == msg.sender check is present
-        // TODO: Verify contract signature here and set a secondary state variable to mint the eBTC
+        require(msg.sender == address(endpoint), InvalidMessageSender());
         console.log("Received message on home chain");
         console.logBytes32(_guid);
         console.logAddress(_executor);
@@ -93,15 +93,12 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         bytes32 messageHash = keccak256(_message);
 
         // 1. Validate source chain and sender
-        // _validateSourceAndSender(_origin, chainId); // TODO: Uncomment with valid chainId hex code and sender address in test case
+        _validateSourceAndSender(_origin, chainId);
 
         // 2. Check for replay attacks
         _validateMessageUniqueness(messageHash);
 
-        // 3. Validate message format
-        // _validateMessageFormat(_message);
-
-        // 4. Process the message
+        // 3. Process the message
         _processMessage(messageHash, chainId, user, eBTCAmount);
 
         emit MessageValidated(_guid, _origin.srcEid, _origin.sender);
@@ -120,21 +117,6 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
             revert MessageAlreadyProcessed(_messageHash);
         }
     }
-
-    // function _validateMessageFormat(bytes calldata _message) internal pure {
-    //     // Validate message format based on your specific requirements
-    //     // For example, if expecting an abi.encoded struct:
-    //     if (_message.length < 32) {
-    //         revert InvalidMessageFormat();
-    //     }
-
-    //     // Add any specific message format validation
-    //     try this.decodeMessage(_message) returns (bool) {
-    //         // Message decoded successfully
-    //     } catch {
-    //         revert InvalidMessageFormat();
-    //     }
-    // }
 
     function _processMessage(bytes32 _messageHash, uint32 _chainId, address _user, uint256 _eBTCAmount) internal {
         // Decode the message and process it

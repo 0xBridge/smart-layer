@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-// TODO: Would require to store user address, AVS address, eBTC amount, chainID (to mint), psbt data (Also, timestamp?)
+// TODO: Is timestamp required to track when eBTC was minted? (In case the messgae from the receiver relayer is delayed)
 struct MintData {
     bool isMinted;
     uint32 chainId;

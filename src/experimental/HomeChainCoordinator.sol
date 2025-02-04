@@ -18,13 +18,13 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     address private immutable avsAddress;
 
     mapping(address => bool) public isOperator; // TODO: Optimise this to store the operators efficiently
-    mapping(address => bytes) private user_mintData; // TODO: Would require to store user address, AVS address, eBTC amount, chainID (to mint), psbt data (Also, timestamp when this was set)
-    mapping(bytes32 => PSBTMetadata) private btcTxn_processedPSBTs; // btcTxnHash => psbtMetadata
+    mapping(address => bytes) private user_mintData;
     mapping(bytes32 => bytes32) private psbtHash_btcTxn; // psbtMetadataHash => btcTxnHash
+    mapping(bytes32 => PSBTMetadata) private btcTxn_processedPSBTs; // btcTxnHash => psbtMetadata
 
-    // TODO: Check with Satyam for this value
+    // TODO: Check with Satyam for these values
     uint256 public constant MAX_MINT_AMOUNT = 1000 ether; // Max amount that can be minted
-    uint256 public constant MIN_LOCK_AMOUNT = 0.01 ether; // Min BTC amount that needs to be locked
+    uint256 public constant MIN_LOCK_AMOUNT = 1000; // Min BTC amount / satoshis that needs to be locked
     uint256 public constant MESSAGE_EXPIRY = 24 hours; // Messages expire after 24 hours
 
     // Events
@@ -49,13 +49,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         _;
     }
 
-    constructor(address _endpoint, address _owner, address _avsAddress, address[] memory _initialOperators)
-        OApp(_endpoint, _owner)
-    {
+    constructor(address _endpoint, address _owner, address[] memory _initialOperators) OApp(_endpoint, _owner) {
         _transferOwnership(_owner);
         _initialiseOperators(_initialOperators);
-        avsAddress = _avsAddress; // TODO: Check if storing and then validating the AVS address is required
-            // endpoint = ILayerZeroEndpointV2(_endpoint);
+        // endpoint = ILayerZeroEndpointV2(_endpoint);
     }
 
     function _initialiseOperators(address[] memory _initialOperators) internal {
@@ -106,24 +103,20 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_psbtData);
 
         // 2. TODO: Get _dstEid for a specific metadata.chainId from LayerZero contract
-        uint32 _dstEid;
+        uint32 _dstEid = metadata.chainId == 8453 ? 30184 : metadata.chainId;
+        console2.log("Destination chain ID: ", _dstEid);
 
         // 3. Check if the message already exists or is processed
+        if (btcTxn_processedPSBTs[_btcTxnHash].isMinted) {
+            revert TxnAlreadyProcessed(_btcTxnHash);
+        }
+        // This should ideally never happen | TODO: Confirm this
         bytes32 psbtHash = keccak256(_psbtData);
         if (psbtHash_btcTxn[psbtHash] != bytes32(0)) {
             revert PSBTAlreadyProcessed(psbtHash);
         }
-        if (btcTxn_processedPSBTs[_btcTxnHash].isMinted) {
-            // This should ideally never happen | TODO: Confirm this
-            revert TxnAlreadyProcessed(_btcTxnHash);
-        }
 
-        // 4. Validate destination chain
-        if (metadata.chainId != _dstEid) {
-            revert UnsupportedChain(_dstEid);
-        }
-
-        // 5. Validate receiver is set for destination chain
+        // 4. Validate receiver is set for destination chain
         if (peers[_dstEid] == bytes32(0)) {
             revert InvalidReceiver();
         }
@@ -175,7 +168,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         bytes memory opReturnData = BitcoinTxnParser.decodeBitcoinTxn(_psbtData);
         BitcoinTxnParser.TransactionMetadata memory metadata = BitcoinTxnParser.decodeMetadata(opReturnData);
 
-        // Validate amounts | TODO: decodeMetadata should give the avsAddress as well to validate is the txn is locking the BTC to the AVS
+        // Validate amounts | TODO: decodeMetadata should give the avsAddress as well to validate if the txn is locking the BTC to the AVS
         // if (metadata.baseTokenAmount > MAX_MINT_AMOUNT) {
         //     revert InvalidAmount(metadata.baseTokenAmount);
         // }
