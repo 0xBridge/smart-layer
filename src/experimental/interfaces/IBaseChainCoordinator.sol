@@ -12,6 +12,5 @@ struct MintData {
 // bytes psbtData;
 
 interface IBaseChainCoordinator {
-    function sendMessage(uint32 _dstEid, string memory _message, bytes calldata _options) external payable;
-    // Create function to receive message if required
+// Put functions that are must required for the base chain coordinator
 }

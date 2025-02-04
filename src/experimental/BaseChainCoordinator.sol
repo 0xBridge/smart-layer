@@ -21,7 +21,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     error InvalidSignature();
 
     // Mapping to store corresponding receiver addresses on different chains
-    // TODO: Check if isGuidProcessed mapping is required
+    // TODO: Check if isGuidProcessed mapping is required to ensure the same message is not processed twice
     mapping(bytes32 => MintData) public messageHash_mintData;
     IERC20 private eBTC;
 
@@ -41,7 +41,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      * @param _peer The receiver address on the destination chain
      */
     function setPeer(uint32 _dstEid, bytes32 _peer) public override onlyOwner {
-        require(_peer != bytes32(0), "Invalid receiver");
+        require(_peer != bytes32(0), "Invalid peer");
         super.setPeer(_dstEid, _peer);
     }
 
@@ -54,7 +54,6 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     function sendMessage(uint32 _dstEid, string memory _message, bytes calldata _options) external payable {
         // require(_message.length > 0, "Empty payload");
 
-        // TODO: Setup a trusted destination chain coordinator mapping to which the message can be sent (require here for the same)
         require(peers[_dstEid] != bytes32(0), "Receiver not set");
 
         // Prepare send payload
@@ -74,11 +73,12 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
     function _lzReceive(
         Origin calldata _origin,
-        bytes32 _guid, // TODO: Check if this is already checked at the endpoint level if is processed
+        bytes32 _guid,
         bytes calldata _message,
         address _executor,
         bytes calldata _extraData
-    ) internal virtual override {
+    ) internal virtual override whenNotPaused {
+        // TODO: If you override the external function, ensure endpoint() == msg.sender check is present
         // TODO: Verify contract signature here and set a secondary state variable to mint the eBTC
         console.log("Received message on home chain");
         console.logBytes32(_guid);
@@ -86,21 +86,20 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         console.logBytes(_message);
         console.logBytes(_extraData);
 
-        (uint32 chainId, address user, uint256 eBTCAmount) = abi.decode(_message, (uint32, address, uint256));
+        (uint32 chainId, address user, uint256 eBTCAmount, uint256 baseTokenAmount) =
+            abi.decode(_message, (uint32, address, uint256, uint256));
 
         // 0. Create keccak256 hash of the message
         bytes32 messageHash = keccak256(_message);
 
         // 1. Validate source chain and sender
-        _validateSourceAndSender(_origin, chainId);
+        // _validateSourceAndSender(_origin, chainId); // TODO: Uncomment with valid chainId hex code and sender address in test case
 
         // 2. Check for replay attacks
         _validateMessageUniqueness(messageHash);
 
         // 3. Validate message format
         // _validateMessageFormat(_message);
-
-        // 4. Check the message has not been processed
 
         // 4. Process the message
         _processMessage(messageHash, chainId, user, eBTCAmount);
@@ -152,6 +151,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     }
 
     function _handleMinting(address _user, uint256 _eBTCAmount) internal {
+        console.log("Minting eBTC for user: ", _user);
         // Your minting logic here
         // eBTC.mint(_user, _eBTCAmount);
     }
@@ -183,12 +183,32 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     }
 
     /**
-     * @dev Allows the owner to withdraw any stuck tokens
+     * @dev Emergency pause
+     */
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @dev Unpause
+     */
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    /**
+     * @dev Withdraw stuck funds (emergency only)
      */
     function withdraw() external onlyOwner nonReentrant {
         (bool success,) = msg.sender.call{value: address(this).balance}("");
         require(success, "Withdrawal failed");
     }
 
-    receive() external payable {}
+    fallback() external payable {
+        // Fallback function to receive native tokens
+    }
+
+    receive() external payable {
+        // Receive native tokens
+    }
 }

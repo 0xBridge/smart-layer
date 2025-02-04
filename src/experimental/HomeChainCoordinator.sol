@@ -7,29 +7,64 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {BitcoinTxnParser} from "../libraries/BitcoinTxnParser.sol";
+import {PSBTMetadata} from "./interfaces/IHomeChainCoordinator.sol";
 
 /**
  * @title HomeChainCoordinator
  * @dev Contract for coordinating cross-chain messages on the home chain
  */
 contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
-    mapping(address => bool) public isOperator; // TODO: Optimise this to store the operator address in a mapping
-    mapping(address => bytes) private user_mintData; // TODO: Would require to store user address, AVS address, eBTC amount, chainID (to mint), psbt data (Also, timestamp?)
+    // State variables
+    address private immutable avsAddress;
+
+    mapping(address => bool) public isOperator; // TODO: Optimise this to store the operators efficiently
+    mapping(address => bytes) private user_mintData; // TODO: Would require to store user address, AVS address, eBTC amount, chainID (to mint), psbt data (Also, timestamp when this was set)
+    mapping(bytes32 => PSBTMetadata) private btcTxn_processedPSBTs; // btcTxnHash => psbtMetadata
+    mapping(bytes32 => bytes32) private psbtHash_btcTxn; // psbtMetadataHash => btcTxnHash
+
+    // TODO: Check with Satyam for this value
+    uint256 public constant MAX_MINT_AMOUNT = 1000 ether; // Max amount that can be minted
+    uint256 public constant MIN_LOCK_AMOUNT = 0.01 ether; // Min BTC amount that needs to be locked
+    uint256 public constant MESSAGE_EXPIRY = 24 hours; // Messages expire after 24 hours
 
     // Events
-    event MessageSent(uint32 dstEid, bytes message, bytes32 receiver, uint256 nativeFee);
+    event MessageSent(
+        uint32 indexed dstEid, bytes message, bytes32 indexed psbtHash, address indexed operator, uint256 timestamp
+    );
+    event OperatorStatusChanged(address indexed operator, bool status);
+
+    // Errors
+    error UnauthorizedOperator(address operator);
+    error PSBTAlreadyProcessed(bytes32 psbtHash);
+    error TxnAlreadyProcessed(bytes32 btcTxnHash);
+    error InvalidPSBTData();
+    error UnsupportedChain(uint32 chainId);
+    error InvalidAmount(uint256 amount);
+    error MessageExpired();
+    error InvalidDestination(address receiver);
+    error InvalidReceiver();
 
     modifier onlyOperator() {
         require(isOperator[msg.sender], "Not an operator");
         _;
     }
 
-    constructor(address _endpoint, address _owner) OApp(_endpoint, _owner) {
+    constructor(address _endpoint, address _owner, address _avsAddress, address[] memory _initialOperators)
+        OApp(_endpoint, _owner)
+    {
         _transferOwnership(_owner);
-        // endpoint = ILayerZeroEndpointV2(_endpoint);
+        _initialiseOperators(_initialOperators);
+        avsAddress = _avsAddress; // TODO: Check if storing and then validating the AVS address is required
+            // endpoint = ILayerZeroEndpointV2(_endpoint);
     }
 
-    function setOperators(address[] calldata _operator, bool[] calldata _statuses) public onlyOwner {
+    function _initialiseOperators(address[] memory _initialOperators) internal {
+        for (uint256 i = 0; i < _initialOperators.length; i++) {
+            _setOperator(_initialOperators[i], true);
+        }
+    }
+
+    function setOperators(address[] calldata _operator, bool[] calldata _statuses) external onlyOwner {
         require(_operator.length == _statuses.length, "Invalid input");
         for (uint256 i = 0; i < _operator.length; i++) {
             _setOperator(_operator[i], _statuses[i]);
@@ -38,6 +73,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
 
     function _setOperator(address _operator, bool _status) internal {
         isOperator[_operator] = _status;
+        emit OperatorStatusChanged(_operator, _status);
     }
 
     /**
@@ -46,33 +82,73 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
      * @param _peer The receiver address on the destination chain
      */
     function setPeer(uint32 _dstEid, bytes32 _peer) public override onlyOwner {
-        require(_peer != bytes32(0), "Invalid receiver");
+        require(_peer != bytes32(0), "Invalid peer");
         super.setPeer(_dstEid, _peer);
     }
 
     /**
-     * @dev Sends a message to the specified chain
-     * @param _dstEid The endpoint ID of the destination chain
-     * @param _message The message to send
-     * @param _options Message execution options (e.g., for sending gas to destination)
+     * @dev Sends a cross-chain message with PSBT data
+     * @param _psbtData The PSBT data to be processed
+     * @param _options LayerZero message options
      */
-    function sendMessage(uint32 _dstEid, bytes memory _message, bytes calldata _options) external payable {
-        require(_message.length > 0, "Empty message");
-        // TODO: Setup a trusted destination chain coordinator mapping to which the message can be sent (require here for the same)
-        require(peers[_dstEid] != bytes32(0), "Receiver not set");
+    function sendMessage(bytes32 _btcTxnHash, bytes calldata _psbtData, bytes calldata _options)
+        external
+        payable
+        whenNotPaused
+        nonReentrant
+    {
+        // 0. Operator Authorization
+        if (!isOperator[msg.sender]) {
+            revert UnauthorizedOperator(msg.sender);
+        }
 
-        // TODO: Decode message and validate if the message is valid and came from the right source
-        BitcoinTxnParser.TransactionMetadata memory metadata = decodeTransactionMetadata(_message);
+        // 1. Parse and validate PSBT data
+        BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_psbtData);
 
-        console2.logAddress(metadata.receiverAddress);
-        console2.log("Locked amount: ", metadata.lockedAmount);
-        console2.log("Chain ID: ", metadata.chainId);
-        console2.log("Base token amount: ", metadata.baseTokenAmount);
+        // 2. TODO: Get _dstEid for a specific metadata.chainId from LayerZero contract
+        uint32 _dstEid;
+
+        // 3. Check if the message already exists or is processed
+        bytes32 psbtHash = keccak256(_psbtData);
+        if (psbtHash_btcTxn[psbtHash] != bytes32(0)) {
+            revert PSBTAlreadyProcessed(psbtHash);
+        }
+        if (btcTxn_processedPSBTs[_btcTxnHash].isMinted) {
+            // This should ideally never happen | TODO: Confirm this
+            revert TxnAlreadyProcessed(_btcTxnHash);
+        }
+
+        // 4. Validate destination chain
+        if (metadata.chainId != _dstEid) {
+            revert UnsupportedChain(_dstEid);
+        }
+
+        // 5. Validate receiver is set for destination chain
+        if (peers[_dstEid] == bytes32(0)) {
+            revert InvalidReceiver();
+        }
+
+        // 6. Store PSBT metadata
+        PSBTMetadata memory psbtMetaData = PSBTMetadata({
+            isMinted: true,
+            chainId: metadata.chainId,
+            user: metadata.receiverAddress,
+            eBTCAmount: metadata.lockedAmount,
+            baseTokenAmount: metadata.baseTokenAmount,
+            btcTxnHash: _btcTxnHash,
+            psbtData: _psbtData
+        });
+        psbtHash_btcTxn[psbtHash] = _btcTxnHash;
+        btcTxn_processedPSBTs[_btcTxnHash] = psbtMetaData;
+
+        // 7. Send message through LayerZerobytes memory payload =
+        bytes memory payload =
+            abi.encode(metadata.chainId, metadata.receiverAddress, metadata.lockedAmount, metadata.baseTokenAmount);
 
         // TODO: Create a function to get the correct MessageFee for the user
         _lzSend(
             _dstEid,
-            _message,
+            payload,
             _options,
             // Fee in native gas and ZRO token.
             MessagingFee(msg.value, 0),
@@ -80,16 +156,39 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             payable(msg.sender) // TODO: Check when does the refund happen and how much is refunded | How to know this value in advance?
         );
 
-        console2.log("Emit event message sent");
-        emit MessageSent(_dstEid, _message, peers[_dstEid], msg.value);
+        emit MessageSent(_dstEid, _psbtData, psbtHash, msg.sender, block.timestamp);
     }
 
     /**
-     * @dev Allows the owner to withdraw any stuck tokens
+     * @dev Validates PSBT data and extracts metadata
      */
-    function withdraw() external onlyOwner nonReentrant {
-        (bool success,) = msg.sender.call{value: address(this).balance}("");
-        require(success, "Withdrawal failed");
+    function _validatePSBTData(bytes calldata _psbtData)
+        internal
+        pure
+        returns (BitcoinTxnParser.TransactionMetadata memory)
+    {
+        if (_psbtData.length == 0) {
+            revert InvalidPSBTData();
+        }
+
+        // Parse transaction outputs and metadata
+        bytes memory opReturnData = BitcoinTxnParser.decodeBitcoinTxn(_psbtData);
+        BitcoinTxnParser.TransactionMetadata memory metadata = BitcoinTxnParser.decodeMetadata(opReturnData);
+
+        // Validate amounts | TODO: decodeMetadata should give the avsAddress as well to validate is the txn is locking the BTC to the AVS
+        // if (metadata.baseTokenAmount > MAX_MINT_AMOUNT) {
+        //     revert InvalidAmount(metadata.baseTokenAmount);
+        // }
+        if (metadata.lockedAmount < MIN_LOCK_AMOUNT) {
+            revert InvalidAmount(metadata.lockedAmount);
+        }
+
+        // Validate receiver address
+        if (metadata.receiverAddress == address(0)) {
+            revert InvalidDestination(metadata.receiverAddress);
+        }
+
+        return metadata;
     }
 
     function _lzReceive(
@@ -105,12 +204,6 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         // Decode the message
         // Execute the message
         // Emit an event
-
-        console2.log("Received message on home chain");
-        console2.logBytes32(_guid);
-        console2.logAddress(_executor);
-        console2.logBytes(_message);
-        console2.logBytes(_extraData);
     }
 
     function decodeTransactionMetadata(bytes memory rawTxnHex)
@@ -122,6 +215,28 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         bytes memory opReturnData = BitcoinTxnParser.decodeBitcoinTxn(rawTxnHex);
         // Decode metadata from OP_RETURN data
         return BitcoinTxnParser.decodeMetadata(opReturnData);
+    }
+
+    /**
+     * @dev Emergency pause
+     */
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @dev Unpause
+     */
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    /**
+     * @dev Withdraw stuck funds (emergency only)
+     */
+    function withdraw() external onlyOwner nonReentrant {
+        (bool success,) = msg.sender.call{value: address(this).balance}("");
+        require(success, "Withdrawal failed");
     }
 
     fallback() external payable {
