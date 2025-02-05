@@ -8,6 +8,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {BitcoinTxnParser} from "../libraries/BitcoinTxnParser.sol";
 import {PSBTMetadata} from "./interfaces/IHomeChainCoordinator.sol";
+import {TxidCalculator} from "../libraries/TxidCalculator.sol";
 
 /**
  * @title HomeChainCoordinator
@@ -97,6 +98,15 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         if (!isOperator[msg.sender]) {
             revert UnauthorizedOperator(msg.sender);
         }
+
+        // 0. btcTxnHash generated from the psbt data being shared should be the same as the one passed
+        bytes32 txid = TxidCalculator.calculateTxid(_psbtData);
+        if (txid != _btcTxnHash) {
+            revert InvalidPSBTData();
+        }
+
+        // TODO: Check if the corrresponding SPV data is present in the SPV contract
+        // TODO: Ensure if the correct witness is present in the psbt data, if not, set it. - But what's the need for this?
 
         // 1. Parse and validate PSBT data
         BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_psbtData);
