@@ -7,10 +7,12 @@ struct PSBTMetadata {
     uint32 chainId;
     address user;
     uint256 eBTCAmount;
-    uint256 baseTokenAmount;
+    uint256 baseTokenAmount; // TODO: Check with Rahul what is this for?
     bytes32 btcTxnHash;
+    bytes32 avsPublicKey; // AVS Bitcoin address
     bytes psbtData;
 }
+// save avsPublicKey/avsNetworkKey
 
 interface IHomeChainCoordinator {
     function sendMessage(uint32 _dstEid, string memory _message, bytes calldata _options) external payable;

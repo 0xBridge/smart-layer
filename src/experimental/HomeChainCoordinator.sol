@@ -19,8 +19,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
 
     mapping(address => bool) public isOperator; // TODO: Optimise this to store the operators efficiently
     mapping(address => bytes) private user_mintData;
-    mapping(bytes32 => bytes32) private psbtHash_btcTxn; // psbtMetadataHash => btcTxnHash
-    mapping(bytes32 => PSBTMetadata) private btcTxn_processedPSBTs; // btcTxnHash => psbtMetadata
+    mapping(bytes32 => PSBTMetadata) private btcTxnHash_processedPSBTs; // btcTxnHash => psbtMetadata
 
     // TODO: Check with Satyam for these values
     uint256 public constant MAX_MINT_AMOUNT = 1000 ether; // Max amount that can be minted
@@ -107,13 +106,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         console2.log("Destination chain ID: ", _dstEid);
 
         // 3. Check if the message already exists or is processed
-        if (btcTxn_processedPSBTs[_btcTxnHash].isMinted) {
+        if (btcTxnHash_processedPSBTs[_btcTxnHash].isMinted) {
             revert TxnAlreadyProcessed(_btcTxnHash);
-        }
-        // This should ideally never happen | TODO: Confirm this
-        bytes32 psbtHash = keccak256(_psbtData);
-        if (psbtHash_btcTxn[psbtHash] != bytes32(0)) {
-            revert PSBTAlreadyProcessed(psbtHash);
         }
 
         // 4. Validate receiver is set for destination chain
@@ -121,6 +115,9 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             revert InvalidReceiver();
         }
 
+        // 5. Validate message expiry?
+
+        bytes32 avsPublicKey;
         // 6. Store PSBT metadata
         PSBTMetadata memory psbtMetaData = PSBTMetadata({
             isMinted: true,
@@ -129,10 +126,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             eBTCAmount: metadata.lockedAmount,
             baseTokenAmount: metadata.baseTokenAmount,
             btcTxnHash: _btcTxnHash,
+            avsPublicKey: avsPublicKey, // TODO: This needs to come from the metadata itself
             psbtData: _psbtData
         });
-        psbtHash_btcTxn[psbtHash] = _btcTxnHash;
-        btcTxn_processedPSBTs[_btcTxnHash] = psbtMetaData;
+        btcTxnHash_processedPSBTs[_btcTxnHash] = psbtMetaData;
 
         // 7. Send message through LayerZerobytes memory payload =
         bytes memory payload =
@@ -149,7 +146,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             payable(msg.sender) // TODO: Check when does the refund happen and how much is refunded | How to know this value in advance?
         );
 
-        emit MessageSent(_dstEid, _psbtData, psbtHash, msg.sender, block.timestamp);
+        emit MessageSent(_dstEid, _psbtData, _btcTxnHash, msg.sender, block.timestamp);
     }
 
     /**
@@ -184,6 +181,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         return metadata;
     }
 
+    function handleFailure() external {}
+
     function _lzReceive(
         Origin calldata _origin,
         bytes32 _guid,
@@ -197,17 +196,6 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         // Decode the message
         // Execute the message
         // Emit an event
-    }
-
-    function decodeTransactionMetadata(bytes memory rawTxnHex)
-        public
-        pure
-        returns (BitcoinTxnParser.TransactionMetadata memory metadata)
-    {
-        // Parse transaction outputs
-        bytes memory opReturnData = BitcoinTxnParser.decodeBitcoinTxn(rawTxnHex);
-        // Decode metadata from OP_RETURN data
-        return BitcoinTxnParser.decodeMetadata(opReturnData);
     }
 
     /**
