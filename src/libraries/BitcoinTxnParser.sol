@@ -30,7 +30,7 @@ library BitcoinTxnParser {
         address receiverAddress;
         uint256 lockedAmount;
         uint32 chainId;
-        uint256 baseTokenAmount;
+        uint256 nativeTokenAmount;
     }
 
     /// @notice Decodes metadata from OP_RETURN data into a structured format
@@ -45,7 +45,7 @@ library BitcoinTxnParser {
         address receiverAddress;
         uint256 lockedAmount;
         uint32 chainId;
-        uint256 baseTokenAmount;
+        uint256 nativeTokenAmount;
 
         assembly {
             let ptr := add(data, 32)
@@ -70,14 +70,14 @@ library BitcoinTxnParser {
 
             // Read base token amount
             ptr := add(ptr, 2) // Skip length bytes
-            baseTokenAmount := shr(192, mload(ptr))
+            nativeTokenAmount := shr(192, mload(ptr))
         }
 
         return TransactionMetadata({
             receiverAddress: receiverAddress,
             lockedAmount: lockedAmount,
             chainId: chainId,
-            baseTokenAmount: baseTokenAmount
+            nativeTokenAmount: nativeTokenAmount
         });
     }
 

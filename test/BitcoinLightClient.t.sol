@@ -477,13 +477,13 @@ contract BitcoinLightClientTest is Test {
         address expectedReceiverAddress = 0x41588441C41D5528CC6AFa3a2a732afeca9e9452;
         uint256 expectedAmount = 1000;
         uint256 expectedChainId = 5;
-        uint256 expectedBaseTokenAmount = 99999;
+        uint256 expectedNativeTokenAmount = 99999;
 
         // Add assertions to check the expected values in metadata
         assertEq(metadata.receiverAddress, expectedReceiverAddress);
         assertEq(metadata.lockedAmount, expectedAmount);
         assertEq(metadata.chainId, expectedChainId);
-        assertEq(metadata.baseTokenAmount, expectedBaseTokenAmount);
+        assertEq(metadata.nativeTokenAmount, expectedNativeTokenAmount);
     }
 
     // Add test for valid OP_RETURN data
@@ -495,13 +495,13 @@ contract BitcoinLightClientTest is Test {
         address expectedReceiverAddress = 0x03AA93e006fBa956cdBAfa2b8EF789D0Cb63e7b4;
         uint256 expectedAmount = 10000;
         uint256 expectedChainId = 123;
-        uint256 expectedBaseTokenAmount = 20000;
+        uint256 expectedNativeTokenAmount = 20000;
 
         // Add assertions to check the expected values in metadata
         assertEq(metadata.receiverAddress, expectedReceiverAddress);
         assertEq(metadata.lockedAmount, expectedAmount);
         assertEq(metadata.chainId, expectedChainId);
-        assertEq(metadata.baseTokenAmount, expectedBaseTokenAmount);
+        assertEq(metadata.nativeTokenAmount, expectedNativeTokenAmount);
     }
 
     // Add test for transaction with no OP_RETURN data

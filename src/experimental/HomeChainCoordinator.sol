@@ -19,7 +19,6 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     address private immutable avsAddress;
 
     mapping(address => bool) public isOperator; // TODO: Optimise this to store the operators efficiently
-    mapping(address => bytes) private user_mintData;
     mapping(bytes32 => PSBTMetadata) private btcTxnHash_processedPSBTs; // btcTxnHash => psbtMetadata
 
     // TODO: Check with Satyam for these values
@@ -28,9 +27,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     uint256 public constant MESSAGE_EXPIRY = 24 hours; // Messages expire after 24 hours
 
     // Events
-    event MessageSent(
-        uint32 indexed dstEid, bytes message, bytes32 indexed psbtHash, address indexed operator, uint256 timestamp
-    );
+    event MessageSent(uint32 indexed dstEid, bytes32 indexed psbtHash, address indexed operator, uint256 timestamp);
     event OperatorStatusChanged(address indexed operator, bool status);
 
     // Errors
@@ -105,7 +102,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             revert InvalidPSBTData();
         }
 
-        // TODO: Check if the corrresponding SPV data is present in the SPV contract
+        // TODO: Check if the corrresponding SPV data is present in the SPV contract - why exactly is it needed?
         // TODO: Ensure if the correct witness is present in the psbt data, if not, set it. - But what's the need for this?
 
         // 1. Parse and validate PSBT data
@@ -127,23 +124,24 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
 
         // 5. Validate message expiry?
 
+        // TODO: This needs to come from the metadata itself as this will keep on changing
         bytes32 avsPublicKey;
         // 6. Store PSBT metadata
         PSBTMetadata memory psbtMetaData = PSBTMetadata({
             isMinted: true,
             chainId: metadata.chainId,
             user: metadata.receiverAddress,
-            eBTCAmount: metadata.lockedAmount,
-            baseTokenAmount: metadata.baseTokenAmount,
+            lockedAmount: metadata.lockedAmount,
+            nativeTokenAmount: metadata.nativeTokenAmount,
             btcTxnHash: _btcTxnHash,
-            avsPublicKey: avsPublicKey, // TODO: This needs to come from the metadata itself
+            avsPublicKey: avsPublicKey,
             psbtData: _psbtData
         });
         btcTxnHash_processedPSBTs[_btcTxnHash] = psbtMetaData;
 
-        // 7. Send message through LayerZerobytes memory payload =
+        // 7. Send message through LayerZerobytes memory payload
         bytes memory payload =
-            abi.encode(metadata.chainId, metadata.receiverAddress, metadata.lockedAmount, metadata.baseTokenAmount);
+            abi.encode(metadata.chainId, metadata.receiverAddress, metadata.lockedAmount, metadata.nativeTokenAmount);
 
         // TODO: Create a function to get the correct MessageFee for the user
         _lzSend(
@@ -156,7 +154,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             payable(msg.sender) // TODO: Check when does the refund happen and how much is refunded | How to know this value in advance?
         );
 
-        emit MessageSent(_dstEid, _psbtData, _btcTxnHash, msg.sender, block.timestamp);
+        emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
     }
 
     /**
@@ -175,9 +173,9 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         bytes memory opReturnData = BitcoinTxnParser.decodeBitcoinTxn(_psbtData);
         BitcoinTxnParser.TransactionMetadata memory metadata = BitcoinTxnParser.decodeMetadata(opReturnData);
 
-        // Validate amounts | TODO: decodeMetadata should give the avsAddress as well to validate if the txn is locking the BTC to the AVS
-        // if (metadata.baseTokenAmount > MAX_MINT_AMOUNT) {
-        //     revert InvalidAmount(metadata.baseTokenAmount);
+        // Validate amounts
+        // if (metadata.nativeTokenAmount > MAX_MINT_AMOUNT) {
+        //     revert InvalidAmount(metadata.nativeTokenAmount);
         // }
         if (metadata.lockedAmount < MIN_LOCK_AMOUNT) {
             revert InvalidAmount(metadata.lockedAmount);
@@ -191,7 +189,42 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         return metadata;
     }
 
-    function handleFailure() external {}
+    function sendMessageFor(address _receiver, bytes32 _btcTxnHash, bytes calldata _options) external payable {
+        if (btcTxnHash_processedPSBTs[_btcTxnHash].user != _receiver) {
+            revert InvalidReceiver(); // This also ensures that the txn is already present
+        }
+
+        PSBTMetadata memory psbtMetaData = btcTxnHash_processedPSBTs[_btcTxnHash];
+        // 1. Parse and get metadata from psbtMetaData
+
+        // 2. TODO: Get _dstEid for a specific metadata.chainId from LayerZero contract
+        uint32 _dstEid = psbtMetaData.chainId == 8453 ? 30184 : psbtMetaData.chainId;
+
+        // 3. Validate receiver is set for destination chain
+        if (peers[_dstEid] == bytes32(0)) {
+            revert InvalidReceiver();
+        }
+
+        // 4. TODO: Check if all the fields needed to be sent in the payload are present in the metadata
+
+        // 5. Send message through LayerZerobytes memory payload =
+        bytes memory payload = abi.encode(
+            psbtMetaData.chainId, psbtMetaData.user, psbtMetaData.lockedAmount, psbtMetaData.nativeTokenAmount
+        );
+
+        // TODO: Create a function to get the correct MessageFee for the user
+        _lzSend(
+            _dstEid,
+            payload,
+            _options,
+            // Fee in native gas and ZRO token.
+            MessagingFee(msg.value, 0),
+            // Refund address in case of failed source message.
+            payable(msg.sender) // TODO: Check when does the refund happen and how much is refunded | How to know this value in advance?
+        );
+
+        emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
+    }
 
     function _lzReceive(
         Origin calldata _origin,

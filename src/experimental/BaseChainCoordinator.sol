@@ -22,7 +22,6 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     error InvalidMessageSender();
 
     // Mapping to store corresponding receiver addresses on different chains
-    // TODO: Check if guid to _message hash mapping is required
     mapping(bytes32 => MintData) public messageHash_mintData;
     IERC20 private eBTC;
 
@@ -86,7 +85,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         console.logBytes(_message);
         console.logBytes(_extraData);
 
-        (uint32 chainId, address user, uint256 eBTCAmount, uint256 baseTokenAmount) =
+        (uint32 chainId, address user, uint256 lockedAmount, uint256 nativeTokenAmount) =
             abi.decode(_message, (uint32, address, uint256, uint256));
 
         // 0. Create keccak256 hash of the message
@@ -99,7 +98,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         _validateMessageUniqueness(messageHash);
 
         // 3. Process the message
-        _processMessage(messageHash, chainId, user, eBTCAmount);
+        _processMessage(messageHash, chainId, user, lockedAmount);
 
         emit MessageValidated(_guid, _origin.srcEid, _origin.sender);
     }
@@ -118,7 +117,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         }
     }
 
-    function _processMessage(bytes32 _messageHash, uint32 _chainId, address _user, uint256 _eBTCAmount) internal {
+    function _processMessage(bytes32 _messageHash, uint32 _chainId, address _user, uint256 _lockedAmount) internal {
         // Decode the message and process it
 
         // Your existing message processing logic
@@ -126,16 +125,16 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         mintData.isMinted = true;
         mintData.chainId = _chainId;
         mintData.user = _user;
-        mintData.eBTCAmount = _eBTCAmount;
+        mintData.lockedAmount = _lockedAmount;
         // Additional processing based on message content
-        _handleMinting(_user, _eBTCAmount);
+        _handleMinting(_user, _lockedAmount);
         messageHash_mintData[_messageHash] = mintData;
     }
 
-    function _handleMinting(address _user, uint256 _eBTCAmount) internal {
+    function _handleMinting(address _user, uint256 _lockedAmount) internal {
         console.log("Minting eBTC for user: ", _user);
         // Your minting logic here
-        // eBTC.mint(_user, _eBTCAmount);
+        // eBTC.mint(_user, _lockedAmount);
     }
 
     function decodeMessage(bytes calldata _message) external pure returns (bool) {

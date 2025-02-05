@@ -4,6 +4,8 @@
 // import {BitcoinUtils} from "./BitcoinUtils.sol";
 // import {BitcoinTxnParser} from "./BitcoinTxnParser.sol";
 
+// /// @title SegWitVerifier
+// /// @notice Library for verifying SegWit signatures
 // library SegWitVerifier {
 //     using BitcoinUtils for *;
 //     using BitcoinTxnParser for *;
@@ -27,18 +29,20 @@
 //         view
 //         returns (bool)
 //     {
+//         // Parse transaction
+//         BitcoinTxnParser.Transaction memory txn = BitcoinTxnParser.parseTransaction(rawTx);
+//         require(txn.hasWitness, "Not a SegWit transaction");
+//         require(inputIndex < txn.inputs.length, "Input index out of bounds");
+
 //         // 1. Calculate hashPrevouts, hashSequence, hashOutputs
 //         bytes32 hashPrevouts = calculateHashPrevouts(rawTx);
 //         bytes32 hashSequence = calculateHashSequence(rawTx);
 //         bytes32 hashOutputs = calculateHashOutputs(rawTx);
 
-//         // 2. Get input details
-//         BitcoinTxnParser.Transaction memory txn = BitcoinTxnParser.parseTransaction(rawTx);
-
-//         // 3. Construct the script code (P2WPKH)
+//         // 2. Construct the script code (P2WPKH)
 //         bytes memory scriptCode = constructP2WPKHScriptCode(txn, inputIndex);
 
-//         // 4. Build signing message (BIP143)
+//         // 3. Build signing message (BIP143)
 //         bytes memory message = abi.encodePacked(
 //             txn.version,
 //             hashPrevouts,
@@ -53,10 +57,10 @@
 //             uint32(1) // SIGHASH_ALL
 //         );
 
-//         // 5. Double SHA256 the message
+//         // 4. Double SHA256 the message
 //         bytes32 messageHash = BitcoinUtils.sha256DoubleHash(message);
 
-//         // 6. Verify ECDSA signature
+//         // 5. Verify ECDSA signature
 //         return verifyECDSASignature(
 //             messageHash, getWitnessSignature(txn, inputIndex), getWitnessPublicKey(txn, inputIndex)
 //         );
@@ -114,39 +118,7 @@
 //         );
 //     }
 
-//     /// @notice Verifies an ECDSA signature using the k256 precompile
-//     function verifyECDSASignature(bytes32 messageHash, bytes memory signature, bytes memory pubKey)
-//         internal
-//         view
-//         returns (bool)
-//     {
-//         // Use ecrecover precompile
-//         (bytes32 r, bytes32 s, uint8 v) = parseSignature(signature);
-
-//         address recovered = ecrecover(messageHash, v, r, s);
-//         address expected = address(uint160(uint256(keccak256(pubKey))));
-
-//         return recovered == expected;
-//     }
-
-//     /// @notice Helper to parse DER signature into r, s, v components
-//     function parseSignature(bytes memory signature) internal pure returns (bytes32 r, bytes32 s, uint8 v) {
-//         require(signature.length == 65, "Invalid signature length");
-
-//         assembly {
-//             r := mload(add(signature, 32))
-//             s := mload(add(signature, 64))
-//             v := byte(0, mload(add(signature, 96)))
-//         }
-
-//         // Adjust v for ethereum's ecrecover
-//         v = v + 27;
-//     }
-
-//     /// @notice Extracts outpoint (txid + vout) from transaction input
-//     /// @param txn Parsed transaction
-//     /// @param index Input index
-//     /// @return Serialized outpoint (36 bytes)
+//     /// @notice Helper to get outpoint from transaction input
 //     function getTxInOutpoint(BitcoinTxnParser.Transaction memory txn, uint256 index)
 //         internal
 //         pure
@@ -161,67 +133,81 @@
 //         );
 //     }
 
-//     /// @notice Extracts sequence number from transaction input
-//     /// @param txn Parsed transaction
-//     /// @param index Input index
-//     /// @return Sequence number as bytes (4 bytes)
+//     /// @notice Helper to get sequence from transaction input
 //     function getTxInSequence(BitcoinTxnParser.Transaction memory txn, uint256 index)
 //         internal
 //         pure
 //         returns (bytes memory)
 //     {
 //         require(index < txn.inputs.length, "Input index out of bounds");
-
 //         return abi.encodePacked(txn.inputs[index].sequence);
 //     }
 
-//     /// @notice Extracts signature from witness data
-//     /// @dev Expects P2WPKH witness format: [signature, pubkey]
-//     /// @param txn Parsed transaction
-//     /// @param index Input index
-//     /// @return DER-encoded signature with sighash type
+//     /// @notice Helper to get witness signature
 //     function getWitnessSignature(BitcoinTxnParser.Transaction memory txn, uint256 index)
 //         internal
 //         pure
 //         returns (bytes memory)
 //     {
 //         require(index < txn.inputs.length, "Input index out of bounds");
-//         require(txn.inputs[index].witness.length == 2, "Invalid P2WPKH witness");
+//         require(txn.inputs[index].witness.length >= 2, "Invalid witness stack");
 
 //         bytes memory signature = txn.inputs[index].witness[0];
-//         require(signature.length >= 64, "Invalid signature length"); // DER signature + sighash byte
+//         require(signature.length >= 64, "Invalid signature length");
 
-//         // Remove sighash byte and return
+//         // Remove sighash byte
 //         return BytesLib.slice(signature, 0, signature.length - 1);
 //     }
 
-//     /// @notice Extracts public key from witness data
-//     /// @dev Expects P2WPKH witness format: [signature, pubkey]
-//     /// @param txn Parsed transaction
-//     /// @param index Input index
-//     /// @return Compressed public key (33 bytes)
+//     /// @notice Helper to get witness public key
 //     function getWitnessPublicKey(BitcoinTxnParser.Transaction memory txn, uint256 index)
 //         internal
 //         pure
 //         returns (bytes memory)
 //     {
 //         require(index < txn.inputs.length, "Input index out of bounds");
-//         require(txn.inputs[index].witness.length == 2, "Invalid P2WPKH witness");
+//         require(txn.inputs[index].witness.length >= 2, "Invalid witness stack");
 
 //         bytes memory pubKey = txn.inputs[index].witness[1];
-//         require(pubKey.length == 33, "Invalid public key length"); // Must be compressed
+//         require(pubKey.length == 33, "Invalid public key length");
 
 //         return pubKey;
+//     }
+
+//     /// @notice Verifies ECDSA signature
+//     function verifyECDSASignature(bytes32 messageHash, bytes memory signature, bytes memory pubKey)
+//         internal
+//         pure
+//         returns (bool)
+//     {
+//         require(signature.length == 64, "Invalid signature length");
+//         require(pubKey.length == 33, "Invalid public key length");
+
+//         (bytes32 r, bytes32 s) = parseSignature(signature);
+
+//         // Verify using ecrecover
+//         address recovered = ecrecover(messageHash, 27, r, s);
+//         if (recovered == address(0)) {
+//             recovered = ecrecover(messageHash, 28, r, s);
+//         }
+
+//         address expected = address(uint160(uint256(keccak256(pubKey))));
+//         return recovered == expected;
+//     }
+
+//     /// @notice Parses DER signature into r, s components
+//     function parseSignature(bytes memory signature) internal pure returns (bytes32 r, bytes32 s) {
+//         require(signature.length == 64, "Invalid signature length");
+
+//         assembly {
+//             r := mload(add(signature, 32))
+//             s := mload(add(signature, 64))
+//         }
 //     }
 // }
 
 // /// @notice Helper library for byte manipulation
 // library BytesLib {
-//     /// @notice Extracts a slice of an array of bytes
-//     /// @param _bytes Source bytes
-//     /// @param _start Start index
-//     /// @param _length Length to extract
-//     /// @return result Extracted bytes
 //     function slice(bytes memory _bytes, uint256 _start, uint256 _length) internal pure returns (bytes memory) {
 //         require(_length + 31 >= _length, "slice_overflow");
 //         require(_bytes.length >= _start + _length, "slice_outOfBounds");
@@ -230,25 +216,12 @@
 //         assembly {
 //             switch iszero(_length)
 //             case 0 {
-//                 // Get a location of some free memory and store it in tempBytes as
-//                 // Solidity does for memory variables.
 //                 tempBytes := mload(0x40)
-
-//                 // The first word of the slice result is potentially not fully used.
-//                 // To ensure correctness, we calculate the length mod 32 and add it
-//                 // to the offset. We can safely add it to the offset because of the
-//                 // overflow check above.
 //                 let lengthmod := and(_length, 31)
-
-//                 // tempBytes = tempBytes + length + lengthmod
 //                 let mc := add(add(tempBytes, lengthmod), mul(0x20, iszero(lengthmod)))
 //                 let end := add(mc, _length)
 
-//                 for {
-//                     // The multiplication in the next line has the same exact purpose
-//                     // as the one above.
-//                     let cc := add(add(add(_bytes, lengthmod), mul(0x20, iszero(lengthmod))), _start)
-//                 } lt(mc, end) {
+//                 for { let cc := add(add(add(_bytes, lengthmod), mul(0x20, iszero(lengthmod))), _start) } lt(mc, end) {
 //                     mc := add(mc, 0x20)
 //                     cc := add(cc, 0x20)
 //                 } { mstore(mc, mload(cc)) }
