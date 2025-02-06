@@ -9,6 +9,7 @@ import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {BitcoinTxnParser} from "../libraries/BitcoinTxnParser.sol";
 import {PSBTMetadata} from "./interfaces/IHomeChainCoordinator.sol";
 import {TxidCalculator} from "../libraries/TxidCalculator.sol";
+import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 
 /**
  * @title HomeChainCoordinator
@@ -21,10 +22,9 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     mapping(address => bool) public isOperator;
     mapping(bytes32 => PSBTMetadata) private btcTxnHash_processedPSBTs; // btcTxnHash => psbtMetadata
 
-    // TODO: Check with Satyam for these values
-    uint256 public constant MAX_MINT_AMOUNT = 1 ether; // Max amount that can be put as the native token amount
-    uint256 public constant MIN_LOCK_AMOUNT = 1000; // Min BTC amount / satoshis that needs to be locked
-    uint256 public constant MESSAGE_EXPIRY = 24 hours; // Messages expire after 24 hours
+    // TODO: Create getter / setter for the below values (to be set via governance)
+    uint256 public constant MAX_GAS_TOKEN_AMOUNT = 1 ether; // Max amount that can be put as the native token amount (create a function getter / setter)
+    uint256 public constant MIN_BTC_AMOUNT = 1000; // Min BTC amount / satoshis that needs to be locked (create a function getter / setter)
 
     // Events
     event MessageSent(uint32 indexed dstEid, bytes32 indexed psbtHash, address indexed operator, uint256 timestamp);
@@ -103,7 +103,6 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         }
 
         // TODO: Check if the corrresponding SPV data is present in the SPV contract - why exactly is it needed though?
-        // TODO: Ensure if the correct witness is present in the psbt data, if not, set it. - But what's the need for this?
 
         // 1. Parse and validate PSBT data
         BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_psbtData);
@@ -122,10 +121,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             revert InvalidReceiver();
         }
 
-        // 5. Validate message expiry?
-
         // TODO: This needs to come from the metadata itself as this will keep on changing
-        bytes32 avsPublicKey;
+        bytes32 networkPublicKey;
         // 6. Store PSBT metadata
         PSBTMetadata memory psbtMetaData = PSBTMetadata({
             isMinted: true,
@@ -134,7 +131,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             lockedAmount: metadata.lockedAmount,
             nativeTokenAmount: metadata.nativeTokenAmount,
             btcTxnHash: _btcTxnHash,
-            avsPublicKey: avsPublicKey,
+            networkPublicKey: networkPublicKey,
             psbtData: _psbtData
         });
         btcTxnHash_processedPSBTs[_btcTxnHash] = psbtMetaData;
@@ -175,10 +172,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         BitcoinTxnParser.TransactionMetadata memory metadata = BitcoinTxnParser.decodeMetadata(opReturnData);
 
         // Validate amounts
-        // if (metadata.nativeTokenAmount > MAX_MINT_AMOUNT) {
+        // if (metadata.nativeTokenAmount > MAX_GAS_TOKEN_AMOUNT) {
         //     revert InvalidAmount(metadata.nativeTokenAmount);
         // }
-        if (metadata.lockedAmount < MIN_LOCK_AMOUNT) {
+        if (metadata.lockedAmount < MIN_BTC_AMOUNT) {
             revert InvalidAmount(metadata.lockedAmount);
         }
 

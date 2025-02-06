@@ -8,7 +8,7 @@ struct PSBTMetadata {
     uint256 lockedAmount;
     uint256 nativeTokenAmount;
     bytes32 btcTxnHash;
-    bytes32 avsPublicKey; // AVS Bitcoin address
+    bytes32 networkPublicKey; // AVS Bitcoin address
     bytes psbtData;
 }
 
