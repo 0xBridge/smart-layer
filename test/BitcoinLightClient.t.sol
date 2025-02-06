@@ -6,6 +6,9 @@ import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 import {BitcoinUtils} from "../src/libraries/BitcoinUtils.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {BitcoinTxnParser} from "../src/libraries/BitcoinTxnParser.sol";
+import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
+
+// const _options = Options.newOptions().addExecutorLzReceiveOption(GAS_LIMIT, MSG_VALUE);
 
 contract BitcoinLightClientTest is Test {
     BitcoinLightClient public bitcoinLightClient;

@@ -7,7 +7,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {MintData, IBaseChainCoordinator} from "./interfaces/IBaseChainCoordinator.sol";
-import {IERC20} from "lib/eigenlayer-middleware/lib/forge-std/src/interfaces/IERC20.sol";
+import {eBTCManager} from "./eBTCManager.sol";
 
 /**
  * @title BaseChainCoordinator
@@ -23,15 +23,15 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
     // Mapping to store corresponding receiver addresses on different chains
     mapping(bytes32 => MintData) private btcTxnHash_mintData;
-    IERC20 private eBTC;
+    eBTCManager private eBTCManagerInstance;
 
     // Events
     event MessageSent(uint32 dstEid, string message, bytes32 receiver, uint256 nativeFee);
     event MessageValidated(bytes32 guid, uint32 srcEid, bytes32 sender);
 
-    constructor(address _endpoint, address _eBTC, address _owner) OApp(_endpoint, _owner) {
+    constructor(address _endpoint, address _eBTCManager, address _owner) OApp(_endpoint, _owner) {
         _transferOwnership(_owner);
-        eBTC = IERC20(_eBTC);
+        eBTCManagerInstance = eBTCManager(payable(_eBTCManager));
         // endpoint = ILayerZeroEndpointV2(_endpoint);
     }
 
@@ -84,7 +84,6 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         console.logBytes(_message);
         console.logBytes(_extraData);
 
-        // TODO: Convert the required eBTC to nativeTokenAmount - Will add an additional failure point - what if the user doesn't have enough eBTC?
         (uint32 chainId, address user, bytes32 btcTxnHash, uint256 lockedAmount, uint256 nativeTokenAmount) =
             abi.decode(_message, (uint32, address, bytes32, uint256, uint256));
 
@@ -129,7 +128,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
     function _handleMinting(address _user, uint256 _lockedAmount) internal {
         console.log("Minting eBTC for user: ", _user);
-        // TODO: Does this mean that the owner of the eBTC contract needs to be set as the respective BaseChainCoordinator contract on that chain?
+
         // eBTC.mint(_user, _lockedAmount);
     }
 

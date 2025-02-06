@@ -113,7 +113,7 @@ contract CoordinatorHomeChainTest is Test {
         bytes memory options = hex"0003010011010000000000000000000000000000c350";
         bytes32 btcTxnHash = 0x0b050a87ba271963ba19dc5ab6a53b6dcf4b5c4f5852033ea92aa78030a9f381;
         vm.recordLogs();
-        homeChainCoordinator.sendMessage{value: 0.2 ether}(btcTxnHash, message, options);
+        homeChainCoordinator.sendMessage{value: 0.2 ether}(btcTxnHash, message, options, address(this));
         console2.log("Message sent");
 
         // Process the message on destination chain

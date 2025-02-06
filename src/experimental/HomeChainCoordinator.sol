@@ -22,9 +22,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     mapping(address => bool) public isOperator;
     mapping(bytes32 => PSBTMetadata) private btcTxnHash_processedPSBTs; // btcTxnHash => psbtMetadata
 
-    // TODO: Create getter / setter for the below values (to be set via governance)
-    uint256 public constant MAX_GAS_TOKEN_AMOUNT = 1 ether; // Max amount that can be put as the native token amount (create a function getter / setter)
-    uint256 public constant MIN_BTC_AMOUNT = 1000; // Min BTC amount / satoshis that needs to be locked (create a function getter / setter)
+    uint256 public maxGasTokenAmount = 1 ether; // Max amount that can be put as the native token amount
+    uint256 public minBTCAmount = 1000; // Min BTC amount / satoshis that needs to be locked
 
     // Events
     event MessageSent(uint32 indexed dstEid, bytes32 indexed psbtHash, address indexed operator, uint256 timestamp);
@@ -70,6 +69,17 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         emit OperatorStatusChanged(_operator, _status);
     }
 
+    // Create getters and setters for the below values
+    function setMaxGasTokenAmount(uint256 _maxGasTokenAmount) external onlyOwner {
+        require(_maxGasTokenAmount > 0, "Invalid amount");
+        maxGasTokenAmount = _maxGasTokenAmount;
+    }
+
+    function setMinBtcAmount(uint256 _minBtcAmount) external onlyOwner {
+        require(_minBtcAmount > 0, "Invalid amount");
+        minBTCAmount = _minBtcAmount;
+    }
+
     /**
      * @dev Sets the peer address for a specific chain _dstEid
      * @param _dstEid The endpoint ID of the destination chain
@@ -85,7 +95,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
      * @param _psbtData The PSBT data to be processed
      * @param _options LayerZero message options
      */
-    function sendMessage(bytes32 _btcTxnHash, bytes calldata _psbtData, bytes calldata _options)
+    function sendMessage(bytes32 _btcTxnHash, bytes calldata _psbtData, bytes calldata _options, address refundAddress)
         external
         payable
         whenNotPaused
@@ -149,7 +159,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             // Fee in native gas and ZRO token.
             MessagingFee(msg.value, 0),
             // Refund address in case of failed source message.
-            payable(msg.sender) // TODO: Check when does the refund happen and how much is refunded | How to know this value in advance?
+            refundAddress
         );
 
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
@@ -160,7 +170,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
      */
     function _validatePSBTData(bytes calldata _psbtData)
         internal
-        pure
+        view
         returns (BitcoinTxnParser.TransactionMetadata memory)
     {
         if (_psbtData.length == 0) {
@@ -172,10 +182,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         BitcoinTxnParser.TransactionMetadata memory metadata = BitcoinTxnParser.decodeMetadata(opReturnData);
 
         // Validate amounts
-        // if (metadata.nativeTokenAmount > MAX_GAS_TOKEN_AMOUNT) {
+        // if (metadata.nativeTokenAmount > maxGasTokenAmount) {
         //     revert InvalidAmount(metadata.nativeTokenAmount);
         // }
-        if (metadata.lockedAmount < MIN_BTC_AMOUNT) {
+        if (metadata.lockedAmount < minBTCAmount) {
             revert InvalidAmount(metadata.lockedAmount);
         }
 
@@ -187,28 +197,33 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         return metadata;
     }
 
-    function sendMessageFor(address _receiver, bytes32 _btcTxnHash, bytes calldata _options) external payable {
+    function sendMessageFor(address _receiver, bytes32 _btcTxnHash, bytes calldata _options, address refundAddress)
+        external
+        payable
+    {
         if (btcTxnHash_processedPSBTs[_btcTxnHash].user != _receiver) {
             revert InvalidReceiver(); // This also ensures that the txn is already present
         }
 
-        PSBTMetadata memory psbtMetaData = btcTxnHash_processedPSBTs[_btcTxnHash];
+        PSBTMetadata memory metadata = btcTxnHash_processedPSBTs[_btcTxnHash];
         // 1. Parse and get metadata from psbtMetaData
 
         // 2. TODO: Get _dstEid for a specific metadata.chainId from LayerZero contract
-        uint32 _dstEid = psbtMetaData.chainId == 8453 ? 30184 : psbtMetaData.chainId;
+        uint32 _dstEid = metadata.chainId == 8453 ? 30184 : metadata.chainId;
 
         // 3. Validate receiver is set for destination chain
         if (peers[_dstEid] == bytes32(0)) {
             revert InvalidReceiver();
         }
 
-        // 4. TODO: Check if all the fields needed to be sent in the payload are present in the metadata
+        // 4. Check if all the fields needed to be sent in the payload are present in the metadata (should never enter revert ideally)
+        if (metadata.chainId == 0 || metadata.user == address(0) || metadata.lockedAmount == 0) {
+            revert InvalidPSBTData();
+        }
 
         // 5. Send message through LayerZerobytes memory payload =
-        bytes memory payload = abi.encode(
-            psbtMetaData.chainId, psbtMetaData.user, psbtMetaData.lockedAmount, psbtMetaData.nativeTokenAmount
-        );
+        bytes memory payload =
+            abi.encode(metadata.chainId, metadata.user, _btcTxnHash, metadata.lockedAmount, metadata.nativeTokenAmount);
 
         // TODO: Create a function to get the correct MessageFee for the user
         _lzSend(
@@ -218,7 +233,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             // Fee in native gas and ZRO token.
             MessagingFee(msg.value, 0),
             // Refund address in case of failed source message.
-            payable(msg.sender) // TODO: Check when does the refund happen and how much is refunded | How to know this value in advance?
+            refundAddress
         );
 
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
