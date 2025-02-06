@@ -6,7 +6,6 @@ struct MintData {
     bool isMinted;
     address user;
     uint256 lockedAmount;
-    bytes32 btcTxnHash;
 }
 
 interface IBaseChainCoordinator {

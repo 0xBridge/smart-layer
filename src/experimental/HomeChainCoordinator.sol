@@ -227,6 +227,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
     }
 
+    function getPSBTData(bytes32 _btcTxnHash) external view returns (PSBTMetadata memory) {
+        return btcTxnHash_processedPSBTs[_btcTxnHash];
+    }
+
     function _lzReceive(
         Origin calldata _origin,
         bytes32 _guid,
