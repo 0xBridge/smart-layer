@@ -1,306 +1,213 @@
-// // SPDX-License-Identifier: UNLICENSED
-// pragma solidity ^0.8.9;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
 
-// import "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-// import "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-// import "@eigenlayer/contracts/permissions/Pausable.sol";
-// import "@eigenlayer-middleware/src/interfaces/IServiceManager.sol";
-// import {BLSApkRegistry} from "@eigenlayer-middleware/src/BLSApkRegistry.sol";
-// import {RegistryCoordinator} from "@eigenlayer-middleware/src/RegistryCoordinator.sol";
-// import {BLSSignatureChecker, IRegistryCoordinator} from "@eigenlayer-middleware/src/BLSSignatureChecker.sol";
-// import {OperatorStateRetriever} from "@eigenlayer-middleware/src/OperatorStateRetriever.sol";
-// import "@eigenlayer-middleware/src/libraries/BN254.sol";
-// import "./IeBTCTaskManager.sol";
+import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
+import {BLSApkRegistry} from "@eigenlayer-middleware/src/BLSApkRegistry.sol";
+import {RegistryCoordinator} from "@eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {BLSSignatureChecker, IRegistryCoordinator} from "@eigenlayer-middleware/src/BLSSignatureChecker.sol";
+import {OperatorStateRetriever} from "@eigenlayer-middleware/src/OperatorStateRetriever.sol";
+import {BN254} from "@eigenlayer-middleware/src/libraries/BN254.sol";
+import {
+    Pausable,
+    IPauserRegistry
+} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
 
-// contract eBTCTaskManager is
-//     Initializable,
-//     OwnableUpgradeable,
-//     Pausable,
-//     BLSSignatureChecker,
-//     OperatorStateRetriever,
-//     IEBTCTaskManager
-// {
-//     using BN254 for BN254.G1Point;
+/**
+ * @title AVSTaskManager
+ * @dev Manages tasks and operator quorums for an Actively Validated Service (AVS)
+ * @notice This contract integrates with EigenLayer for operator management and BLS signature verification
+ */
+contract AVSTaskManager is Initializable, OwnableUpgradeable, Pausable, BLSSignatureChecker, OperatorStateRetriever {
+    using BN254 for BN254.G1Point;
 
-//     /* CONSTANT */
-//     // The number of blocks from the task initialization within which the aggregator has to respond to
-//     uint32 public immutable TASK_RESPONSE_WINDOW_BLOCK;
-//     uint32 public constant TASK_CHALLENGE_WINDOW_BLOCK = 100;
-//     uint256 internal constant _THRESHOLD_DENOMINATOR = 100;
+    /* CONSTANTS */
+    uint32 public immutable TASK_RESPONSE_WINDOW_BLOCK;
+    uint32 public constant TASK_CHALLENGE_WINDOW_BLOCK = 100;
+    uint256 internal constant _THRESHOLD_DENOMINATOR = 100;
 
-//     /* STORAGE */
-//     // The latest task index
-//     uint32 public latestTaskNum;
+    /* STRUCTURES */
+    struct Task {
+        bytes32 taskHash;
+        uint32 taskCreatedBlock;
+        uint32 quorumThresholdPercentage;
+        bytes quorumNumbers;
+        bool isCompleted;
+    }
 
-//     // mapping of task indices to all tasks hashes
-//     // when a task is created, task hash is stored here,
-//     // and responses need to pass the actual task,
-//     // which is hashed onchain and checked against this mapping
-//     mapping(uint32 => bytes32) public allTaskHashes;
+    struct TaskResponse {
+        uint32 referenceTaskIndex;
+        bytes32 response;
+    }
 
-//     // mapping of task indices to hash of abi.encode(taskResponse, taskResponseMetadata)
-//     mapping(uint32 => bytes32) public allTaskResponses;
+    struct TaskResponseMetadata {
+        uint32 taskResponsedBlock;
+        bytes32 hashOfNonSigners;
+    }
 
-//     mapping(uint32 => bool) public taskSuccesfullyChallenged;
+    // struct NonSignerStakesAndSignature {
+    //     uint256[] nonSignerQuorumStakeAmounts;
+    //     BN254.G1Point[] nonSignerPubkeys;
+    //     BN254.G2Point signature;
+    // }
 
-//     address public aggregator;
-//     address public generator;
+    /* STATE VARIABLES */
+    uint32 public latestTaskNum;
+    mapping(uint32 => bytes32) public allTaskHashes;
+    mapping(uint32 => bytes32) public allTaskResponses;
+    mapping(uint32 => bool) public taskSuccesfullyChallenged;
 
-//     modifier onlyAggregator() {
-//         require(msg.sender == aggregator, "Aggregator must be the caller");
-//         _;
-//     }
+    address public aggregator;
+    address public generator;
 
-//     // onlyTaskGenerator is used to restrict createNewTask from only being called by a permissioned entity
-//     // in a real world scenario, this would be removed by instead making createNewTask a payable function
-//     modifier onlyTaskGenerator() {
-//         require(msg.sender == generator, "Task generator must be the caller");
-//         _;
-//     }
+    /* EVENTS */
+    event NewTaskCreated(uint32 indexed taskId, Task task);
+    event TaskResponded(TaskResponse taskResponse, TaskResponseMetadata metadata);
+    event TaskChallengedSuccessfully(uint32 indexed taskId, address indexed challenger);
+    event TaskChallengedUnsuccessfully(uint32 indexed taskId, address indexed challenger);
+    event GeneratorUpdated(address indexed oldGenerator, address indexed newGenerator);
+    event AggregatorUpdated(address indexed oldAggregator, address indexed newAggregator);
 
-//     constructor(IRegistryCoordinator _registryCoordinator, uint32 _taskResponseWindowBlock)
-//         BLSSignatureChecker(_registryCoordinator)
-//     {
-//         TASK_RESPONSE_WINDOW_BLOCK = _taskResponseWindowBlock;
-//     }
+    /* MODIFIERS */
+    modifier onlyAggregator() {
+        require(msg.sender == aggregator, "Aggregator must be the caller");
+        _;
+    }
 
-//     function initialize(IPauserRegistry _pauserRegistry, address initialOwner, address _aggregator, address _generator)
-//         public
-//         initializer
-//     {
-//         _initializePauser(_pauserRegistry, UNPAUSE_ALL);
-//         _transferOwnership(initialOwner);
-//         _setAggregator(_aggregator);
-//         _setGenerator(_generator);
-//     }
+    modifier onlyTaskGenerator() {
+        require(msg.sender == generator, "Task generator must be the caller");
+        _;
+    }
 
-//     function setGenerator(address newGenerator) external onlyOwner {
-//         _setGenerator(newGenerator);
-//     }
+    /* CONSTRUCTOR */
+    constructor(IRegistryCoordinator _registryCoordinator, uint32 _taskResponseWindowBlock)
+        BLSSignatureChecker(_registryCoordinator)
+    {
+        TASK_RESPONSE_WINDOW_BLOCK = _taskResponseWindowBlock;
+    }
 
-//     function setAggregator(address newAggregator) external onlyOwner {
-//         _setAggregator(newAggregator);
-//     }
+    /**
+     * @dev Initialize the contract
+     * @param _pauserRegistry Pauser registry contract
+     * @param initialOwner Initial owner of the contract
+     * @param _aggregator Initial aggregator address
+     * @param _generator Initial generator address
+     */
+    function initialize(IPauserRegistry _pauserRegistry, address initialOwner, address _aggregator, address _generator)
+        public
+        initializer
+    {
+        _initializePauser(_pauserRegistry, UNPAUSE_ALL);
+        _transferOwnership(initialOwner);
+        _setAggregator(_aggregator);
+        _setGenerator(_generator);
+    }
 
-//     /* FUNCTIONS */
-//     // NOTE: this function creates new task, assigns it a taskId
-//     function createNewTask(
-//         string memory aliceSignedPsbt,
-//         address destinationAddress,
-//         bytes32 destinationChainCode,
-//         uint32 quorumThresholdPercentage,
-//         bytes calldata quorumNumbers
-//     ) external onlyTaskGenerator {
-//         // create a new task struct
-//         Task memory newTask;
-//         newTask.aliceSignedPsbt = aliceSignedPsbt;
-//         newTask.destinationAddress = destinationAddress;
-//         newTask.destinationChainCode = destinationChainCode;
-//         newTask.taskCreatedBlock = uint32(block.number);
-//         newTask.quorumThresholdPercentage = quorumThresholdPercentage;
-//         newTask.quorumNumbers = quorumNumbers;
+    /**
+     * @dev Creates a new task
+     * @param taskData Task data to be hashed
+     * @param quorumThresholdPercentage Required percentage of quorum participation
+     * @param quorumNumbers Quorum identifiers
+     */
+    function createNewTask(bytes calldata taskData, uint32 quorumThresholdPercentage, bytes calldata quorumNumbers)
+        external
+        onlyTaskGenerator
+    {
+        Task memory newTask;
+        newTask.taskHash = keccak256(taskData);
+        newTask.taskCreatedBlock = uint32(block.number);
+        newTask.quorumThresholdPercentage = quorumThresholdPercentage;
+        newTask.quorumNumbers = quorumNumbers;
+        newTask.isCompleted = false;
 
-//         // store hash of task onchain, emit event, and increase taskNum
-//         allTaskHashes[latestTaskNum] = keccak256(abi.encode(newTask));
-//         emit NewTaskCreated(latestTaskNum, newTask);
-//         latestTaskNum = latestTaskNum + 1;
-//     }
+        allTaskHashes[latestTaskNum] = keccak256(abi.encode(newTask));
+        emit NewTaskCreated(latestTaskNum, newTask);
+        latestTaskNum = latestTaskNum + 1;
+    }
 
-//     // NOTE: this function responds to existing tasks.
-//     function respondToTask(
-//         Task calldata task,
-//         TaskResponse calldata taskResponse,
-//         NonSignerStakesAndSignature memory nonSignerStakesAndSignature
-//     ) external onlyAggregator {
-//         uint32 taskCreatedBlock = task.taskCreatedBlock;
-//         bytes calldata quorumNumbers = task.quorumNumbers;
-//         uint32 quorumThresholdPercentage = task.quorumThresholdPercentage;
+    /**
+     * @dev Responds to an existing task with aggregated signature
+     * @param task Original task data
+     * @param taskResponse Response data
+     * @param nonSignerStakesAndSignature Signature and stake information
+     */
+    function respondToTask(
+        Task calldata task,
+        TaskResponse calldata taskResponse,
+        NonSignerStakesAndSignature memory nonSignerStakesAndSignature
+    ) external onlyAggregator {
+        require(keccak256(abi.encode(task)) == allTaskHashes[taskResponse.referenceTaskIndex], "Task mismatch");
+        require(allTaskResponses[taskResponse.referenceTaskIndex] == bytes32(0), "Task already responded");
+        require(uint32(block.number) <= task.taskCreatedBlock + TASK_RESPONSE_WINDOW_BLOCK, "Response window expired");
 
-//         // check that the task is valid, hasn't been responsed yet, and is being responsed in time
-//         require(
-//             keccak256(abi.encode(task)) == allTaskHashes[taskResponse.referenceTaskIndex],
-//             "supplied task does not match the one recorded in the contract"
-//         );
-//         // some logical checks
-//         require(
-//             allTaskResponses[taskResponse.referenceTaskIndex] == bytes32(0),
-//             "Aggregator has already responded to the task"
-//         );
-//         require(
-//             uint32(block.number) <= taskCreatedBlock + TASK_RESPONSE_WINDOW_BLOCK,
-//             "Aggregator has responded to the task too late"
-//         );
+        // Calculate message hash for signature verification
+        bytes32 message = keccak256(abi.encode(taskResponse));
 
-//         /* CHECKING SIGNATURES & WHETHER THRESHOLD IS MET OR NOT */
-//         // calculate message which operators signed
-//         bytes32 message = keccak256(abi.encode(taskResponse));
+        // Verify BLS signature and check quorum thresholds
+        (QuorumStakeTotals memory quorumStakeTotals, bytes32 hashOfNonSigners) =
+            checkSignatures(message, task.quorumNumbers, task.taskCreatedBlock, nonSignerStakesAndSignature);
 
-//         // check the BLS signature
-//         (QuorumStakeTotals memory quorumStakeTotals, bytes32 hashOfNonSigners) =
-//             checkSignatures(message, quorumNumbers, taskCreatedBlock, nonSignerStakesAndSignature);
+        // Verify quorum threshold requirements
+        for (uint256 i = 0; i < task.quorumNumbers.length; i++) {
+            require(
+                quorumStakeTotals.signedStakeForQuorum[i] * _THRESHOLD_DENOMINATOR
+                    >= quorumStakeTotals.totalStakeForQuorum[i] * uint8(task.quorumThresholdPercentage),
+                "Quorum threshold not met"
+            );
+        }
 
-//         // check that signatories own at least a threshold percentage of each quourm
-//         for (uint256 i = 0; i < quorumNumbers.length; i++) {
-//             // we don't check that the quorumThresholdPercentages are not >100 because a greater value would trivially fail the check, implying
-//             // signed stake > total stake
-//             require(
-//                 quorumStakeTotals.signedStakeForQuorum[i] * _THRESHOLD_DENOMINATOR
-//                     >= quorumStakeTotals.totalStakeForQuorum[i] * uint8(quorumThresholdPercentage),
-//                 "Signatories do not own at least threshold percentage of a quorum"
-//             );
-//         }
+        TaskResponseMetadata memory metadata = TaskResponseMetadata(uint32(block.number), hashOfNonSigners);
 
-//         TaskResponseMetadata memory taskResponseMetadata = TaskResponseMetadata(uint32(block.number), hashOfNonSigners);
-//         // updating the storage with task responsea
-//         allTaskResponses[taskResponse.referenceTaskIndex] = keccak256(abi.encode(taskResponse, taskResponseMetadata));
+        allTaskResponses[taskResponse.referenceTaskIndex] = keccak256(abi.encode(taskResponse, metadata));
 
-//         // emitting event
-//         emit TaskResponded(taskResponse, taskResponseMetadata);
-//     }
+        emit TaskResponded(taskResponse, metadata);
+    }
 
-//     function taskNumber() external view returns (uint32) {
-//         return latestTaskNum;
-//     }
+    /**
+     * @dev Updates the task generator address
+     * @param newGenerator New generator address
+     */
+    function setGenerator(address newGenerator) external onlyOwner {
+        _setGenerator(newGenerator);
+    }
 
-//     // NOTE: this function enables a challenger to raise and resolve a challenge.
-//     // TODO: require challenger to pay a bond for raising a challenge
-//     // TODO(samlaf): should we check that quorumNumbers is same as the one recorded in the task?
-//     // function raiseAndResolveChallenge(
-//     //     Task calldata task,
-//     //     TaskResponse calldata taskResponse,
-//     //     TaskResponseMetadata calldata taskResponseMetadata,
-//     //     BN254.G1Point[] memory pubkeysOfNonSigningOperators
-//     // ) external {
-//     //     uint32 referenceTaskIndex = taskResponse.referenceTaskIndex;
-//     //     uint256 numberToBeSquared = task.numberToBeSquared;
-//     //     // some logical checks
-//     //     require(allTaskResponses[referenceTaskIndex] != bytes32(0), "Task hasn't been responded to yet");
-//     //     require(
-//     //         allTaskResponses[referenceTaskIndex] == keccak256(abi.encode(taskResponse, taskResponseMetadata)),
-//     //         "Task response does not match the one recorded in the contract"
-//     //     );
-//     //     require(
-//     //         taskSuccesfullyChallenged[referenceTaskIndex] == false,
-//     //         "The response to this task has already been challenged successfully."
-//     //     );
+    /**
+     * @dev Updates the aggregator address
+     * @param newAggregator New aggregator address
+     */
+    function setAggregator(address newAggregator) external onlyOwner {
+        _setAggregator(newAggregator);
+    }
 
-//     //     require(
-//     //         uint32(block.number) <= taskResponseMetadata.taskResponsedBlock + TASK_CHALLENGE_WINDOW_BLOCK,
-//     //         "The challenge period for this task has already expired."
-//     //     );
+    /**
+     * @dev Returns the total number of tasks
+     */
+    function taskNumber() external view returns (uint32) {
+        return latestTaskNum;
+    }
 
-//     //     // logic for checking whether challenge is valid or not
-//     //     uint256 actualSquaredOutput = numberToBeSquared * numberToBeSquared;
-//     //     bool isResponseCorrect = (actualSquaredOutput == taskResponse.numberSquared);
+    /**
+     * @dev Returns the task response window in blocks
+     */
+    function getTaskResponseWindowBlock() external view returns (uint32) {
+        return TASK_RESPONSE_WINDOW_BLOCK;
+    }
 
-//     //     // if response was correct, no slashing happens so we return
-//     //     if (isResponseCorrect == true) {
-//     //         emit TaskChallengedUnsuccessfully(referenceTaskIndex, msg.sender);
-//     //         return;
-//     //     }
+    /**
+     * @dev Internal function to update generator address
+     */
+    function _setGenerator(address newGenerator) internal {
+        address oldGenerator = generator;
+        generator = newGenerator;
+        emit GeneratorUpdated(oldGenerator, newGenerator);
+    }
 
-//     //     // get the list of hash of pubkeys of operators who weren't part of the task response submitted by the aggregator
-//     //     bytes32[] memory hashesOfPubkeysOfNonSigningOperators = new bytes32[](pubkeysOfNonSigningOperators.length);
-//     //     for (uint256 i = 0; i < pubkeysOfNonSigningOperators.length; i++) {
-//     //         hashesOfPubkeysOfNonSigningOperators[i] = pubkeysOfNonSigningOperators[i].hashG1Point();
-//     //     }
-
-//     //     // verify whether the pubkeys of "claimed" non-signers supplied by challenger are actually non-signers as recorded before
-//     //     // when the aggregator responded to the task
-//     //     // currently inlined, as the MiddlewareUtils.computeSignatoryRecordHash function was removed from BLSSignatureChecker
-//     //     // in this PR: https://github.com/Layr-Labs/eigenlayer-contracts/commit/c836178bf57adaedff37262dff1def18310f3dce#diff-8ab29af002b60fc80e3d6564e37419017c804ae4e788f4c5ff468ce2249b4386L155-L158
-//     //     // TODO(samlaf): contracts team will add this function back in the BLSSignatureChecker, which we should use to prevent potential bugs from code duplication
-//     //     bytes32 signatoryRecordHash =
-//     //         keccak256(abi.encodePacked(task.taskCreatedBlock, hashesOfPubkeysOfNonSigningOperators));
-//     //     require(
-//     //         signatoryRecordHash == taskResponseMetadata.hashOfNonSigners,
-//     //         "The pubkeys of non-signing operators supplied by the challenger are not correct."
-//     //     );
-
-//     //     // get the address of operators who didn't sign
-//     //     address[] memory addresssOfNonSigningOperators = new address[](pubkeysOfNonSigningOperators.length);
-//     //     for (uint256 i = 0; i < pubkeysOfNonSigningOperators.length; i++) {
-//     //         addresssOfNonSigningOperators[i] =
-//     //             BLSApkRegistry(address(blsApkRegistry)).pubkeyHashToOperator(hashesOfPubkeysOfNonSigningOperators[i]);
-//     //     }
-
-//     //     // @dev the below code is commented out for the upcoming M2 release
-//     //     //      in which there will be no slashing. The slasher is also being redesigned
-//     //     //      so its interface may very well change.
-//     //     // ==========================================
-//     //     // // get the list of all operators who were active when the task was initialized
-//     //     // Operator[][] memory allOperatorInfo = getOperatorState(
-//     //     //     IRegistryCoordinator(address(registryCoordinator)),
-//     //     //     task.quorumNumbers,
-//     //     //     task.taskCreatedBlock
-//     //     // );
-//     //     // // freeze the operators who signed adversarially
-//     //     // for (uint i = 0; i < allOperatorInfo.length; i++) {
-//     //     //     // first for loop iterate over quorums
-
-//     //     //     for (uint j = 0; j < allOperatorInfo[i].length; j++) {
-//     //     //         // second for loop iterate over operators active in the quorum when the task was initialized
-
-//     //     //         // get the operator address
-//     //     //         bytes32 operatorID = allOperatorInfo[i][j].operatorId;
-//     //     //         address operatorAddress = BLSPubkeyRegistry(
-//     //     //             address(blsPubkeyRegistry)
-//     //     //         ).pubkeyCompendium().pubkeyHashToOperator(operatorID);
-
-//     //     //         // check if the operator has already NOT been frozen
-//     //     //         if (
-//     //     //             IServiceManager(
-//     //     //                 address(
-//     //     //                     BLSRegistryCoordinatorWithIndices(
-//     //     //                         address(registryCoordinator)
-//     //     //                     ).serviceManager()
-//     //     //                 )
-//     //     //             ).slasher().isFrozen(operatorAddress) == false
-//     //     //         ) {
-//     //     //             // check whether the operator was a signer for the task
-//     //     //             bool wasSigningOperator = true;
-//     //     //             for (
-//     //     //                 uint k = 0;
-//     //     //                 k < addresssOfNonSigningOperators.length;
-//     //     //                 k++
-//     //     //             ) {
-//     //     //                 if (
-//     //     //                     operatorAddress == addresssOfNonSigningOperators[k]
-//     //     //                 ) {
-//     //     //                     // if the operator was a non-signer, then we set the flag to false
-//     //     //                     wasSigningOperator == false;
-//     //     //                     break;
-//     //     //                 }
-//     //     //             }
-
-//     //     //             if (wasSigningOperator == true) {
-//     //     //                 BLSRegistryCoordinatorWithIndices(
-//     //     //                     address(registryCoordinator)
-//     //     //                 ).serviceManager().freezeOperator(operatorAddress);
-//     //     //             }
-//     //     //         }
-//     //     //     }
-//     //     // }
-
-//     //     // the task response has been challenged successfully
-//     //     taskSuccesfullyChallenged[referenceTaskIndex] = true;
-
-//     //     emit TaskChallengedSuccessfully(referenceTaskIndex, msg.sender);
-//     // }
-
-//     function getTaskResponseWindowBlock() external view returns (uint32) {
-//         return TASK_RESPONSE_WINDOW_BLOCK;
-//     }
-
-//     function _setGenerator(address newGenerator) internal {
-//         address oldGenerator = generator;
-//         generator = newGenerator;
-//         emit GeneratorUpdated(oldGenerator, newGenerator);
-//     }
-
-//     function _setAggregator(address newAggregator) internal {
-//         address oldAggregator = aggregator;
-//         aggregator = newAggregator;
-//         emit AggregatorUpdated(oldAggregator, newAggregator);
-//     }
-// }
+    /**
+     * @dev Internal function to update aggregator address
+     */
+    function _setAggregator(address newAggregator) internal {
+        address oldAggregator = aggregator;
+        aggregator = newAggregator;
+        emit AggregatorUpdated(oldAggregator, newAggregator);
+    }
+}
