@@ -85,11 +85,9 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         console.logBytes(_message);
         console.logBytes(_extraData);
 
-        (uint32 chainId, address user, uint256 lockedAmount, uint256 nativeTokenAmount) =
-            abi.decode(_message, (uint32, address, uint256, uint256));
-
-        // 0. Create keccak256 hash of the message
-        bytes32 messageHash = keccak256(_message);
+        // TODO: Convert the required eBTC to nativeTokenAmount - Will add an additional failure point - what if the user doesn't have enough eBTC?
+        (uint32 chainId, address user, bytes32 messageHash, uint256 lockedAmount, uint256 nativeTokenAmount) =
+            abi.decode(_message, (uint32, address, bytes32, uint256, uint256));
 
         // 1. Validate source chain and sender
         _validateSourceAndSender(_origin, chainId);
@@ -98,7 +96,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         _validateMessageUniqueness(messageHash);
 
         // 3. Process the message
-        _processMessage(messageHash, chainId, user, lockedAmount);
+        _processMessage(messageHash, user, lockedAmount);
 
         emit MessageValidated(_guid, _origin.srcEid, _origin.sender);
     }
@@ -117,23 +115,23 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         }
     }
 
-    function _processMessage(bytes32 _messageHash, uint32 _chainId, address _user, uint256 _lockedAmount) internal {
+    function _processMessage(bytes32 _messageHash, address _user, uint256 _lockedAmount) internal {
         // Decode the message and process it
 
         // Your existing message processing logic
         MintData memory mintData = messageHash_mintData[_messageHash];
         mintData.isMinted = true;
-        mintData.chainId = _chainId;
+        mintData.btcTxnHash = _messageHash;
         mintData.user = _user;
         mintData.lockedAmount = _lockedAmount;
+        messageHash_mintData[_messageHash] = mintData;
         // Additional processing based on message content
         _handleMinting(_user, _lockedAmount);
-        messageHash_mintData[_messageHash] = mintData;
     }
 
     function _handleMinting(address _user, uint256 _lockedAmount) internal {
         console.log("Minting eBTC for user: ", _user);
-        // Your minting logic here
+        // TODO: Does this mean that the owner of the eBTC contract needs to be set as the respective BaseChainCoordinator contract on that chain?
         // eBTC.mint(_user, _lockedAmount);
     }
 

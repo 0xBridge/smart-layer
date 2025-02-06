@@ -18,11 +18,11 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     // State variables
     address private immutable avsAddress;
 
-    mapping(address => bool) public isOperator; // TODO: Optimise this to store the operators efficiently
+    mapping(address => bool) public isOperator;
     mapping(bytes32 => PSBTMetadata) private btcTxnHash_processedPSBTs; // btcTxnHash => psbtMetadata
 
     // TODO: Check with Satyam for these values
-    uint256 public constant MAX_MINT_AMOUNT = 1000 ether; // Max amount that can be minted
+    uint256 public constant MAX_MINT_AMOUNT = 1 ether; // Max amount that can be put as the native token amount
     uint256 public constant MIN_LOCK_AMOUNT = 1000; // Min BTC amount / satoshis that needs to be locked
     uint256 public constant MESSAGE_EXPIRY = 24 hours; // Messages expire after 24 hours
 
@@ -102,7 +102,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             revert InvalidPSBTData();
         }
 
-        // TODO: Check if the corrresponding SPV data is present in the SPV contract - why exactly is it needed?
+        // TODO: Check if the corrresponding SPV data is present in the SPV contract - why exactly is it needed though?
         // TODO: Ensure if the correct witness is present in the psbt data, if not, set it. - But what's the need for this?
 
         // 1. Parse and validate PSBT data
@@ -140,8 +140,9 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         btcTxnHash_processedPSBTs[_btcTxnHash] = psbtMetaData;
 
         // 7. Send message through LayerZerobytes memory payload
-        bytes memory payload =
-            abi.encode(metadata.chainId, metadata.receiverAddress, metadata.lockedAmount, metadata.nativeTokenAmount);
+        bytes memory payload = abi.encode(
+            metadata.chainId, metadata.receiverAddress, _btcTxnHash, metadata.lockedAmount, metadata.nativeTokenAmount
+        );
 
         // TODO: Create a function to get the correct MessageFee for the user
         _lzSend(
