@@ -10,6 +10,8 @@ import {BitcoinTxnParser} from "../libraries/BitcoinTxnParser.sol";
 import {PSBTMetadata} from "./interfaces/IHomeChainCoordinator.sol";
 import {TxidCalculator} from "../libraries/TxidCalculator.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
+import {BitcoinLightClient} from "../BitcoinLightClient.sol";
+import {BitcoinUtils} from "../libraries/BitcoinUtils.sol";
 
 /**
  * @title HomeChainCoordinator
@@ -17,10 +19,10 @@ import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/Option
  */
 contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     // State variables
-    address private immutable avsAddress;
+    BitcoinLightClient private lightClient;
 
-    mapping(address => bool) public isOperator;
-    mapping(bytes32 => PSBTMetadata) private btcTxnHash_processedPSBTs; // btcTxnHash => psbtMetadata
+    address private taskManager;
+    mapping(bytes32 => PSBTMetadata) private btcTxnHash_psbtMetadata;
 
     uint256 public maxGasTokenAmount = 1 ether; // Max amount that can be put as the native token amount
     uint256 public minBTCAmount = 1000; // Min BTC amount / satoshis that needs to be locked
@@ -39,34 +41,20 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     error MessageExpired();
     error InvalidDestination(address receiver);
     error InvalidReceiver();
+    error InvalidBitcoinTxn();
 
-    modifier onlyOperator() {
-        require(isOperator[msg.sender], "Not an operator");
+    modifier onlyTaskManager() {
+        require(msg.sender == taskManager, UnauthorizedOperator(msg.sender));
         _;
     }
 
-    constructor(address _endpoint, address _owner, address[] memory _initialOperators) OApp(_endpoint, _owner) {
+    constructor(address _lightClient, address _endpoint, address _owner, address _taskManager)
+        OApp(_endpoint, _owner)
+    {
         _transferOwnership(_owner);
-        _initialiseOperators(_initialOperators);
+        lightClient = BitcoinLightClient(_lightClient);
+        taskManager = _taskManager;
         // endpoint = ILayerZeroEndpointV2(_endpoint);
-    }
-
-    function _initialiseOperators(address[] memory _initialOperators) internal {
-        for (uint256 i = 0; i < _initialOperators.length; i++) {
-            _setOperator(_initialOperators[i], true);
-        }
-    }
-
-    function setOperators(address[] calldata _operator, bool[] calldata _statuses) external onlyOwner {
-        require(_operator.length == _statuses.length, "Invalid input");
-        for (uint256 i = 0; i < _operator.length; i++) {
-            _setOperator(_operator[i], _statuses[i]);
-        }
-    }
-
-    function _setOperator(address _operator, bool _status) internal {
-        isOperator[_operator] = _status;
-        emit OperatorStatusChanged(_operator, _status);
     }
 
     // Create getters and setters for the below values
@@ -90,22 +78,57 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         super.setPeer(_dstEid, _peer);
     }
 
+    function submitBlockAndSendMessage(
+        bytes calldata rawHeader,
+        bytes[] calldata intermediateHeaders,
+        bytes32 _btcTxnHash,
+        bytes32[] calldata _proof,
+        uint256 _index,
+        bytes calldata _psbtData,
+        bytes calldata _options,
+        address refundAddress
+    ) external payable whenNotPaused nonReentrant onlyTaskManager {
+        // 0. Submit block
+        bytes32 blockHash = lightClient.submitRawBlockHeader(rawHeader, intermediateHeaders);
+        // 1. Get merkle root
+        bytes32 merkleRoot = lightClient.getMerkleRootForBlock(blockHash);
+        // 2. Send message
+        _sendMessage(blockHash, _btcTxnHash, merkleRoot, _proof, _index, _psbtData, _options, refundAddress);
+    }
+
     /**
      * @dev Sends a cross-chain message with PSBT data
      * @param _psbtData The PSBT data to be processed
      * @param _options LayerZero message options
      */
-    function sendMessage(bytes32 _btcTxnHash, bytes calldata _psbtData, bytes calldata _options, address refundAddress)
-        external
-        payable
-        whenNotPaused
-        nonReentrant
-    {
-        // 0. Operator Authorization
-        if (!isOperator[msg.sender]) {
-            revert UnauthorizedOperator(msg.sender);
-        }
+    function sendMessage(
+        bytes32 _blockHash,
+        bytes32 _btcTxnHash,
+        bytes32[] calldata _proof,
+        uint256 _index,
+        bytes calldata _psbtData,
+        bytes calldata _options,
+        address refundAddress
+    ) external payable whenNotPaused nonReentrant onlyTaskManager {
+        bytes32 merkleRoot = lightClient.getMerkleRootForBlock(_blockHash);
+        _sendMessage(_blockHash, _btcTxnHash, merkleRoot, _proof, _index, _psbtData, _options, refundAddress);
+    }
 
+    /**
+     * @dev Sends a cross-chain message with PSBT data
+     * @param _psbtData The PSBT data to be processed
+     * @param _options LayerZero message options
+     */
+    function _sendMessage(
+        bytes32 _blockHash,
+        bytes32 _btcTxnHash,
+        bytes32 _merkleRoot,
+        bytes32[] calldata _proof,
+        uint256 _index,
+        bytes calldata _psbtData,
+        bytes calldata _options,
+        address refundAddress
+    ) internal {
         // 0. btcTxnHash generated from the psbt data being shared should be the same as the one passed
         bytes32 txid = TxidCalculator.calculateTxid(_psbtData);
         if (txid != _btcTxnHash) {
@@ -122,7 +145,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         console2.log("Destination chain ID: ", _dstEid);
 
         // 3. Check if the message already exists or is processed
-        if (btcTxnHash_processedPSBTs[_btcTxnHash].isMinted) {
+        if (btcTxnHash_psbtMetadata[_btcTxnHash].isMinted) {
             revert TxnAlreadyProcessed(_btcTxnHash);
         }
 
@@ -130,6 +153,9 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         if (peers[_dstEid] == bytes32(0)) {
             revert InvalidReceiver();
         }
+
+        // 5. Validate txn with SPV data
+        require(BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index), InvalidBitcoinTxn());
 
         // TODO: This needs to come from the metadata itself as this will keep on changing
         bytes32 networkPublicKey;
@@ -144,7 +170,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             networkPublicKey: networkPublicKey,
             psbtData: _psbtData
         });
-        btcTxnHash_processedPSBTs[_btcTxnHash] = psbtMetaData;
+        btcTxnHash_psbtMetadata[_btcTxnHash] = psbtMetaData;
 
         // 7. Send message through LayerZerobytes memory payload
         bytes memory payload = abi.encode(
@@ -201,11 +227,11 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         external
         payable
     {
-        if (btcTxnHash_processedPSBTs[_btcTxnHash].user != _receiver) {
+        if (btcTxnHash_psbtMetadata[_btcTxnHash].user != _receiver) {
             revert InvalidReceiver(); // This also ensures that the txn is already present
         }
 
-        PSBTMetadata memory metadata = btcTxnHash_processedPSBTs[_btcTxnHash];
+        PSBTMetadata memory metadata = btcTxnHash_psbtMetadata[_btcTxnHash];
         // 1. Parse and get metadata from psbtMetaData
 
         // 2. TODO: Get _dstEid for a specific metadata.chainId from LayerZero contract
@@ -240,7 +266,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     }
 
     function getPSBTData(bytes32 _btcTxnHash) external view returns (PSBTMetadata memory) {
-        return btcTxnHash_processedPSBTs[_btcTxnHash];
+        return btcTxnHash_psbtMetadata[_btcTxnHash];
     }
 
     function _lzReceive(

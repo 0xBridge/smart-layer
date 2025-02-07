@@ -90,8 +90,7 @@ contract BitcoinLightClientTest is Test {
         vm.startPrank(SUBMITTER);
 
         // Submit block 11 (direct connection to initial)
-        bool success = client.submitRawBlockHeader(BLOCK_11_HEADER, new bytes[](0));
-        assertTrue(success);
+        client.submitRawBlockHeader(BLOCK_11_HEADER, new bytes[](0));
 
         assertEq(client.getLatestHeaderHash(), BLOCK_11_HASH);
 
@@ -362,8 +361,7 @@ contract BitcoinLightClientTest is Test {
         intermediateHeaders[97] =
             hex"01000000e915d9a478e3adf3186c07c61a22228b10fd87df343c92782ecc052c000000006e06373c80de397406dc3d19c90d71d230058d28293614ea58d6a57f8f5d32f8b8ce6649ffff001d173807f8";
 
-        bool success = client.submitRawBlockHeader(BLOCK_109_HEADER, intermediateHeaders);
-        assertTrue(success);
+        client.submitRawBlockHeader(BLOCK_109_HEADER, intermediateHeaders);
 
         BitcoinUtils.BlockHeader memory checkpoint = client.getLatestCheckpoint();
         assertEq(checkpoint.height, 109);

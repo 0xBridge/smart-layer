@@ -56,6 +56,7 @@ contract AVSTaskManager is Initializable, OwnableUpgradeable, Pausable, BLSSigna
     mapping(uint32 => bytes32) public allTaskHashes;
     mapping(uint32 => bytes32) public allTaskResponses;
     mapping(uint32 => bool) public taskSuccesfullyChallenged;
+    mapping(address => bool) public isOperator;
 
     address public aggregator;
     address public generator;
@@ -67,15 +68,11 @@ contract AVSTaskManager is Initializable, OwnableUpgradeable, Pausable, BLSSigna
     event TaskChallengedUnsuccessfully(uint32 indexed taskId, address indexed challenger);
     event GeneratorUpdated(address indexed oldGenerator, address indexed newGenerator);
     event AggregatorUpdated(address indexed oldAggregator, address indexed newAggregator);
+    event OperatorStatusChanged(address indexed operator, bool status);
 
     /* MODIFIERS */
-    modifier onlyAggregator() {
-        require(msg.sender == aggregator, "Aggregator must be the caller");
-        _;
-    }
-
-    modifier onlyTaskGenerator() {
-        require(msg.sender == generator, "Task generator must be the caller");
+    modifier onlyOperator() {
+        require(isOperator[msg.sender], "Operator only");
         _;
     }
 
@@ -90,17 +87,33 @@ contract AVSTaskManager is Initializable, OwnableUpgradeable, Pausable, BLSSigna
      * @dev Initialize the contract
      * @param _pauserRegistry Pauser registry contract
      * @param initialOwner Initial owner of the contract
-     * @param _aggregator Initial aggregator address
-     * @param _generator Initial generator address
+     * @param _initialOperators Initial generator address
      */
-    function initialize(IPauserRegistry _pauserRegistry, address initialOwner, address _aggregator, address _generator)
+    function initialize(IPauserRegistry _pauserRegistry, address initialOwner, address[] memory _initialOperators)
         public
         initializer
     {
         _initializePauser(_pauserRegistry, UNPAUSE_ALL);
         _transferOwnership(initialOwner);
-        _setAggregator(_aggregator);
-        _setGenerator(_generator);
+        _initialiseOperators(_initialOperators);
+    }
+
+    function _initialiseOperators(address[] memory _initialOperators) internal {
+        for (uint256 i = 0; i < _initialOperators.length; i++) {
+            _setOperator(_initialOperators[i], true);
+        }
+    }
+
+    function setOperators(address[] calldata _operator, bool[] calldata _statuses) external onlyOwner {
+        require(_operator.length == _statuses.length, "Invalid input");
+        for (uint256 i = 0; i < _operator.length; i++) {
+            _setOperator(_operator[i], _statuses[i]);
+        }
+    }
+
+    function _setOperator(address _operator, bool _status) internal {
+        isOperator[_operator] = _status;
+        emit OperatorStatusChanged(_operator, _status);
     }
 
     /**
@@ -111,7 +124,7 @@ contract AVSTaskManager is Initializable, OwnableUpgradeable, Pausable, BLSSigna
      */
     function createNewTask(bytes calldata taskData, uint32 quorumThresholdPercentage, bytes calldata quorumNumbers)
         external
-        onlyTaskGenerator
+        onlyOperator
     {
         Task memory newTask;
         newTask.taskHash = keccak256(taskData);
@@ -135,7 +148,7 @@ contract AVSTaskManager is Initializable, OwnableUpgradeable, Pausable, BLSSigna
         Task calldata task,
         TaskResponse calldata taskResponse,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature
-    ) external onlyAggregator {
+    ) external onlyOperator {
         require(keccak256(abi.encode(task)) == allTaskHashes[taskResponse.referenceTaskIndex], "Task mismatch");
         require(allTaskResponses[taskResponse.referenceTaskIndex] == bytes32(0), "Task already responded");
         require(uint32(block.number) <= task.taskCreatedBlock + TASK_RESPONSE_WINDOW_BLOCK, "Response window expired");
@@ -161,22 +174,6 @@ contract AVSTaskManager is Initializable, OwnableUpgradeable, Pausable, BLSSigna
         allTaskResponses[taskResponse.referenceTaskIndex] = keccak256(abi.encode(taskResponse, metadata));
 
         emit TaskResponded(taskResponse, metadata);
-    }
-
-    /**
-     * @dev Updates the task generator address
-     * @param newGenerator New generator address
-     */
-    function setGenerator(address newGenerator) external onlyOwner {
-        _setGenerator(newGenerator);
-    }
-
-    /**
-     * @dev Updates the aggregator address
-     * @param newAggregator New aggregator address
-     */
-    function setAggregator(address newAggregator) external onlyOwner {
-        _setAggregator(newAggregator);
     }
 
     /**
