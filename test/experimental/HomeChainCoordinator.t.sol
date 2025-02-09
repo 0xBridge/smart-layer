@@ -11,6 +11,8 @@ import {BitcoinLightClient} from "../../src/BitcoinLightClient.sol";
 import {AVSTaskManager} from "../../src/avs/AVSTaskManager.sol";
 import {eBTCManager} from "../../src/experimental/eBTCManager.sol";
 import {eBTC} from "../../src/eBTC.sol";
+import {IRegistryCoordinator} from "@eigenlayer-middleware/src/BLSSignatureChecker.sol";
+
 // import {OptionsBuilder} from "lib/devtools/packages/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 
 contract HomeChainCoordinatorTest is Test {
@@ -23,6 +25,8 @@ contract HomeChainCoordinatorTest is Test {
     AVSTaskManager private avsTaskManager;
     eBTCManager private eBTCManagerInstance;
     eBTC private eBTCInstance;
+    IRegistryCoordinator private registryCoordinator;
+
     HelperConfig private homeConfig;
     HelperConfig private baseConfig;
     address private usdc;
@@ -73,7 +77,6 @@ contract HomeChainCoordinatorTest is Test {
         address[] memory initialOperators = new address[](2);
         initialOperators[0] = address(this);
         initialOperators[1] = msg.sender;
-        address registryCoordinator;
         avsTaskManager = new AVSTaskManager(
             registryCoordinator,
             owner,

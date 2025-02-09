@@ -73,7 +73,7 @@ contract AVSTaskManager is BLSSignatureChecker, OperatorStateRetriever, Ownable,
     /* CONSTRUCTOR */
     // TODO: Replace owner with governance later
     constructor(
-        address _registryCoordinator,
+        IRegistryCoordinator _registryCoordinator,
         address initialOwner,
         address[] memory _initialOperators,
         uint32 _taskResponseWindowBlock
