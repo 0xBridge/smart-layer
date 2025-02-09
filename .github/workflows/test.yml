@@ -28,6 +28,11 @@ jobs:
         with:
           version: nightly
 
+      - name: Update submodules
+        run: |
+          git submodule update --init --recursive
+          forge install
+
       - name: Show Forge version
         run: |
           forge --version
@@ -36,6 +41,10 @@ jobs:
         run: |
           forge fmt --check
         id: fmt
+
+      - name: Clean
+        run: |
+          forge clean
 
       - name: Run Forge build
         run: |
