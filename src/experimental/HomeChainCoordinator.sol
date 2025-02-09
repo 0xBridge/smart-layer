@@ -32,7 +32,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     event OperatorStatusChanged(address indexed operator, bool status);
 
     // Errors
-    error UnauthorizedOperator(address operator);
+    error UnauthorizedAccess(address operator);
     error PSBTAlreadyProcessed(bytes32 psbtHash);
     error TxnAlreadyProcessed(bytes32 btcTxnHash);
     error InvalidPSBTData();
@@ -44,7 +44,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     error InvalidBitcoinTxn();
 
     modifier onlyTaskManager() {
-        require(msg.sender == taskManager, UnauthorizedOperator(msg.sender));
+        require(msg.sender == taskManager, UnauthorizedAccess(msg.sender));
         _;
     }
 
@@ -54,30 +54,47 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         _transferOwnership(_owner);
         lightClient = BitcoinLightClient(_lightClient);
         taskManager = _taskManager;
-        // endpoint = ILayerZeroEndpointV2(_endpoint);
     }
 
-    // Create getters and setters for the below values
+    /**
+     * @dev Sets the maximum amount of gas tokens that can be used.
+     * @param _maxGasTokenAmount The maximum gas token amount to set.
+     */
     function setMaxGasTokenAmount(uint256 _maxGasTokenAmount) external onlyOwner {
         require(_maxGasTokenAmount > 0, "Invalid amount");
         maxGasTokenAmount = _maxGasTokenAmount;
     }
 
+    /**
+     * @dev Sets the minimum amount of BTC that needs to be locked.
+     * @param _minBtcAmount The minimum BTC amount to set.
+     */
     function setMinBtcAmount(uint256 _minBtcAmount) external onlyOwner {
         require(_minBtcAmount > 0, "Invalid amount");
         minBTCAmount = _minBtcAmount;
     }
 
     /**
-     * @dev Sets the peer address for a specific chain _dstEid
-     * @param _dstEid The endpoint ID of the destination chain
-     * @param _peer The receiver address on the destination chain
+     * @dev Sets the peer address for a specific chain.
+     * @param _dstEid The endpoint ID of the destination chain.
+     * @param _peer The receiver address on the destination chain.
      */
     function setPeer(uint32 _dstEid, bytes32 _peer) public override onlyOwner {
         require(_peer != bytes32(0), "Invalid peer");
         super.setPeer(_dstEid, _peer);
     }
 
+    /**
+     * @dev Submits a block and sends a message with PSBT data.
+     * @param rawHeader The raw block header.
+     * @param intermediateHeaders The intermediate headers for the block.
+     * @param _btcTxnHash The BTC transaction hash.
+     * @param _proof The proof for the transaction.
+     * @param _index The index of the transaction in the block.
+     * @param _psbtData The PSBT data to be processed.
+     * @param _options LayerZero message options.
+     * @param _refundAddress The address to refund in case of failure.
+     */
     function submitBlockAndSendMessage(
         bytes calldata rawHeader,
         bytes[] calldata intermediateHeaders,
@@ -86,20 +103,25 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         uint256 _index,
         bytes calldata _psbtData,
         bytes calldata _options,
-        address refundAddress
+        address _refundAddress
     ) external payable whenNotPaused nonReentrant onlyTaskManager {
-        // 0. Submit block
+        // 0. Submit block header along with intermediate headers to light client
         bytes32 blockHash = lightClient.submitRawBlockHeader(rawHeader, intermediateHeaders);
-        // 1. Get merkle root
+        // 1. Get merkle root to validate txn
         bytes32 merkleRoot = lightClient.getMerkleRootForBlock(blockHash);
         // 2. Send message
-        _sendMessage(blockHash, _btcTxnHash, merkleRoot, _proof, _index, _psbtData, _options, refundAddress);
+        _sendMessage(merkleRoot, _btcTxnHash, _proof, _index, _psbtData, _options, _refundAddress);
     }
 
     /**
-     * @dev Sends a cross-chain message with PSBT data
-     * @param _psbtData The PSBT data to be processed
-     * @param _options LayerZero message options
+     * @dev Sends a cross-chain message with PSBT data.
+     * @param _blockHash The block hash to validate the transaction.
+     * @param _btcTxnHash The BTC transaction hash.
+     * @param _proof The proof for the transaction.
+     * @param _index The index of the transaction in the block.
+     * @param _psbtData The PSBT data to be processed.
+     * @param _options LayerZero message options.
+     * @param _refundAddress The address to refund in case of failure.
      */
     function sendMessage(
         bytes32 _blockHash,
@@ -108,34 +130,36 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         uint256 _index,
         bytes calldata _psbtData,
         bytes calldata _options,
-        address refundAddress
+        address _refundAddress
     ) external payable whenNotPaused nonReentrant onlyTaskManager {
         bytes32 merkleRoot = lightClient.getMerkleRootForBlock(_blockHash);
-        _sendMessage(_blockHash, _btcTxnHash, merkleRoot, _proof, _index, _psbtData, _options, refundAddress);
+        _sendMessage(merkleRoot, _btcTxnHash, _proof, _index, _psbtData, _options, _refundAddress);
     }
 
     /**
-     * @dev Sends a cross-chain message with PSBT data
-     * @param _psbtData The PSBT data to be processed
-     * @param _options LayerZero message options
+     * @dev Internal function to send a cross-chain message with PSBT data.
+     * @param _merkleRoot The merkle root for the block.
+     * @param _btcTxnHash The BTC transaction hash.
+     * @param _proof The proof for the transaction.
+     * @param _index The index of the transaction in the block.
+     * @param _psbtData The PSBT data to be processed.
+     * @param _options LayerZero message options.
+     * @param _refundAddress The address to refund in case of failure.
      */
     function _sendMessage(
-        bytes32 _blockHash,
-        bytes32 _btcTxnHash,
         bytes32 _merkleRoot,
+        bytes32 _btcTxnHash,
         bytes32[] calldata _proof,
         uint256 _index,
         bytes calldata _psbtData,
         bytes calldata _options,
-        address refundAddress
+        address _refundAddress
     ) internal {
         // 0. btcTxnHash generated from the psbt data being shared should be the same as the one passed
         bytes32 txid = TxidCalculator.calculateTxid(_psbtData);
         if (txid != _btcTxnHash) {
             revert InvalidPSBTData();
         }
-
-        // TODO: Check if the corrresponding SPV data is present in the SPV contract - why exactly is it needed though?
 
         // 1. Parse and validate PSBT data
         BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_psbtData);
@@ -166,7 +190,6 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             user: metadata.receiverAddress,
             lockedAmount: metadata.lockedAmount,
             nativeTokenAmount: metadata.nativeTokenAmount,
-            btcTxnHash: _btcTxnHash,
             networkPublicKey: networkPublicKey,
             psbtData: _psbtData
         });
@@ -185,14 +208,16 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             // Fee in native gas and ZRO token.
             MessagingFee(msg.value, 0),
             // Refund address in case of failed source message.
-            refundAddress
+            _refundAddress
         );
 
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
     }
 
     /**
-     * @dev Validates PSBT data and extracts metadata
+     * @dev Validates PSBT data and extracts metadata.
+     * @param _psbtData The PSBT data to validate.
+     * @return metadata The extracted transaction metadata.
      */
     function _validatePSBTData(bytes calldata _psbtData)
         internal
@@ -208,9 +233,9 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         BitcoinTxnParser.TransactionMetadata memory metadata = BitcoinTxnParser.decodeMetadata(opReturnData);
 
         // Validate amounts
-        // if (metadata.nativeTokenAmount > maxGasTokenAmount) {
-        //     revert InvalidAmount(metadata.nativeTokenAmount);
-        // }
+        if (metadata.nativeTokenAmount > maxGasTokenAmount) {
+            revert InvalidAmount(metadata.nativeTokenAmount);
+        }
         if (metadata.lockedAmount < minBTCAmount) {
             revert InvalidAmount(metadata.lockedAmount);
         }
@@ -223,7 +248,14 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         return metadata;
     }
 
-    function sendMessageFor(address _receiver, bytes32 _btcTxnHash, bytes calldata _options, address refundAddress)
+    /**
+     * @dev Sends a message for a specific receiver with the given BTC transaction hash.
+     * @param _receiver The address of the receiver.
+     * @param _btcTxnHash The BTC transaction hash.
+     * @param _options LayerZero message options.
+     * @param _refundAddress The address to refund in case of failure.
+     */
+    function sendMessageFor(address _receiver, bytes32 _btcTxnHash, bytes calldata _options, address _refundAddress)
         external
         payable
     {
@@ -231,8 +263,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             revert InvalidReceiver(); // This also ensures that the txn is already present
         }
 
-        PSBTMetadata memory metadata = btcTxnHash_psbtMetadata[_btcTxnHash];
         // 1. Parse and get metadata from psbtMetaData
+        PSBTMetadata memory metadata = btcTxnHash_psbtMetadata[_btcTxnHash];
 
         // 2. TODO: Get _dstEid for a specific metadata.chainId from LayerZero contract
         uint32 _dstEid = metadata.chainId == 8453 ? 30184 : metadata.chainId;
@@ -259,16 +291,29 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             // Fee in native gas and ZRO token.
             MessagingFee(msg.value, 0),
             // Refund address in case of failed source message.
-            refundAddress
+            _refundAddress
         );
 
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
     }
 
+    /**
+     * @dev Retrieves the PSBT metadata for a given BTC transaction hash.
+     * @param _btcTxnHash The BTC transaction hash.
+     * @return The PSBT metadata associated with the transaction hash.
+     */
     function getPSBTData(bytes32 _btcTxnHash) external view returns (PSBTMetadata memory) {
         return btcTxnHash_psbtMetadata[_btcTxnHash];
     }
 
+    /**
+     * @dev Internal function to receive messages from LayerZero.
+     * @param _origin The origin of the message.
+     * @param _guid The unique identifier for the message.
+     * @param _message The message data.
+     * @param _executor The address executing the message.
+     * @param _extraData Additional data for processing the message.
+     */
     function _lzReceive(
         Origin calldata _origin,
         bytes32 _guid,
@@ -285,31 +330,37 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @dev Emergency pause
+     * @dev Pauses the contract in case of emergency.
      */
     function pause() external onlyOwner {
         _pause();
     }
 
     /**
-     * @dev Unpause
+     * @dev Unpauses the contract.
      */
     function unpause() external onlyOwner {
         _unpause();
     }
 
     /**
-     * @dev Withdraw stuck funds (emergency only)
+     * @dev Withdraws stuck funds from the contract (emergency only).
      */
     function withdraw() external onlyOwner nonReentrant {
         (bool success,) = msg.sender.call{value: address(this).balance}("");
         require(success, "Withdrawal failed");
     }
 
+    /**
+     * @dev Fallback function to receive native tokens.
+     */
     fallback() external payable {
         // Fallback function to receive native tokens
     }
 
+    /**
+     * @dev Receive function to accept native tokens.
+     */
     receive() external payable {
         // Receive native tokens
     }

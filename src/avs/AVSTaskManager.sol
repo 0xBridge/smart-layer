@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
-import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
-import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
 import {BLSApkRegistry} from "@eigenlayer-middleware/src/BLSApkRegistry.sol";
 import {RegistryCoordinator} from "@eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {BLSSignatureChecker, IRegistryCoordinator} from "@eigenlayer-middleware/src/BLSSignatureChecker.sol";
@@ -12,18 +10,18 @@ import {
     Pausable,
     IPauserRegistry
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title AVSTaskManager
  * @dev Manages tasks and operator quorums for an Actively Validated Service (AVS)
  * @notice This contract integrates with EigenLayer for operator management and BLS signature verification
  */
-contract AVSTaskManager is Initializable, OwnableUpgradeable, Pausable, BLSSignatureChecker, OperatorStateRetriever {
+contract AVSTaskManager is BLSSignatureChecker, OperatorStateRetriever, Ownable, Pausable {
     using BN254 for BN254.G1Point;
 
     /* CONSTANTS */
     uint32 public immutable TASK_RESPONSE_WINDOW_BLOCK;
-    uint32 public constant TASK_CHALLENGE_WINDOW_BLOCK = 100;
     uint256 internal constant _THRESHOLD_DENOMINATOR = 100;
 
     /* STRUCTURES */
@@ -58,15 +56,11 @@ contract AVSTaskManager is Initializable, OwnableUpgradeable, Pausable, BLSSigna
     mapping(uint32 => bool) public taskSuccesfullyChallenged;
     mapping(address => bool) public isOperator;
 
-    address public aggregator;
-    address public generator;
-
     /* EVENTS */
     event NewTaskCreated(uint32 indexed taskId, Task task);
     event TaskResponded(TaskResponse taskResponse, TaskResponseMetadata metadata);
     event TaskChallengedSuccessfully(uint32 indexed taskId, address indexed challenger);
     event TaskChallengedUnsuccessfully(uint32 indexed taskId, address indexed challenger);
-    event GeneratorUpdated(address indexed oldGenerator, address indexed newGenerator);
     event AggregatorUpdated(address indexed oldAggregator, address indexed newAggregator);
     event OperatorStatusChanged(address indexed operator, bool status);
 
@@ -77,25 +71,16 @@ contract AVSTaskManager is Initializable, OwnableUpgradeable, Pausable, BLSSigna
     }
 
     /* CONSTRUCTOR */
-    constructor(IRegistryCoordinator _registryCoordinator, uint32 _taskResponseWindowBlock)
-        BLSSignatureChecker(_registryCoordinator)
-    {
-        TASK_RESPONSE_WINDOW_BLOCK = _taskResponseWindowBlock;
-    }
-
-    /**
-     * @dev Initialize the contract
-     * @param _pauserRegistry Pauser registry contract
-     * @param initialOwner Initial owner of the contract
-     * @param _initialOperators Initial generator address
-     */
-    function initialize(IPauserRegistry _pauserRegistry, address initialOwner, address[] memory _initialOperators)
-        public
-        initializer
-    {
-        _initializePauser(_pauserRegistry, UNPAUSE_ALL);
+    // TODO: Replace owner with governance later
+    constructor(
+        address _registryCoordinator,
+        address initialOwner,
+        address[] memory _initialOperators,
+        uint32 _taskResponseWindowBlock
+    ) BLSSignatureChecker(_registryCoordinator) {
         _transferOwnership(initialOwner);
         _initialiseOperators(_initialOperators);
+        TASK_RESPONSE_WINDOW_BLOCK = _taskResponseWindowBlock;
     }
 
     function _initialiseOperators(address[] memory _initialOperators) internal {
@@ -136,6 +121,8 @@ contract AVSTaskManager is Initializable, OwnableUpgradeable, Pausable, BLSSigna
         allTaskHashes[latestTaskNum] = keccak256(abi.encode(newTask));
         emit NewTaskCreated(latestTaskNum, newTask);
         latestTaskNum = latestTaskNum + 1;
+
+        // TODO: send message to HomeChainCoordinator
     }
 
     /**
@@ -188,23 +175,5 @@ contract AVSTaskManager is Initializable, OwnableUpgradeable, Pausable, BLSSigna
      */
     function getTaskResponseWindowBlock() external view returns (uint32) {
         return TASK_RESPONSE_WINDOW_BLOCK;
-    }
-
-    /**
-     * @dev Internal function to update generator address
-     */
-    function _setGenerator(address newGenerator) internal {
-        address oldGenerator = generator;
-        generator = newGenerator;
-        emit GeneratorUpdated(oldGenerator, newGenerator);
-    }
-
-    /**
-     * @dev Internal function to update aggregator address
-     */
-    function _setAggregator(address newAggregator) internal {
-        address oldAggregator = aggregator;
-        aggregator = newAggregator;
-        emit AggregatorUpdated(oldAggregator, newAggregator);
     }
 }
