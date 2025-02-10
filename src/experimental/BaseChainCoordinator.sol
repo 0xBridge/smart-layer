@@ -29,9 +29,8 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     event MessageSent(uint32 dstEid, string message, bytes32 receiver, uint256 nativeFee);
     event MessageValidated(bytes32 guid, uint32 srcEid, bytes32 sender);
 
-    constructor(address _endpoint, address _eBTCManager, address _owner) OApp(_endpoint, _owner) {
+    constructor(address _endpoint, address _owner) OApp(_endpoint, _owner) {
         _transferOwnership(_owner);
-        eBTCManagerInstance = eBTCManager(payable(_eBTCManager));
         // endpoint = ILayerZeroEndpointV2(_endpoint);
     }
 
@@ -69,6 +68,10 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         );
 
         emit MessageSent(_dstEid, _message, peers[_dstEid], msg.value);
+    }
+
+    function setEBTCManager(address _eBTCManager) external onlyOwner {
+        eBTCManagerInstance = eBTCManager(payable(_eBTCManager));
     }
 
     function _lzReceive(
@@ -129,7 +132,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     function _handleMinting(address _user, uint256 _lockedAmount) internal {
         console.log("Minting eBTC for user: ", _user);
 
-        // eBTC.mint(_user, _lockedAmount);
+        eBTCManagerInstance.mint(_user, _lockedAmount);
     }
 
     function getTxnData(bytes32 _btcTxnHash) external view returns (MintData memory) {

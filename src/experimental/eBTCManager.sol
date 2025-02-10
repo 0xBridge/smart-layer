@@ -27,7 +27,7 @@ contract eBTCManager is Ownable, Pausable, ReentrancyGuard {
     }
 
     // Add function to set and remove eBTC token address
-    function seteBTC(address _eBTC) external onlyOwner {
+    function setEBTC(address _eBTC) external onlyOwner {
         eBTCToken = eBTC(_eBTC);
     }
 

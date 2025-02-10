@@ -41,19 +41,12 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     error MessageExpired();
     error InvalidDestination(address receiver);
     error InvalidReceiver();
-    error InvalidBitcoinTxn();
+    error BitcoinTxnNotFound();
 
-    modifier onlyTaskManager() {
-        require(msg.sender == taskManager, UnauthorizedAccess(msg.sender));
-        _;
-    }
-
-    constructor(address _lightClient, address _endpoint, address _owner, address _taskManager)
-        OApp(_endpoint, _owner)
-    {
+    constructor(address _lightClient, address _endpoint, address _owner) OApp(_endpoint, _owner) {
         _transferOwnership(_owner);
         lightClient = BitcoinLightClient(_lightClient);
-        taskManager = _taskManager;
+        // taskManager = _taskManager;
     }
 
     /**
@@ -84,6 +77,9 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         super.setPeer(_dstEid, _peer);
     }
 
+    // TODO: The message will come from the endpoint but for now we're considering it to be the owner
+    // TODO: Check if the message is coming from the task manager deplyed on Ethereum
+
     /**
      * @dev Submits a block and sends a message with PSBT data.
      * @param rawHeader The raw block header.
@@ -104,7 +100,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         bytes calldata _psbtData,
         bytes calldata _options,
         address _refundAddress
-    ) external payable whenNotPaused nonReentrant onlyTaskManager {
+    ) external payable whenNotPaused nonReentrant onlyOwner {
         // 0. Submit block header along with intermediate headers to light client
         bytes32 blockHash = lightClient.submitRawBlockHeader(rawHeader, intermediateHeaders);
         // 1. Get merkle root to validate txn
@@ -131,7 +127,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         bytes calldata _psbtData,
         bytes calldata _options,
         address _refundAddress
-    ) external payable whenNotPaused nonReentrant onlyTaskManager {
+    ) external payable whenNotPaused nonReentrant onlyOwner {
         bytes32 merkleRoot = lightClient.getMerkleRootForBlock(_blockHash);
         _sendMessage(merkleRoot, _btcTxnHash, _proof, _index, _psbtData, _options, _refundAddress);
     }
@@ -179,7 +175,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         }
 
         // 5. Validate txn with SPV data
-        require(BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index), InvalidBitcoinTxn());
+        require(BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index), BitcoinTxnNotFound());
 
         // TODO: This needs to come from the metadata itself as this will keep on changing
         bytes32 networkPublicKey;

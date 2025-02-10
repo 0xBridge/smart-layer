@@ -31,7 +31,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        _disableInitializers();
+        // _disableInitializers(); // TODO: Uncomment this line
     }
 
     /**
