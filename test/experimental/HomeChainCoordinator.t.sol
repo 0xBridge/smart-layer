@@ -12,6 +12,7 @@ import {AVSTaskManager} from "../../src/avs/AVSTaskManager.sol";
 import {eBTCManager} from "../../src/experimental/eBTCManager.sol";
 import {eBTC} from "../../src/eBTC.sol";
 import {OptionsBuilder} from "lib/devtools/packages/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract HomeChainCoordinatorTest is Test {
     // using OptionsBuilder for bytes;
@@ -64,19 +65,29 @@ contract HomeChainCoordinatorTest is Test {
 
     function setUp() public {
         string memory destRpcUrl = vm.envString("BASE_RPC_URL");
-        destForkId = vm.createSelectFork(destRpcUrl); // Create fork at the latest block
+        destForkId = vm.createSelectFork(destRpcUrl);
         baseConfig = new HelperConfig();
         HelperConfig.NetworkConfig memory baseNetworkConfig = baseConfig.getConfig();
         owner = baseNetworkConfig.account;
         vm.prank(owner);
-        // TODO: Deploy eBTC
+
+        // Deploy the base chain coordinator
         baseChainCoordinator = new BaseChainCoordinator(
             BASE_STARGATE_ENDPOINT_V2, // endpoint
             owner // owner
         );
-        eBTCToken = new eBTC();
-        eBTCManagerInstance = new eBTCManager(owner);
+        // Deploy the eBTCManager contract
+        eBTCManagerInstance = new eBTCManager(owner, address(baseChainCoordinator));
+        // Deploy implementation and proxy for eBTC using ERC1967Proxy
+        eBTC eBTCImplementation = new eBTC();
+        bytes memory initData = abi.encodeWithSelector(eBTC.initialize.selector, address(eBTCManagerInstance));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(eBTCImplementation), initData);
+        eBTCToken = eBTC(address(proxy));
+
+        vm.startPrank(owner);
+        baseChainCoordinator.setEBTCManager(address(eBTCManagerInstance));
         eBTCManagerInstance.setEBTC(address(eBTCToken));
+        vm.stopPrank();
 
         string memory rpcUrl = vm.envString("OPTIMISM_RPC_URL");
         sourceForkId = vm.createSelectFork(rpcUrl);

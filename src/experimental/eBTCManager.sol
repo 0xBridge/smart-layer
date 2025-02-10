@@ -4,14 +4,16 @@ pragma solidity ^0.8.28;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {eBTC} from "../eBTC.sol";
 
 /**
  * @title eBTCManager
  * @dev Implementation of a secure eBTCManager contract with ownership and pause functionality
  */
-contract eBTCManager is Ownable, Pausable, ReentrancyGuard {
+contract eBTCManager is AccessControl, Ownable, Pausable, ReentrancyGuard {
     // State variables
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     eBTC private eBTCToken;
 
     // Events
@@ -22,8 +24,11 @@ contract eBTCManager is Ownable, Pausable, ReentrancyGuard {
      * @dev Contract constructor
      * @param _initialOwner The address that will own the contract
      */
-    constructor(address _initialOwner) {
+    constructor(address _initialOwner, address _baseChainCoordinator) {
         _transferOwnership(_initialOwner);
+        // grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
+        // Give baseChainCoordinator access to mint and burn functions
+        // grantRole(MINTER_ROLE, _baseChainCoordinator);
     }
 
     // Add function to set and remove eBTC token address
@@ -35,7 +40,7 @@ contract eBTCManager is Ownable, Pausable, ReentrancyGuard {
      * @dev Deposits funds into the contract
      * @notice This function is pausable and protected against reentrancy
      */
-    function mint(address to, uint256 amount) external payable onlyOwner nonReentrant whenNotPaused {
+    function mint(address to, uint256 amount) external nonReentrant whenNotPaused {
         eBTCToken.mint(to, amount);
         emit Minted(to, amount);
     }
@@ -44,7 +49,7 @@ contract eBTCManager is Ownable, Pausable, ReentrancyGuard {
      * @dev Withdraws funds from the contract
      * @notice This function is pausable and protected against reentrancy
      */
-    function withdraw(address to, uint256 amount) external onlyOwner nonReentrant whenNotPaused {
+    function withdraw(address to, uint256 amount) external onlyRole(MINTER_ROLE) nonReentrant whenNotPaused {
         eBTCToken.burn(amount);
         emit Withdrawn(to, amount);
     }
