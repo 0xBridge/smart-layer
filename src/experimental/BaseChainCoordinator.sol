@@ -132,7 +132,6 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     function _handleMinting(address _user, uint256 _lockedAmount) internal {
         console.log("Minting eBTC for user: ", _user);
         console.log("Locked amount: ", _lockedAmount);
-        console.log("eBTCManager address: ", address(eBTCManagerInstance));
         eBTCManagerInstance.mint(_user, _lockedAmount);
     }
 
