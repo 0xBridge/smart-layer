@@ -42,6 +42,10 @@ contract HomeChainCoordinatorTest is Test {
     uint256 private constant DEST_CHAIN_ID = 8453;
     address private constant BASE_STARGATE_ENDPOINT_V2 = 0x1a44076050125825900e736c501f859c50fE728c;
 
+    // BTC txn metadata
+    address private constant BTC_RECEIVER = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
+    uint256 private constant BTC_AMOUNT = 1000;
+
     // Bitcoin SPV Testnet constants (Block #68738)
     // uint32 private constant blockVersion = 869072896;
     // uint32 private constant blockTimestamp = 1738652675;
@@ -171,6 +175,9 @@ contract HomeChainCoordinatorTest is Test {
 
         // Check if the message was processed correctly
         vm.selectFork(destForkId);
+        // Get eBTC balance of the designated receiver
+        uint256 balance = eBTCToken.balanceOf(BTC_RECEIVER);
+        assertEq(balance, BTC_AMOUNT);
     }
 
     fallback() external payable {}

@@ -11,7 +11,7 @@ import {eBTC} from "../eBTC.sol";
  * @title eBTCManager
  * @dev Implementation of a secure eBTCManager contract with ownership and pause functionality
  */
-contract eBTCManager is AccessControl, Ownable, Pausable, ReentrancyGuard {
+contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
     // State variables
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     eBTC private eBTCToken;
@@ -25,14 +25,13 @@ contract eBTCManager is AccessControl, Ownable, Pausable, ReentrancyGuard {
      * @param _initialOwner The address that will own the contract
      */
     constructor(address _initialOwner, address _baseChainCoordinator) {
-        _transferOwnership(_initialOwner);
-        // grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
         // Give baseChainCoordinator access to mint and burn functions
         // grantRole(MINTER_ROLE, _baseChainCoordinator);
+        // grantRole(DEFAULT_ADMIN_ROLE, _initialOwner); // TODO: Add governance layer later
     }
 
     // Add function to set and remove eBTC token address
-    function setEBTC(address _eBTC) external onlyOwner {
+    function setEBTC(address _eBTC) external {
         eBTCToken = eBTC(_eBTC);
     }
 
@@ -60,7 +59,7 @@ contract eBTCManager is AccessControl, Ownable, Pausable, ReentrancyGuard {
      * @dev Pauses all contract operations
      * @notice Only callable by contract owner
      */
-    function pause() external onlyOwner {
+    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _pause();
     }
 
@@ -68,7 +67,7 @@ contract eBTCManager is AccessControl, Ownable, Pausable, ReentrancyGuard {
      * @dev Unpauses all contract operations
      * @notice Only callable by contract owner
      */
-    function unpause() external onlyOwner {
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
 
