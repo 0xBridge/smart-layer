@@ -7,9 +7,11 @@ on:
     branches: [main, light-client, architecture]
 
 env:
-  FOUNDRY_PROFILE: ci
+  FOUNDRY_PROFILE: ci-testing
   RPC_URL: ${{ secrets.RPC_URL }}
   PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+  OPTIMISM_RPC_URL: ${{ secrets.OPTIMISM_RPC_URL }}
+  BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
 
 jobs:
   check:
