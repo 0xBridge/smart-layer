@@ -26,12 +26,12 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
      */
     constructor(address _initialOwner, address _baseChainCoordinator) {
         // Give baseChainCoordinator access to mint and burn functions
-        // grantRole(MINTER_ROLE, _baseChainCoordinator);
-        // grantRole(DEFAULT_ADMIN_ROLE, _initialOwner); // TODO: Add governance layer later
+        _setupRole(MINTER_ROLE, _baseChainCoordinator);
+        _setupRole(DEFAULT_ADMIN_ROLE, _initialOwner);
     }
 
     // Add function to set and remove eBTC token address
-    function setEBTC(address _eBTC) external {
+    function setEBTC(address _eBTC) external onlyRole(DEFAULT_ADMIN_ROLE) {
         eBTCToken = eBTC(_eBTC);
     }
 
@@ -39,7 +39,9 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
      * @dev Deposits funds into the contract
      * @notice This function is pausable and protected against reentrancy
      */
-    function mint(address to, uint256 amount) external nonReentrant whenNotPaused {
+    function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) nonReentrant whenNotPaused {
+        require(to != address(0), "Invalid recipient");
+        require(amount > 0, "Invalid amount");
         eBTCToken.mint(to, amount);
         emit Minted(to, amount);
     }
@@ -49,6 +51,8 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
      * @notice This function is pausable and protected against reentrancy
      */
     function withdraw(address to, uint256 amount) external onlyRole(MINTER_ROLE) nonReentrant whenNotPaused {
+        require(to != address(0), "Invalid recipient");
+        require(amount > 0, "Invalid amount");
         eBTCToken.burn(amount);
         emit Withdrawn(to, amount);
     }

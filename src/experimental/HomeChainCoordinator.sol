@@ -78,7 +78,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     }
 
     // TODO: The message will come from the endpoint but for now we're considering it to be the owner
-    // TODO: Check if the message is coming from the task manager deplyed on Ethereum
+    // TODO: Check if the message is coming from the task manager
 
     /**
      * @dev Submits a block and sends a message with PSBT data.

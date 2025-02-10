@@ -80,8 +80,10 @@ contract HomeChainCoordinatorTest is Test {
             BASE_STARGATE_ENDPOINT_V2, // endpoint
             owner // owner
         );
+
         // Deploy the eBTCManager contract
         eBTCManagerInstance = new eBTCManager(owner, address(baseChainCoordinator));
+
         // Deploy implementation and proxy for eBTC using ERC1967Proxy
         eBTC eBTCImplementation = new eBTC();
         bytes memory initData = abi.encodeWithSelector(eBTC.initialize.selector, address(eBTCManagerInstance));
@@ -97,10 +99,22 @@ contract HomeChainCoordinatorTest is Test {
         sourceForkId = vm.createSelectFork(rpcUrl);
         homeConfig = new HelperConfig();
         lzHelper = new LayerZeroV2Helper();
-        btcLightClient = new BitcoinLightClient(); // Though this will be upgradable, we've direcly accessed this for now
-        btcLightClient.initialize(
-            owner, blockVersion, blockTimestamp, difficultyBits, nonce, height, prevBlock, merkleRoot
+
+        // Deploy implementation and proxy for BitcoinLightClient using ERC1967Proxy
+        BitcoinLightClient bitcoinLightClientImplementation = new BitcoinLightClient();
+        bytes memory lightClientInitData = abi.encodeWithSelector(
+            BitcoinLightClient.initialize.selector,
+            owner,
+            blockVersion,
+            blockTimestamp,
+            difficultyBits,
+            nonce,
+            height,
+            prevBlock,
+            merkleRoot
         );
+        ERC1967Proxy lightClientProxy = new ERC1967Proxy(address(bitcoinLightClientImplementation), lightClientInitData);
+        btcLightClient = BitcoinLightClient(address(lightClientProxy));
 
         vm.prank(owner);
         homeChainCoordinator = new HomeChainCoordinator(address(btcLightClient), OPTIMISM_ENDPOINT_V2, owner);
