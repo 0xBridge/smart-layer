@@ -120,6 +120,8 @@ contract HomeChainCoordinatorTest is Test {
         assertEq(homeChainCoordinator.peers(DEST_EID), receiver);
     }
 
+    // TODO: Add test for submitBlockAndSendMessage
+
     function testSendMessage() public {
         // Set the receiver first
         bytes32 sender = bytes32(uint256(uint160(address(homeChainCoordinator))));
