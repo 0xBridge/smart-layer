@@ -42,6 +42,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     error InvalidDestination(address receiver);
     error InvalidReceiver();
     error BitcoinTxnNotFound();
+    error BitcoinTxnAndPSBTMismatch();
 
     constructor(address _lightClient, address _endpoint, address _owner) OApp(_endpoint, _owner) {
         _transferOwnership(_owner);
@@ -154,7 +155,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         // 0. btcTxnHash generated from the psbt data being shared should be the same as the one passed
         bytes32 txid = TxidCalculator.calculateTxid(_psbtData);
         if (txid != _btcTxnHash) {
-            revert InvalidPSBTData();
+            revert BitcoinTxnAndPSBTMismatch();
         }
 
         // 1. Parse and validate PSBT data

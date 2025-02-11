@@ -3,6 +3,7 @@ libs = ["lib"]
 out = "out"
 src = "src"
 via-ir = true
+fs_permissions = [{ access = "read", path = "./"}]
 
 optimizer = true
 optimizer_runs = 200

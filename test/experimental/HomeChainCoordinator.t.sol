@@ -27,7 +27,6 @@ contract HomeChainCoordinatorTest is Test {
 
     HelperConfig private homeConfig;
     HelperConfig private baseConfig;
-    address private usdc;
 
     address private owner;
     address private user;
