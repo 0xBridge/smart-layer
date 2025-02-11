@@ -74,14 +74,15 @@ contract HomeChainCoordinatorTest is Test {
         owner = baseNetworkConfig.account;
         vm.prank(owner);
 
+        // Deploy the eBTCManager contract
+        eBTCManagerInstance = new eBTCManager(owner);
+
         // Deploy the base chain coordinator
         baseChainCoordinator = new BaseChainCoordinator(
             BASE_STARGATE_ENDPOINT_V2, // endpoint
-            owner // owner
+            owner, // owner
+            address(eBTCManagerInstance) // eBTCManager
         );
-
-        // Deploy the eBTCManager contract
-        eBTCManagerInstance = new eBTCManager(owner, address(baseChainCoordinator));
 
         // Deploy implementation and proxy for eBTC using ERC1967Proxy
         eBTC eBTCImplementation = new eBTC();
@@ -90,7 +91,7 @@ contract HomeChainCoordinatorTest is Test {
         eBTCToken = eBTC(address(proxy));
 
         vm.startPrank(owner);
-        baseChainCoordinator.setEBTCManager(address(eBTCManagerInstance));
+        eBTCManagerInstance.setEBTCManager(address(baseChainCoordinator));
         eBTCManagerInstance.setEBTC(address(eBTCToken));
         vm.stopPrank();
 

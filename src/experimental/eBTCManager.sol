@@ -28,10 +28,14 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
      * @dev Contract constructor
      * @param _initialOwner The address that will own the contract
      */
-    constructor(address _initialOwner, address _baseChainCoordinator) {
+    constructor(address _initialOwner) {
         // Give baseChainCoordinator access to mint and burn functions
-        _setupRole(MINTER_ROLE, _baseChainCoordinator);
         _setupRole(DEFAULT_ADMIN_ROLE, _initialOwner);
+    }
+
+    // Add function to set and remove base chain coordinator address
+    function setEBTCManager(address _baseChainCoordinator) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setupRole(MINTER_ROLE, _baseChainCoordinator);
     }
 
     // Add function to set and remove eBTC token address
@@ -54,7 +58,7 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
      * @dev Withdraws funds from the contract
      * @notice This function is pausable and protected against reentrancy
      */
-    function withdraw(address to, uint256 amount) external onlyRole(MINTER_ROLE) nonReentrant whenNotPaused {
+    function burn(address to, uint256 amount) external onlyRole(MINTER_ROLE) nonReentrant whenNotPaused {
         if (to == address(0)) revert InvalidRecipient();
         if (amount == 0) revert InvalidAmount();
         eBTCToken.burn(amount);
@@ -78,9 +82,4 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
     function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
-
-    /**
-     * @dev Prevents accidental ETH transfers to the contract
-     */
-    receive() external payable {}
 }

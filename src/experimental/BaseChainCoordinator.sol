@@ -30,9 +30,9 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     event MessageSent(uint32 dstEid, string message, bytes32 receiver, uint256 nativeFee);
     event MessageValidated(bytes32 guid, uint32 srcEid, bytes32 sender);
 
-    constructor(address _endpoint, address _owner) OApp(_endpoint, _owner) {
+    constructor(address _endpoint, address _owner, address _eBTCManager) OApp(_endpoint, _owner) {
         _transferOwnership(_owner);
-        // endpoint = ILayerZeroEndpointV2(_endpoint);
+        eBTCManagerInstance = eBTCManager(_eBTCManager);
     }
 
     /**
