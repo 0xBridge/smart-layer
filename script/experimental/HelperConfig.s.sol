@@ -39,8 +39,8 @@ contract HelperConfig is Script {
     uint256 constant BASE_MAINNET_CHAIN_ID = 8453;
     uint256 constant OP_MAINNET_CHAIN_ID = 10;
 
-    // Update the BURNER_WALLET to your burner wallet!
-    address constant BURNER_WALLET = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
+    // Update the OWNER_WALLET to your burner wallet!
+    address constant OWNER_WALLET = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
     // address constant FOUNDRY_DEFAULT_WALLET = 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38;
     // address constant ANVIL_DEFAULT_ACCOUNT = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
 
@@ -68,7 +68,7 @@ contract HelperConfig is Script {
             chainId_endpointId[chainId] = endpointId;
             networkConfigs[endpointId] = NetworkConfig({
                 endpoint: config.endpoint,
-                account: BURNER_WALLET // We'll keep this constant
+                account: OWNER_WALLET // We'll keep this constant
             });
         }
     }

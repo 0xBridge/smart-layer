@@ -193,7 +193,4 @@ contract HomeChainCoordinatorTest is Test {
         uint256 balance = eBTCToken.balanceOf(BTC_RECEIVER);
         assertEq(balance, BTC_AMOUNT);
     }
-
-    fallback() external payable {}
-    receive() external payable {}
 }

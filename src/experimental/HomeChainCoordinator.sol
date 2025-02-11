@@ -21,8 +21,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     error TxnAlreadyProcessed(bytes32 btcTxnHash);
     error InvalidPSBTData();
     error InvalidAmount(uint256 amount);
-    error InvalidDestination(address receiver);
-    error InvalidReceiver();
+    error InvalidDestination();
+    error InvalidReceiver(address receiver);
     error BitcoinTxnNotFound();
     error BitcoinTxnAndPSBTMismatch();
     error InvalidPeer();
@@ -167,7 +167,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
 
         // 4. Validate receiver is set for destination chain
         if (peers[_dstEid] == bytes32(0)) {
-            revert InvalidReceiver();
+            revert InvalidDestination();
         }
 
         // 5. Validate txn with SPV data
@@ -197,10 +197,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             _dstEid,
             payload,
             _options,
-            // Fee in native gas and ZRO token.
-            MessagingFee(msg.value, 0),
-            // Refund address in case of failed source message.
-            _refundAddress
+            MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
+            _refundAddress // Refund address in case of failed source message.
         );
 
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
@@ -234,7 +232,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
 
         // Validate receiver address
         if (metadata.receiverAddress == address(0)) {
-            revert InvalidDestination(metadata.receiverAddress);
+            revert InvalidReceiver(metadata.receiverAddress);
         }
 
         return metadata;
@@ -252,7 +250,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         payable
     {
         if (btcTxnHash_psbtMetadata[_btcTxnHash].user != _receiver) {
-            revert InvalidReceiver(); // This also ensures that the txn is already present
+            revert InvalidReceiver(_receiver); // This also ensures that the txn is already present
         }
 
         // 1. Parse and get metadata from psbtMetaData
@@ -263,7 +261,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
 
         // 3. Validate receiver is set for destination chain
         if (peers[_dstEid] == bytes32(0)) {
-            revert InvalidReceiver();
+            revert InvalidDestination();
         }
 
         // 4. Check if all the fields needed to be sent in the payload are present in the metadata (should never enter revert ideally)
@@ -280,10 +278,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
             _dstEid,
             payload,
             _options,
-            // Fee in native gas and ZRO token.
-            MessagingFee(msg.value, 0),
-            // Refund address in case of failed source message.
-            _refundAddress
+            MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
+            _refundAddress // Refund address in case of failed source message.
         );
 
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
@@ -341,19 +337,5 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     function withdraw() external onlyOwner nonReentrant {
         (bool success,) = msg.sender.call{value: address(this).balance}("");
         if (!success) revert WithdrawalFailed();
-    }
-
-    /**
-     * @dev Fallback function to receive native tokens.
-     */
-    fallback() external payable {
-        // Fallback function to receive native tokens
-    }
-
-    /**
-     * @dev Receive function to accept native tokens.
-     */
-    receive() external payable {
-        // Receive native tokens
     }
 }

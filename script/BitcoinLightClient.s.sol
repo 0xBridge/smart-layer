@@ -6,7 +6,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 
 contract DeployBitcoinLightClient is Script {
-    function run(address proxyAddress) external returns (address proxy_, address implementation_) {
+    function run() external returns (address proxy_, address implementation_) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address admin = vm.envAddress("ADMIN_ADDRESS");
 

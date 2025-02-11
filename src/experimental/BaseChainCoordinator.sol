@@ -14,7 +14,7 @@ import {eBTCManager} from "./eBTCManager.sol";
  */
 contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoordinator {
     // Errors
-    error InvalidSource(uint32 srcEid, bytes32 sender);
+    error InvalidSource(uint32 srcChainId, uint32 currentChainId);
     error MessageAlreadyProcessed(bytes32 btcTxnHash);
     error InvalidSignature();
     error InvalidMessageSender();
@@ -28,7 +28,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
     // Events
     event MessageSent(uint32 dstEid, string message, bytes32 receiver, uint256 nativeFee);
-    event MessageValidated(bytes32 guid, uint32 srcEid, bytes32 sender);
+    event MessageProcessed(bytes32 guid, uint32 srcEid, bytes32 sender);
 
     constructor(address _endpoint, address _owner, address _eBTCManager) OApp(_endpoint, _owner) {
         _transferOwnership(_owner);
@@ -71,20 +71,19 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         eBTCManagerInstance = eBTCManager(payable(_eBTCManager));
     }
 
-    function _lzReceive(
-        Origin calldata _origin,
-        bytes32 _guid,
-        bytes calldata _message,
-        address _executor,
-        bytes calldata _extraData
-    ) internal virtual override whenNotPaused {
+    function _lzReceive(Origin calldata _origin, bytes32 _guid, bytes calldata _message, address, bytes calldata)
+        internal
+        virtual
+        override
+        whenNotPaused
+    {
         if (msg.sender != address(endpoint)) revert InvalidMessageSender();
 
         (uint32 chainId, address user, bytes32 btcTxnHash, uint256 lockedAmount, uint256 nativeTokenAmount) =
             abi.decode(_message, (uint32, address, bytes32, uint256, uint256));
 
         // 1. Validate source chain and sender
-        _validateSourceAndSender(_origin, chainId);
+        _validateSource(chainId);
 
         // 2. Check for replay attacks
         _validateMessageUniqueness(btcTxnHash);
@@ -92,13 +91,12 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         // 3. Process the message
         _processMessage(btcTxnHash, user, lockedAmount);
 
-        emit MessageValidated(_guid, _origin.srcEid, _origin.sender);
+        emit MessageProcessed(_guid, _origin.srcEid, _origin.sender);
     }
 
-    function _validateSourceAndSender(Origin calldata _origin, uint32 chainId) internal view {
-        // Verify the sender matches our stored peer for this chain
-        if (_origin.sender != peers[_origin.srcEid] || chainId != block.chainid) {
-            revert InvalidSource(_origin.srcEid, _origin.sender);
+    function _validateSource(uint32 chainId) internal view {
+        if (chainId != block.chainid) {
+            revert InvalidSource(chainId, uint32(block.chainid));
         }
     }
 
@@ -169,13 +167,5 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     function withdraw() external onlyOwner nonReentrant {
         (bool success,) = msg.sender.call{value: address(this).balance}("");
         if (!success) revert WithdrawalFailed();
-    }
-
-    fallback() external payable {
-        // Fallback function to receive native tokens
-    }
-
-    receive() external payable {
-        // Receive native tokens
     }
 }
