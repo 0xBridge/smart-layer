@@ -34,7 +34,7 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
     }
 
     // Add function to set and remove base chain coordinator address
-    function setEBTCManager(address _baseChainCoordinator) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setMinterRole(address _baseChainCoordinator) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setupRole(MINTER_ROLE, _baseChainCoordinator);
     }
 

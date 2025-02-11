@@ -2,17 +2,16 @@
 pragma solidity ^0.8.28;
 
 import {Test, Vm} from "forge-std/Test.sol";
-import {IOAppCore} from "lib/devtools/packages/oapp-evm/contracts/oapp/interfaces/IOAppCore.sol";
-import {LayerZeroV2Helper} from "lib/pigeon/src/layerzero-v2/LayerZeroV2Helper.sol";
-import {HomeChainCoordinator} from "../src/HomeChainCoordinator.sol";
-import {BaseChainCoordinator} from "../../src/BaseChainCoordinator.sol";
-import {HelperConfig} from "../script/HelperConfig.s.sol";
-import {BitcoinLightClient} from "../../src/BitcoinLightClient.sol";
-import {AVSTaskManager} from "../../src/avs/AVSTaskManager.sol";
-import {eBTCManager} from "../../src/eBTCManager.sol";
-import {eBTC} from "../../src/eBTC.sol";
-import {OptionsBuilder} from "lib/devtools/packages/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
+import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {LayerZeroV2Helper} from "lib/pigeon/src/layerzero-v2/LayerZeroV2Helper.sol";
+import {HelperConfig} from "../script/HelperConfig.s.sol";
+import {HomeChainCoordinator} from "../src/HomeChainCoordinator.sol";
+import {BaseChainCoordinator} from "../src/BaseChainCoordinator.sol";
+import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
+import {AVSTaskManager} from "../src/avs/AVSTaskManager.sol";
+import {eBTCManager} from "../src/eBTCManager.sol";
+import {eBTC} from "../src/eBTC.sol";
 
 contract HomeChainCoordinatorTest is Test {
     // using OptionsBuilder for bytes;
@@ -91,7 +90,7 @@ contract HomeChainCoordinatorTest is Test {
         eBTCToken = eBTC(address(proxy));
 
         vm.startPrank(owner);
-        eBTCManagerInstance.setEBTCManager(address(baseChainCoordinator));
+        eBTCManagerInstance.setMinterRole(address(baseChainCoordinator));
         eBTCManagerInstance.setEBTC(address(eBTCToken));
         vm.stopPrank();
 

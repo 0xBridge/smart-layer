@@ -12,5 +12,5 @@ struct PSBTMetadata {
 }
 
 interface IHomeChainCoordinator {
-    function sendMessage(uint32 _dstEid, string memory _message, bytes calldata _options) external payable;
+// Put functions that are must required for the home chain coordinator
 }

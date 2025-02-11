@@ -2,21 +2,20 @@
 pragma solidity ^0.8.28;
 
 import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
-import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {BitcoinTxnParser} from "./libraries/BitcoinTxnParser.sol";
 import {TxidCalculator} from "./libraries/TxidCalculator.sol";
 import {BitcoinUtils} from "./libraries/BitcoinUtils.sol";
-import {PSBTMetadata} from "./interfaces/IHomeChainCoordinator.sol";
+import {PSBTMetadata, IHomeChainCoordinator} from "./interfaces/IHomeChainCoordinator.sol";
 import {BitcoinLightClient} from "./BitcoinLightClient.sol";
 
 /**
  * @title HomeChainCoordinator
  * @dev Contract for coordinating cross-chain messages on the home chain
  */
-contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
+contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoordinator {
     // Errors
     error TxnAlreadyProcessed(bytes32 btcTxnHash);
     error InvalidPSBTData();
