@@ -18,6 +18,17 @@ import {BitcoinUtils} from "../libraries/BitcoinUtils.sol";
  * @dev Contract for coordinating cross-chain messages on the home chain
  */
 contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
+    // Errors
+    error TxnAlreadyProcessed(bytes32 btcTxnHash);
+    error InvalidPSBTData();
+    error InvalidAmount(uint256 amount);
+    error InvalidDestination(address receiver);
+    error InvalidReceiver();
+    error BitcoinTxnNotFound();
+    error BitcoinTxnAndPSBTMismatch();
+    error InvalidPeer();
+    error WithdrawalFailed();
+
     // State variables
     BitcoinLightClient private lightClient;
 
@@ -31,23 +42,9 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
     event MessageSent(uint32 indexed dstEid, bytes32 indexed psbtHash, address indexed operator, uint256 timestamp);
     event OperatorStatusChanged(address indexed operator, bool status);
 
-    // Errors
-    error UnauthorizedAccess(address operator);
-    error PSBTAlreadyProcessed(bytes32 psbtHash);
-    error TxnAlreadyProcessed(bytes32 btcTxnHash);
-    error InvalidPSBTData();
-    error UnsupportedChain(uint32 chainId);
-    error InvalidAmount(uint256 amount);
-    error MessageExpired();
-    error InvalidDestination(address receiver);
-    error InvalidReceiver();
-    error BitcoinTxnNotFound();
-    error BitcoinTxnAndPSBTMismatch();
-
     constructor(address _lightClient, address _endpoint, address _owner) OApp(_endpoint, _owner) {
         _transferOwnership(_owner);
         lightClient = BitcoinLightClient(_lightClient);
-        // taskManager = _taskManager;
     }
 
     /**
@@ -55,7 +52,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
      * @param _maxGasTokenAmount The maximum gas token amount to set.
      */
     function setMaxGasTokenAmount(uint256 _maxGasTokenAmount) external onlyOwner {
-        require(_maxGasTokenAmount > 0, "Invalid amount");
+        if (_maxGasTokenAmount == 0) revert InvalidAmount(_maxGasTokenAmount);
         maxGasTokenAmount = _maxGasTokenAmount;
     }
 
@@ -64,7 +61,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
      * @param _minBtcAmount The minimum BTC amount to set.
      */
     function setMinBtcAmount(uint256 _minBtcAmount) external onlyOwner {
-        require(_minBtcAmount > 0, "Invalid amount");
+        if (_minBtcAmount == 0) revert InvalidAmount(_minBtcAmount);
         minBTCAmount = _minBtcAmount;
     }
 
@@ -74,7 +71,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
      * @param _peer The receiver address on the destination chain.
      */
     function setPeer(uint32 _dstEid, bytes32 _peer) public override onlyOwner {
-        require(_peer != bytes32(0), "Invalid peer");
+        if (_peer == bytes32(0)) revert InvalidPeer();
         super.setPeer(_dstEid, _peer);
     }
 
@@ -176,7 +173,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         }
 
         // 5. Validate txn with SPV data
-        require(BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index), BitcoinTxnNotFound());
+        if (!BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index)) revert BitcoinTxnNotFound();
 
         // TODO: This needs to come from the metadata itself as this will keep on changing
         bytes32 networkPublicKey;
@@ -345,7 +342,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
      */
     function withdraw() external onlyOwner nonReentrant {
         (bool success,) = msg.sender.call{value: address(this).balance}("");
-        require(success, "Withdrawal failed");
+        if (!success) revert WithdrawalFailed();
     }
 
     /**

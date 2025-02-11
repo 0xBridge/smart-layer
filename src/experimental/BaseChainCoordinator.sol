@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {console} from "forge-std/console.sol";
 import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -16,10 +15,12 @@ import {eBTCManager} from "./eBTCManager.sol";
 contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoordinator {
     // Errors
     error InvalidSource(uint32 srcEid, bytes32 sender);
-    error InvalidMessageFormat();
     error MessageAlreadyProcessed(bytes32 btcTxnHash);
     error InvalidSignature();
     error InvalidMessageSender();
+    error InvalidPeer();
+    error ReceiverNotSet();
+    error WithdrawalFailed();
 
     // Mapping to store corresponding receiver addresses on different chains
     mapping(bytes32 => MintData) private btcTxnHash_mintData;
@@ -40,7 +41,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      * @param _peer The receiver address on the destination chain
      */
     function setPeer(uint32 _dstEid, bytes32 _peer) public override onlyOwner {
-        require(_peer != bytes32(0), "Invalid peer");
+        if (_peer == bytes32(0)) revert InvalidPeer();
         super.setPeer(_dstEid, _peer);
     }
 
@@ -51,9 +52,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      * @param _options Message execution options (e.g., for sending gas to destination)
      */
     function sendMessage(uint32 _dstEid, string memory _message, bytes calldata _options) external payable {
-        // require(_message.length > 0, "Empty payload");
-
-        require(peers[_dstEid] != bytes32(0), "Receiver not set");
+        if (peers[_dstEid] == bytes32(0)) revert ReceiverNotSet();
 
         // Prepare send payload
         bytes memory _payload = abi.encode(_message);
@@ -61,10 +60,8 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
             _dstEid,
             _payload,
             _options,
-            // Fee in native gas and ZRO token.
-            MessagingFee(msg.value, 0),
-            // Refund address in case of failed source message.
-            payable(msg.sender)
+            MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
+            payable(msg.sender) // Refund address in case of failed source message.
         );
 
         emit MessageSent(_dstEid, _message, peers[_dstEid], msg.value);
@@ -81,11 +78,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         address _executor,
         bytes calldata _extraData
     ) internal virtual override whenNotPaused {
-        require(msg.sender == address(endpoint), InvalidMessageSender());
-        console.log("Received message on home chain");
-        console.logBytes32(_guid);
-        console.logBytes(_message);
-        console.logBytes(_extraData);
+        if (msg.sender != address(endpoint)) revert InvalidMessageSender();
 
         (uint32 chainId, address user, bytes32 btcTxnHash, uint256 lockedAmount, uint256 nativeTokenAmount) =
             abi.decode(_message, (uint32, address, bytes32, uint256, uint256));
@@ -130,8 +123,6 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     }
 
     function _handleMinting(address _user, uint256 _lockedAmount) internal {
-        console.log("Minting eBTC for user: ", _user);
-        console.log("Locked amount: ", _lockedAmount);
         eBTCManagerInstance.mint(_user, _lockedAmount);
     }
 
@@ -177,7 +168,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      */
     function withdraw() external onlyOwner nonReentrant {
         (bool success,) = msg.sender.call{value: address(this).balance}("");
-        require(success, "Withdrawal failed");
+        if (!success) revert WithdrawalFailed();
     }
 
     fallback() external payable {

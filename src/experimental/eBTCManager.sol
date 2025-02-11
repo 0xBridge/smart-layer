@@ -12,6 +12,10 @@ import {eBTC} from "../eBTC.sol";
  * @dev Implementation of a secure eBTCManager contract with ownership and pause functionality
  */
 contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
+    // Errors
+    error InvalidRecipient();
+    error InvalidAmount();
+
     // State variables
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     eBTC private eBTCToken;
@@ -40,8 +44,8 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
      * @notice This function is pausable and protected against reentrancy
      */
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) nonReentrant whenNotPaused {
-        require(to != address(0), "Invalid recipient");
-        require(amount > 0, "Invalid amount");
+        if (to == address(0)) revert InvalidRecipient();
+        if (amount == 0) revert InvalidAmount();
         eBTCToken.mint(to, amount);
         emit Minted(to, amount);
     }
@@ -51,8 +55,8 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
      * @notice This function is pausable and protected against reentrancy
      */
     function withdraw(address to, uint256 amount) external onlyRole(MINTER_ROLE) nonReentrant whenNotPaused {
-        require(to != address(0), "Invalid recipient");
-        require(amount > 0, "Invalid amount");
+        if (to == address(0)) revert InvalidRecipient();
+        if (amount == 0) revert InvalidAmount();
         eBTCToken.burn(amount);
         emit Withdrawn(to, amount);
     }

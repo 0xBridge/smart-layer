@@ -26,11 +26,11 @@ library BitcoinUtils {
     function sha256DoubleHash(bytes memory bytesData) internal view returns (bytes32) {
         // First SHA256
         (bool success, bytes memory result) = address(0x2).staticcall(abi.encodePacked(bytesData));
-        require(success, SHA256_FAILED());
+        if (!success) revert SHA256_FAILED();
 
         // Second SHA256
         (success, result) = address(0x2).staticcall(result);
-        require(success, SHA256_FAILED());
+        if (!success) revert SHA256_FAILED();
 
         return bytes32(result);
     }
@@ -39,7 +39,7 @@ library BitcoinUtils {
     /// @param rawHeader The 80-byte Bitcoin block header
     /// @return header The parsed BlockHeader struct
     function parseBlockHeader(bytes calldata rawHeader) internal pure returns (BlockHeader memory header) {
-        require(rawHeader.length == 80, INVALID_HEADER_LENGTH());
+        if (rawHeader.length != 80) revert INVALID_HEADER_LENGTH();
 
         // Version (4 bytes) - Convert from LE to BE
         header.version = uint32(bytesToUint256(reverseBytes(rawHeader[0:4])));
@@ -227,7 +227,7 @@ library BitcoinUtils {
         uint32 coef = bits & 0x00ffffff;
 
         // Add safety checks
-        require(exp <= 32, EXPONENT_TOO_LARGE()); // Reasonable limit for Bitcoin
+        if (exp > 32) revert EXPONENT_TOO_LARGE(); // Reasonable limit for Bitcoin
 
         // Use a safer calculation method
         if (exp <= 3) return coef >> (8 * (3 - exp));
@@ -253,7 +253,7 @@ library BitcoinUtils {
     /// @param txids Merkle proof nodes
     /// @return bytes32 Calculated merkle root in natural byte order
     function calculateMerkleRootInNaturalByteOrder(bytes32[] memory txids) internal view returns (bytes32) {
-        require(txids.length != 0, INVALID_INPUT());
+        if (txids.length == 0) revert INVALID_INPUT();
         if (txids.length == 1) return txids[0];
 
         // Create a memory array to store the current level's hashes
@@ -340,11 +340,11 @@ library BitcoinUtils {
         returns (bytes32[] memory proof, bool[] memory directions)
     {
         // Check if transactions array is empty
-        require(transactions.length > 0, EMPTY_TXN_LIST());
+        if (transactions.length == 0) revert EMPTY_TXN_LIST();
 
         // Calculate maximum allowed index (number of transactions - 1)
         uint256 maxIndex = transactions.length - 1;
-        require(index <= maxIndex, INDEX_OUT_OF_BOUNDS());
+        if (index > maxIndex) revert INDEX_OUT_OF_BOUNDS();
 
         // Calculate the number of levels in the tree
         uint256 levels = 0;
