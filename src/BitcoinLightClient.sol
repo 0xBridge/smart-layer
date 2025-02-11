@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {BitcoinUtils} from "./lib/BitcoinUtils.sol";
 import {UUPSUpgradeable} from "@openzeppelin-upgrades/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin-upgrades/contracts/access/AccessControlUpgradeable.sol";
 import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initializable.sol";
+import {BitcoinTxnParser} from "./libraries/BitcoinTxnParser.sol";
+import {BitcoinUtils} from "./libraries/BitcoinUtils.sol";
 
 contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgradeable {
     // Error codes
@@ -86,6 +87,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
      * @param prevBlock Previous block hash
      * @param merkleRoot Block merkle root
      * @param intermediateHeaders Array of intermediate headers
+     * @return blockHash Block hash
      * @dev Only accounts with BLOCK_SUBMIT_ROLE can submit headers
      */
     function submitBlockHeader(
@@ -97,7 +99,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
         bytes32 prevBlock,
         bytes32 merkleRoot,
         bytes[] calldata intermediateHeaders
-    ) external returns (bool) {
+    ) external returns (bytes32 blockHash) {
         BitcoinUtils.BlockHeader memory header = BitcoinUtils.BlockHeader({
             version: blockVersion,
             timestamp: blockTimestamp,
@@ -107,23 +109,24 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
             prevBlock: prevBlock,
             merkleRoot: merkleRoot
         });
-        bytes32 blockHash = BitcoinUtils.getBlockHashFromParams(header);
-        return _submitBlockHeader(blockHash, header, intermediateHeaders);
+        blockHash = BitcoinUtils.getBlockHashFromParams(header);
+        _submitBlockHeader(blockHash, header, intermediateHeaders);
     }
 
     /**
      * @notice Submit a new raw block header along with intermediate headers (in reverse array order)
      * @param rawHeader Raw block header bytes
      * @param intermediateHeaders Array of intermediate headers
+     * @return blockHash Block hash
      * @dev Only accounts with BLOCK_SUBMIT_ROLE can submit headers
      */
     function submitRawBlockHeader(bytes calldata rawHeader, bytes[] calldata intermediateHeaders)
         external
-        returns (bool)
+        returns (bytes32 blockHash)
     {
-        bytes32 blockHash = getBlockHash(rawHeader);
+        blockHash = getBlockHash(rawHeader);
         BitcoinUtils.BlockHeader memory header = BitcoinUtils.parseBlockHeader(rawHeader);
-        return _submitBlockHeader(blockHash, header, intermediateHeaders);
+        _submitBlockHeader(blockHash, header, intermediateHeaders);
     }
 
     /**
@@ -136,7 +139,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
         bytes32 blockHash,
         BitcoinUtils.BlockHeader memory header,
         bytes[] calldata intermediateHeaders
-    ) internal returns (bool) {
+    ) internal {
         if (!BitcoinUtils.verifyProofOfWork(blockHash, header.difficultyBits)) {
             revert INVALID_PROOF_OF_WORK();
         }
@@ -154,7 +157,6 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
         headers[latestCheckpointHeaderHash] = header;
 
         emit BlockHeaderSubmitted(blockHash, header.prevBlock, header.height);
-        return true;
     }
 
     /**
@@ -219,6 +221,13 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
     }
 
     /**
+     * @notice Get the merkle root for a block
+     */
+    function getMerkleRootForBlock(bytes32 blockHash) external view returns (bytes32) {
+        return headers[blockHash].merkleRoot;
+    }
+
+    /**
      * @notice Generate merkle proof for a transaction
      * @param transactions Array of transaction hashes
      * @param index Binary path index
@@ -269,5 +278,21 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
      */
     function version() external pure returns (string memory) {
         return "1.0.0";
+    }
+
+    /**
+     * @notice Extracts OP_RETURN data from a raw Bitcoin transaction
+     * @param rawTxnHex The raw Bitcoin transaction bytes
+     * @return metadata Structured metadata containing receiver address, locked Amount, chain ID, and base token amount
+     */
+    function decodeTransactionMetadata(bytes calldata rawTxnHex)
+        public
+        pure
+        returns (BitcoinTxnParser.TransactionMetadata memory metadata)
+    {
+        // Parse transaction outputs
+        bytes memory opReturnData = BitcoinTxnParser.decodeBitcoinTxn(rawTxnHex);
+        // Decode metadata from OP_RETURN data
+        return BitcoinTxnParser.decodeMetadata(opReturnData);
     }
 }

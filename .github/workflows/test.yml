@@ -2,14 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main, light-client]
+    branches: [main, light-client, architecture]
   pull_request:
-    branches: [main, light-client]
+    branches: [main, light-client, architecture]
 
 env:
-  FOUNDRY_PROFILE: ci
-  RPC_URL: ${{ secrets.RPC_URL }}
-  PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+  FOUNDRY_PROFILE: ci-testing
+  FOUNDRY_DISABLE_NIGHTLY_WARNING: true
+  BASE_RPC_URL: ${{ vars.BASE_RPC_URL }}
+  OPTIMISM_RPC_URL: ${{ vars.OPTIMISM_RPC_URL }}
 
 jobs:
   check:
@@ -28,6 +29,11 @@ jobs:
         with:
           version: nightly
 
+      - name: Update submodules
+        run: |
+          git submodule update --init --recursive
+          forge install
+
       - name: Show Forge version
         run: |
           forge --version
@@ -36,6 +42,10 @@ jobs:
         run: |
           forge fmt --check
         id: fmt
+
+      - name: Clean
+        run: |
+          forge clean
 
       - name: Run Forge build
         run: |

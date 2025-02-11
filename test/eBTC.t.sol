@@ -58,12 +58,12 @@ contract eBTCTest is Test {
         assertTrue(proxy.hasRole(MINTER_ROLE, minter));
     }
 
-    function testFail_ReinitializeProxy() public {
+    function testFail__ReinitializeProxy() public {
         vm.prank(admin);
         proxy.initialize(minter);
     }
 
-    function testFail_InitializeImplementation() public {
+    function testFail__InitializeImplementation() public {
         vm.prank(admin);
         implementation.initialize(minter);
     }
@@ -75,7 +75,7 @@ contract eBTCTest is Test {
         assertTrue(proxy.hasRole(MINTER_ROLE, user1));
     }
 
-    function testFail_NonAdminCannotGrantRole() public {
+    function testFail__NonAdminCannotGrantRole() public {
         vm.prank(user1);
         proxy.grantRole(MINTER_ROLE, user2);
     }
@@ -87,7 +87,7 @@ contract eBTCTest is Test {
         assertEq(proxy.balanceOf(user1), 1000);
     }
 
-    function testFail_NonMinterCannotMint() public {
+    function testFail__NonMinterCannotMint() public {
         vm.prank(user1);
         proxy.mint(user1, 1000);
     }
@@ -101,7 +101,7 @@ contract eBTCTest is Test {
         assertEq(proxy.balanceOf(minter), 500);
     }
 
-    function testFail_NonMinterCannotBurn() public {
+    function testFail__NonMinterCannotBurn() public {
         vm.startPrank(minter);
         proxy.mint(user1, 1000);
         vm.stopPrank();
@@ -122,7 +122,7 @@ contract eBTCTest is Test {
         assertEq(proxy.balanceOf(user2), 500);
     }
 
-    function testFail_TransferWithInsufficientBalance() public {
+    function testFail__TransferWithInsufficientBalance() public {
         vm.prank(minter);
         proxy.mint(user1, 100);
 
@@ -145,7 +145,7 @@ contract eBTCTest is Test {
         assertEq(proxy.balanceOf(user2), 500);
     }
 
-    function testFail_TransferFromWithoutApproval() public {
+    function testFail__TransferFromWithoutApproval() public {
         vm.prank(minter);
         proxy.mint(user1, 1000);
 
@@ -193,7 +193,7 @@ contract eBTCTest is Test {
         assertEq(eBTCV2(address(proxy)).newVariable(), 42);
     }
 
-    function testFail_UpgradeByNonAdmin() public {
+    function testFail__UpgradeByNonAdmin() public {
         vm.prank(user1);
         proxy.upgradeTo(address(implementationV2));
     }
@@ -213,12 +213,12 @@ contract eBTCTest is Test {
         assertTrue(proxy.hasRole(DEFAULT_ADMIN_ROLE, admin));
     }
 
-    function testFail_UpgradeToZeroAddress() public {
+    function testFail__UpgradeToZeroAddress() public {
         vm.prank(admin);
         proxy.upgradeTo(address(0));
     }
 
-    function testFail_UnauthorizedInitializeAfterUpgrade() public {
+    function testFail__UnauthorizedInitializeAfterUpgrade() public {
         vm.prank(admin);
         proxy.upgradeTo(address(implementationV2));
 
@@ -256,7 +256,7 @@ contract eBTCTest is Test {
         assertEq(proxy.balanceOf(user1), 1000);
     }
 
-    function testFail_BurnMoreThanBalance() public {
+    function testFail__BurnMoreThanBalance() public {
         vm.startPrank(minter);
         proxy.mint(minter, 1000);
         proxy.burn(2000);

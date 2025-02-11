@@ -2,23 +2,36 @@
 libs = ["lib"]
 out = "out"
 src = "src"
+via-ir = true
+fs_permissions = [{ access = "read", path = "./"}]
 
 optimizer = true
 optimizer_runs = 200
-remapping = [
-    "@openzeppelin-upgrades=lib/eigenlayer-middleware/lib/openzeppelin-contracts-upgradeable",
-    "@openzeppelin=lib/eigenlayer-middleware/lib/openzeppelin-contracts",
+remappings = [
+    "@openzeppelin/=lib/eigenlayer-middleware/lib/openzeppelin-contracts/",
+    "@openzeppelin-upgradeable/=lib/eigenlayer-middleware/lib/openzeppelin-contracts-upgradeable/",
+    "@layerzerolabs/oapp-evm/=lib/devtools/packages/oapp-evm/",
+    "@layerzerolabs/lz-evm-protocol-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/protocol/",
+    "@layerzerolabs/lz-evm-messagelib-v2/=lib/layerzero-v2/packages/layerzero-v2/evm/messagelib/",
+    "solidity-bytes-utils/=lib/solidity-bytes-utils/",
+    "@eigenlayer-middleware/=lib/eigenlayer-middleware/"
 ]
-solc = '0.8.28'
+solc = "0.8.28"
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
 [etherscan]
 mainnet = {key = "${ETHERSCAN_API_KEY}"}
 optimism = {key = "${ETHERSCAN_OPTIMISM_KEY}"}
-sepolia = {key = "${ETHERSCAN_API_KEY}"}
+sepolia = {key = "${ETHERSCAN_SEPOLIA_KEY}"}
+polygon = { key = "${ETHERSCAN_POLYGON_KEY}" }
+arbitrum = { key = "${ETHERSCAN_ARBITURM_KEY}" }
+base = { key = "${ETHERSCAN_BASE_KEY}" }
 
 [rpc_endpoints]
 mainnet = "${MAINNET_RPC_URL}"
 op-sepolia = "${OP_SEPOLIA_RPC_URL}"
-optimism = "${OP_MAINNET_RPC_URL}"
+optimism = "${OPTIMISM_RPC_URL}"
 sepolia = "${SEPOLIA_RPC_URL}"
+polygon = "${POLYGON_RPC_URL}"
+arbitrum = "${ARBITRUM_RPC_URL}"
+base = "${BASE_RPC_URL}"
