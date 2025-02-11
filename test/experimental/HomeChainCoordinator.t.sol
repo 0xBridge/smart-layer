@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test, console2, Vm} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {IOAppCore} from "lib/devtools/packages/oapp-evm/contracts/oapp/interfaces/IOAppCore.sol";
 import {LayerZeroV2Helper} from "lib/pigeon/src/layerzero-v2/LayerZeroV2Helper.sol";
 import {HomeChainCoordinator} from "../../src/experimental/HomeChainCoordinator.sol";
@@ -182,11 +182,9 @@ contract HomeChainCoordinatorTest is Test {
         homeChainCoordinator.sendMessage{value: 0.2 ether}(
             blockHash, btcTxnHash, proof, index, psbtData, options, owner
         );
-        console2.log("Message sent");
 
         // Process the message on destination chain
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        // Is there a way to console logs here?
         lzHelper.help(BASE_STARGATE_ENDPOINT_V2, destForkId, logs);
 
         // Check if the message was processed correctly

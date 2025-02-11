@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {console2} from "forge-std/console2.sol";
 import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -160,7 +159,6 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
 
         // 2. TODO: Get _dstEid for a specific metadata.chainId from LayerZero contract
         uint32 _dstEid = metadata.chainId == 8453 ? 30184 : metadata.chainId;
-        console2.log("Destination chain ID: ", _dstEid);
 
         // 3. Check if the message already exists or is processed
         if (btcTxnHash_psbtMetadata[_btcTxnHash].isMinted) {
