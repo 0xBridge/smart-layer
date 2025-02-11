@@ -157,15 +157,15 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         // 1. Parse and validate PSBT data
         BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_psbtData);
 
-        // 2. TODO: Get _dstEid for a specific metadata.chainId from LayerZero contract
+        // TODO: Remove this after updating the test with the correct chainId in the metadata
         uint32 _dstEid = metadata.chainId == 8453 ? 30184 : metadata.chainId;
 
-        // 3. Check if the message already exists or is processed
+        // 2. Check if the message already exists or is processed
         if (btcTxnHash_psbtMetadata[_btcTxnHash].isMinted) {
             revert TxnAlreadyProcessed(_btcTxnHash);
         }
 
-        // 4. Validate receiver is set for destination chain
+        // 3. Validate receiver is set for destination chain
         if (peers[_dstEid] == bytes32(0)) {
             revert InvalidDestination();
         }
@@ -188,9 +188,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         btcTxnHash_psbtMetadata[_btcTxnHash] = psbtMetaData;
 
         // 7. Send message through LayerZerobytes memory payload
-        bytes memory payload = abi.encode(
-            metadata.chainId, metadata.receiverAddress, _btcTxnHash, metadata.lockedAmount, metadata.nativeTokenAmount
-        );
+        bytes memory payload =
+            abi.encode(metadata.receiverAddress, _btcTxnHash, metadata.lockedAmount, metadata.nativeTokenAmount);
 
         // TODO: Create a function to get the correct MessageFee for the user
         _lzSend(
@@ -256,22 +255,21 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable {
         // 1. Parse and get metadata from psbtMetaData
         PSBTMetadata memory metadata = btcTxnHash_psbtMetadata[_btcTxnHash];
 
-        // 2. TODO: Get _dstEid for a specific metadata.chainId from LayerZero contract
+        // TODO: Remove this after updating the test with the correct chainId in the metadata
         uint32 _dstEid = metadata.chainId == 8453 ? 30184 : metadata.chainId;
 
-        // 3. Validate receiver is set for destination chain
+        // 2. Validate receiver is set for destination chain
         if (peers[_dstEid] == bytes32(0)) {
             revert InvalidDestination();
         }
 
-        // 4. Check if all the fields needed to be sent in the payload are present in the metadata (should never enter revert ideally)
+        // 3. Check if all the fields needed to be sent in the payload are present in the metadata (should never enter revert ideally)
         if (metadata.chainId == 0 || metadata.user == address(0) || metadata.lockedAmount == 0) {
             revert InvalidPSBTData();
         }
 
-        // 5. Send message through LayerZerobytes memory payload =
-        bytes memory payload =
-            abi.encode(metadata.chainId, metadata.user, _btcTxnHash, metadata.lockedAmount, metadata.nativeTokenAmount);
+        // 4. Send message through LayerZerobytes memory payload =
+        bytes memory payload = abi.encode(metadata.user, _btcTxnHash, metadata.lockedAmount, metadata.nativeTokenAmount);
 
         // TODO: Create a function to get the correct MessageFee for the user
         _lzSend(

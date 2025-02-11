@@ -14,9 +14,7 @@ import {eBTCManager} from "./eBTCManager.sol";
  */
 contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoordinator {
     // Errors
-    error InvalidSource(uint32 srcChainId, uint32 currentChainId);
     error MessageAlreadyProcessed(bytes32 btcTxnHash);
-    error InvalidSignature();
     error InvalidMessageSender();
     error InvalidPeer();
     error ReceiverNotSet();
@@ -79,25 +77,16 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     {
         if (msg.sender != address(endpoint)) revert InvalidMessageSender();
 
-        (uint32 chainId, address user, bytes32 btcTxnHash, uint256 lockedAmount, uint256 nativeTokenAmount) =
-            abi.decode(_message, (uint32, address, bytes32, uint256, uint256));
+        (address user, bytes32 btcTxnHash, uint256 lockedAmount, uint256 nativeTokenAmount) =
+            abi.decode(_message, (address, bytes32, uint256, uint256));
 
-        // 1. Validate source chain and sender
-        _validateSource(chainId);
-
-        // 2. Check for replay attacks
+        // 1. Check for replay attacks
         _validateMessageUniqueness(btcTxnHash);
 
-        // 3. Process the message
+        // 2. Process the message
         _processMessage(btcTxnHash, user, lockedAmount);
 
         emit MessageProcessed(_guid, _origin.srcEid, _origin.sender);
-    }
-
-    function _validateSource(uint32 chainId) internal view {
-        if (chainId != block.chainid) {
-            revert InvalidSource(chainId, uint32(block.chainid));
-        }
     }
 
     function _validateMessageUniqueness(bytes32 _btcTxnHash) internal view {
@@ -109,8 +98,6 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
     function _processMessage(bytes32 _btcTxnHash, address _user, uint256 _lockedAmount) internal {
         // Decode the message and process it
-
-        // Your existing message processing logic
         MintData memory mintData = btcTxnHash_mintData[_btcTxnHash];
         mintData.isMinted = true;
         mintData.user = _user;
