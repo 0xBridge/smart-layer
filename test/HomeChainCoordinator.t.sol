@@ -24,8 +24,8 @@ contract HomeChainCoordinatorTest is Test {
     eBTCManager private eBTCManagerInstance;
     eBTC private eBTCToken;
 
-    HelperConfig private homeConfig;
-    HelperConfig private baseConfig;
+    HelperConfig.NetworkConfig private srcNetworkConfig;
+    HelperConfig.NetworkConfig private destNetworkConfig;
 
     address private owner;
     address private user;
@@ -34,11 +34,10 @@ contract HomeChainCoordinatorTest is Test {
     uint256 private sourceForkId;
     uint256 private destForkId;
 
-    uint32 private constant OP_EID = 30111;
-    address private constant OPTIMISM_ENDPOINT_V2 = 0x1a44076050125825900e736c501f859c50fE728c;
-    uint32 private constant DEST_EID = 30184;
-    uint256 private constant DEST_CHAIN_ID = 8453;
-    address private constant BASE_STARGATE_ENDPOINT_V2 = 0x1a44076050125825900e736c501f859c50fE728c;
+    // uint32 private constant OP_EID = 30111;
+    // address private constant OPTIMISM_ENDPOINT_V2 = 0x1a44076050125825900e736c501f859c50fE728c;
+    // uint32 private constant DEST_EID = 30184;
+    // address private constant BASE_ENDPOINT_V2 = 0x1a44076050125825900e736c501f859c50fE728c;
 
     // BTC txn metadata
     address private constant BTC_RECEIVER = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
@@ -68,9 +67,9 @@ contract HomeChainCoordinatorTest is Test {
     function setUp() public {
         string memory destRpcUrl = vm.envString("BASE_RPC_URL");
         destForkId = vm.createSelectFork(destRpcUrl);
-        baseConfig = new HelperConfig();
-        HelperConfig.NetworkConfig memory baseNetworkConfig = baseConfig.getConfig();
-        owner = baseNetworkConfig.account;
+        HelperConfig destConfig = new HelperConfig();
+        destNetworkConfig = destConfig.getConfig();
+        owner = destNetworkConfig.account;
         vm.prank(owner);
 
         // Deploy the eBTCManager contract
@@ -78,7 +77,7 @@ contract HomeChainCoordinatorTest is Test {
 
         // Deploy the base chain coordinator
         baseChainCoordinator = new BaseChainCoordinator(
-            BASE_STARGATE_ENDPOINT_V2, // endpoint
+            destNetworkConfig.endpoint, // endpoint
             owner, // owner
             address(eBTCManagerInstance) // eBTCManager
         );
@@ -94,9 +93,10 @@ contract HomeChainCoordinatorTest is Test {
         eBTCManagerInstance.setEBTC(address(eBTCToken));
         vm.stopPrank();
 
-        string memory rpcUrl = vm.envString("OPTIMISM_RPC_URL");
-        sourceForkId = vm.createSelectFork(rpcUrl);
-        homeConfig = new HelperConfig();
+        string memory srcRpcUrl = vm.envString("OPTIMISM_RPC_URL");
+        sourceForkId = vm.createSelectFork(srcRpcUrl);
+        HelperConfig srcConfig = new HelperConfig();
+        srcNetworkConfig = srcConfig.getConfig();
         lzHelper = new LayerZeroV2Helper();
 
         // Deploy implementation and proxy for BitcoinLightClient using ERC1967Proxy
@@ -116,7 +116,7 @@ contract HomeChainCoordinatorTest is Test {
         btcLightClient = BitcoinLightClient(address(lightClientProxy));
 
         vm.prank(owner);
-        homeChainCoordinator = new HomeChainCoordinator(address(btcLightClient), OPTIMISM_ENDPOINT_V2, owner);
+        homeChainCoordinator = new HomeChainCoordinator(address(btcLightClient), srcNetworkConfig.endpoint, owner);
 
         // Fund the contract
         // vm.deal(address(this), 100 ether);
@@ -127,10 +127,10 @@ contract HomeChainCoordinatorTest is Test {
         // Set the receiver
         bytes32 receiver = bytes32(uint256(uint160(address(baseChainCoordinator))));
         vm.prank(owner);
-        homeChainCoordinator.setPeer(DEST_EID, receiver);
+        homeChainCoordinator.setPeer(destNetworkConfig.endpointId, receiver);
 
         // Assert that the receiver is set correctly
-        assertEq(homeChainCoordinator.peers(DEST_EID), receiver);
+        assertEq(homeChainCoordinator.peers(destNetworkConfig.endpointId), receiver);
     }
 
     // TODO: Add test for submitBlockAndSendMessage
@@ -143,13 +143,13 @@ contract HomeChainCoordinatorTest is Test {
         // Set receivers and peers on both chains
         vm.selectFork(sourceForkId);
         vm.startPrank(owner);
-        homeChainCoordinator.setPeer(DEST_EID, receiver);
+        homeChainCoordinator.setPeer(destNetworkConfig.endpointId, receiver);
         vm.stopPrank();
 
         // Set up peer on destination chain
         vm.selectFork(destForkId);
         vm.prank(owner);
-        baseChainCoordinator.setPeer(OP_EID, sender);
+        baseChainCoordinator.setPeer(srcNetworkConfig.endpointId, sender);
 
         // Back to source chain for sending message
         vm.selectFork(sourceForkId);
@@ -184,7 +184,7 @@ contract HomeChainCoordinatorTest is Test {
 
         // Process the message on destination chain
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        lzHelper.help(BASE_STARGATE_ENDPOINT_V2, destForkId, logs);
+        lzHelper.help(destNetworkConfig.endpoint, destForkId, logs);
 
         // Check if the message was processed correctly
         vm.selectFork(destForkId);
