@@ -26,5 +26,17 @@
   "10": {
     "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
     "endpointId": 30111
+  },
+  "1115": {
+    "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
+    "endpointId": 40153
+  },
+  "84532": {
+    "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
+    "endpointId": 40245
+  },
+  "80002": {
+    "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
+    "endpointId": 40267
   }
 }
