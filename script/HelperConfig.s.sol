@@ -23,7 +23,7 @@ contract HelperConfig is Script {
 
         // Read and parse network config for current chain
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/scripts/network-config.json");
+        string memory path = string.concat(root, "/script/network-config.json");
         string memory json = vm.readFile(path);
 
         // Try to parse the network config for current chain

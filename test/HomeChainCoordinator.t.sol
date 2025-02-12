@@ -9,18 +9,14 @@ import {HelperConfig} from "../script/HelperConfig.s.sol";
 import {HomeChainCoordinator} from "../src/HomeChainCoordinator.sol";
 import {BaseChainCoordinator} from "../src/BaseChainCoordinator.sol";
 import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
-import {AVSTaskManager} from "../src/avs/AVSTaskManager.sol";
 import {eBTCManager} from "../src/eBTCManager.sol";
 import {eBTC} from "../src/eBTC.sol";
 
 contract HomeChainCoordinatorTest is Test {
-    // using OptionsBuilder for bytes;
-
     LayerZeroV2Helper private lzHelper;
     HomeChainCoordinator private homeChainCoordinator;
     BaseChainCoordinator private baseChainCoordinator;
     BitcoinLightClient private btcLightClient;
-    AVSTaskManager private avsTaskManager;
     eBTCManager private eBTCManagerInstance;
     eBTC private eBTCToken;
 
@@ -33,11 +29,6 @@ contract HomeChainCoordinatorTest is Test {
 
     uint256 private sourceForkId;
     uint256 private destForkId;
-
-    // uint32 private constant OP_EID = 30111;
-    // address private constant OPTIMISM_ENDPOINT_V2 = 0x1a44076050125825900e736c501f859c50fE728c;
-    // uint32 private constant DEST_EID = 30184;
-    // address private constant BASE_ENDPOINT_V2 = 0x1a44076050125825900e736c501f859c50fE728c;
 
     // BTC txn metadata
     address private constant BTC_RECEIVER = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
@@ -65,7 +56,7 @@ contract HomeChainCoordinatorTest is Test {
     event MessageSent(uint32 dstEid, string message, bytes32 receiver, uint256 nativeFee);
 
     function setUp() public {
-        string memory destRpcUrl = vm.envString("BASE_RPC_URL");
+        string memory destRpcUrl = vm.envString("CORE_TESTNET_RPC_URL");
         destForkId = vm.createSelectFork(destRpcUrl);
         HelperConfig destConfig = new HelperConfig();
         destNetworkConfig = destConfig.getConfig();
@@ -93,7 +84,7 @@ contract HomeChainCoordinatorTest is Test {
         eBTCManagerInstance.setEBTC(address(eBTCToken));
         vm.stopPrank();
 
-        string memory srcRpcUrl = vm.envString("OPTIMISM_RPC_URL");
+        string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
         sourceForkId = vm.createSelectFork(srcRpcUrl);
         HelperConfig srcConfig = new HelperConfig();
         srcNetworkConfig = srcConfig.getConfig();
@@ -120,7 +111,7 @@ contract HomeChainCoordinatorTest is Test {
 
         // Fund the contract
         // vm.deal(address(this), 100 ether);
-        vm.deal(owner, 100 ether);
+        vm.deal(owner, 100 ether); // This is 100 native tokens on the source chain
     }
 
     function testSetReceiver() public {
@@ -178,9 +169,7 @@ contract HomeChainCoordinatorTest is Test {
             hex"020000000001018b1a4ac7b6fc2a0a58ea6345238faae0785115da71e15b46609caa440ec834b90100000000ffffffff04102700000000000022512038b619797eb282894c5e33d554b03e1bb8d81d6d30d3c1a164ed15c8107f0774e80300000000000016001471d044aeb7f41205a9ef0e3d785e7d38a776cfa10000000000000000326a3000144e56a8e3757f167378b38269e1ca0e1a1f124c9e000800000000000003e800040000210500080000000000004e207b84000000000000160014d6a279dc882b830c5562b49e3e25bf3c5767ab7302483045022100b4957432ec426f9f66797305bf0c44d586674d48c260c3d059b81b65a473f717022025b2f1641234dfd3f27eafabdd68a2fa1a0ab286a5292664f7ad9c260aa1455701210226795246077d56dfbc6730ef3a6833206a34f0ba1bd6a570de14d49c42781ddb00000000";
         vm.recordLogs();
         vm.prank(owner);
-        homeChainCoordinator.sendMessage{value: 0.2 ether}(
-            blockHash, btcTxnHash, proof, index, psbtData, options, owner
-        );
+        homeChainCoordinator.sendMessage{value: 1 ether}(blockHash, btcTxnHash, proof, index, psbtData, options, owner);
 
         // Process the message on destination chain
         Vm.Log[] memory logs = vm.getRecordedLogs();
