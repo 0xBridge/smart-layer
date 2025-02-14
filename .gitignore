@@ -12,6 +12,8 @@ docs/
 
 # Dotenv file
 .env
+.env.avs
+.env.contracts
 broadcast/*
 
 # Gas files
