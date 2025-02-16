@@ -100,6 +100,9 @@ contract AVSTest is Test {
     address private constant EL_STRATEGY_MANAGER = 0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6;
     address private constant ST_ETH_STRATEGY = 0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3;
 
+    address private constant SIGNER = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
+
+    // TODO: Test it in sequence for a fresh setup with
     function alreadyDone_setUp() public {
         // 1. Deploy the AVS contracts - this can be done via the Othentic cli
 
@@ -135,7 +138,7 @@ contract AVSTest is Test {
         // https://amoy.polygonscan.com/tx/0x5fd0a7919ae8af9785cccf670dfb0ad9897bdfc7a6b2f50156cb1453063f55c4
         IAttestationCenter(ATTESTATION_CENTER).unpause(REWARDS_FLOW); // Deployer (AVS_MULTISIG_OWNER)
 
-        // 7. Claim Rewards
+        // 7. Claim Rewards - Can be done post submitTask
         // https://amoy.polygonscan.com/tx/0xa733561e71a50530177c8c92e08c95cefb0263f92572a99f8f9c80d63895b5af
         // IAttestationCenter(ATTESTATION_CENTER).requestBatchPayment(); // Deployer (AVS_MULTISIG_OWNER)
     }
@@ -151,13 +154,27 @@ contract AVSTest is Test {
 
         // Create the task info
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
-            proofOfTask: "Proof of task",
-            data: "Data",
-            taskPerformer: address(0x1234567890123456789012345678901234567890),
-            taskDefinitionId: 1
+            proofOfTask: "Proof_Of_Task",
+            data: hex"4920616d2049726f6e6d616e21", // hex bytes data
+            taskPerformer: SIGNER,
+            taskDefinitionId: 0
         });
 
-        // Submit the task
-        attestationCenter.submitTask(taskInfo, true, "TP Signature", [1, 2], [1, 2, 3]);
+        // Submit the task (TODO: Figure this part out)
+        bytes memory tpSignature =
+            hex"58ae6a69ddab6e1e661db8fbcbc8ede05f9e43941325fb462aaa54fd565b5c89704d5a0a45f1229ee6c648d0e647d3b93087bbd520e5fd32bd37dee19662a4421b";
+        uint256[2] memory taSignature = [
+            9093911615789399830602974754443205710846914036477274464096283111600022727438,
+            11541948654984445339530075522406573357857067838037210814544443461153759883923
+        ];
+        uint256[] memory attestersIds = new uint256[](2);
+        attestersIds[0] = 3;
+        attestersIds[1] = 4;
+
+        vm.prank(SIGNER);
+        attestationCenter.submitTask(taskInfo, true, tpSignature, taSignature, attestersIds);
+
+        // Distribute rewards
+        // attestationCenter.requestBatchPayment(); // Deployer (AVS_MULTISIG_OWNER)
     }
 }
