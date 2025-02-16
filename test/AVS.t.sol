@@ -66,7 +66,10 @@ interface IVault {
 
 // interface
 contract AVSTest is Test {
+    address private constant SIGNER = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
+
     // Amoy Variables
+    uint256 private homeForkId;
 
     // Holesky Variables
     // This would change for every operator
@@ -75,7 +78,6 @@ contract AVSTest is Test {
     uint256 private ethAmountToStake = 1 ether;
     uint256 private wethTreasuryAmountDeposit = 10 ether;
 
-    // 1. Deploy the AVS contracts - Done via the Othentic cli
     // Amoy deployed addresses
     address private constant ATTESTATION_CENTER = 0x276ef26eEDC3CFE0Cdf22fB033Abc9bF6b6a95B3;
     address private constant L2_MESSAGE_HANDLER = 0x99cFa1A168545F9f19218b0D6a0654b95d57842a;
@@ -84,7 +86,7 @@ contract AVSTest is Test {
 
     // Amoy constants
     address private constant ZERO_ADDRESS = address(0);
-    bytes4 private constant REWARDS_FLOW = 0xc6d72715;
+    bytes4 private constant REWARDS_FLOW = 0xc6d72715; // 0xc6d72715 - RewardsFlow
     address private constant AVS_MULTISIG_OWNER = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
 
     // Holesky deployed addresses
@@ -100,9 +102,7 @@ contract AVSTest is Test {
     address private constant EL_STRATEGY_MANAGER = 0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6;
     address private constant ST_ETH_STRATEGY = 0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3;
 
-    address private constant SIGNER = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
-
-    // TODO: Test it in sequence for a fresh setup with
+    // 1. Deploy the AVS contracts - Done via the Othentic cli (TODO: Test with a fresh deploy)
     function alreadyDone_setUp() public {
         // 1. Deploy the AVS contracts - this can be done via the Othentic cli
 
@@ -143,10 +143,13 @@ contract AVSTest is Test {
         // IAttestationCenter(ATTESTATION_CENTER).requestBatchPayment(); // Deployer (AVS_MULTISIG_OWNER)
     }
 
-    // Create the required task -
+    function setUp() public {
+        // Create and select the network on which the task is to be submitted
+        string memory homeRpcUrl = vm.envString("AMOY_RPC_URL");
+        homeForkId = vm.createSelectFork(homeRpcUrl);
+    }
 
     // Submit it to the AttestationCenter via the submitTask function
-
     // Currently, all the above happens in one go via the Othentic cli
     function testSubmitTask() public {
         // Create the AttestationCenter contract
@@ -154,7 +157,7 @@ contract AVSTest is Test {
 
         // Create the task info
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
-            proofOfTask: "Proof_Of_Task",
+            proofOfTask: "QmVgZ7wnP8fMfpAtqGPbJAmUT8AMumtyahwUEhoodcyMUG",
             data: hex"4920616d2049726f6e6d616e21", // hex bytes data
             taskPerformer: SIGNER,
             taskDefinitionId: 0
