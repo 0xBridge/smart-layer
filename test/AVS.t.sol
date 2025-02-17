@@ -102,7 +102,7 @@ contract AVSTest is Test {
     address private constant EL_STRATEGY_MANAGER = 0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6;
     address private constant ST_ETH_STRATEGY = 0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3;
 
-    // 1. Deploy the AVS contracts - Done via the Othentic cli (TODO: Test with a fresh deploy)
+    // 1. Deploy the AVS contracts - Done via the Othentic cli (TODO: Test with a fresh deployment)
     function alreadyDone_setUp() public {
         // 1. Deploy the AVS contracts - this can be done via the Othentic cli
 

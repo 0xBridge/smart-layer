@@ -10,10 +10,10 @@ import {IAttestationCenter, IAvsLogic} from "./interfaces/IAvsLogic.sol";
 import {IOBLS} from "./interfaces/IOBLS.sol";
 
 /**
- * @title OxBridgeAVS
+ * @title AVSExtension
  * @dev Implementation of a secure 0xBridge AVS logic with ownership and pause functionality
  */
-contract OxBridgeAVS is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
+contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     // using BN254 for BN254.G1Point;
 
     // Errors
@@ -24,9 +24,10 @@ contract OxBridgeAVS is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     error InvalidSignatures();
 
     // Constants
-    bytes32 internal constant TASK_DOMAIN = keccak256("OxBridgeAVSTask"); // TODO: Update this
+    bytes32 internal constant TASK_DOMAIN = keccak256("TasksManager");
     uint16 internal constant TASK_DEFINITION_ID = 1; // For task-specific voting power
     uint32 internal constant DEFAULT_QUORUM_THRESHOLD = 66; // 66% threshold
+    uint32 internal constant MINIMUM_QUORUM_NUMBER = 2; // TODO: Change this via governance
 
     // TODO: Optimize the storage of the below struct
     // Task storage
@@ -87,7 +88,7 @@ contract OxBridgeAVS is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         _setPerformer(newPerformer);
     }
 
-    /* FUNCTIONS */
+    // TODO: Optimis this function
     // NOTE: this function creates new task, assigns it a taskId
     function createNewTask(
         bytes32 _blockHash,
@@ -118,8 +119,28 @@ contract OxBridgeAVS is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         emit NewTaskCreated(latestTaskNum++, newTask);
     }
 
-    // TODO: the signature of the below function needs to change to
+    // TODO: beforeTaskSubmission - check if the task is valid, exists
     function beforeTaskSubmission(
+        IAttestationCenter.TaskInfo calldata _taskInfo,
+        bool _isApproved,
+        bytes calldata _tpSignature,
+        uint256[2] calldata _taSignature,
+        uint256[] calldata _attestersIds
+    ) external onlyAttestationCenter {
+        // Decode task ID from taskInfo data
+        uint32 taskId = abi.decode(_taskInfo.data, (uint32));
+
+        // Check that the task is valid, hasn't been responsed yet
+        if (!_isApproved) revert TaskNotApproved();
+        if (!isTaskValid(taskId)) revert InvalidTask();
+        if (isTaskCompleted(taskId)) revert TaskAlreadyCompleted();
+
+        TaskData memory task = taskData[taskId];
+
+        // Prepare message for signature verification
+    }
+
+    function afterTaskSubmission(
         IAttestationCenter.TaskInfo calldata _taskInfo,
         bool _isApproved,
         bytes calldata _tpSignature,
@@ -165,7 +186,8 @@ contract OxBridgeAVS is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
             requiredPower,
             0 // No minimum per-operator requirement
         ) {
-            // TODO: Replace address(this).balance with value from an external function or ZRO token method to to pay gas fees
+            // TODO: Replace address(this).balance with value from an external function or ZRO token method to to pay the required gas fees
+            // TODO: Add a quoteFee function to calculate the required gas fees
             // Send message after successful verification
             homeChainCoordinator.sendMessage{value: address(this).balance}(
                 task.blockHash, task.btcTxnHash, task.proof, task.index, task.psbtData, task.options
