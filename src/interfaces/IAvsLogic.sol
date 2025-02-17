@@ -13,13 +13,13 @@ interface IAttestationCenter {
 }
 
 interface IAvsLogic {
-    function afterTaskSubmission(
-        IAttestationCenter.TaskInfo calldata _taskInfo,
-        bool _isApproved,
-        bytes calldata _tpSignature,
-        uint256[2] calldata _taSignature,
-        uint256[] calldata _attestersIds
-    ) external;
+    // function afterTaskSubmission(
+    //     IAttestationCenter.TaskInfo calldata _taskInfo,
+    //     bool _isApproved,
+    //     bytes calldata _tpSignature,
+    //     uint256[2] calldata _taSignature,
+    //     uint256[] calldata _attestersIds
+    // ) external;
 
     function beforeTaskSubmission(
         IAttestationCenter.TaskInfo calldata _taskInfo,
