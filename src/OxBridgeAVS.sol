@@ -14,16 +14,21 @@ import {IOBLS} from "./interfaces/IOBLS.sol";
  * @dev Implementation of a secure 0xBridge AVS logic with ownership and pause functionality
  */
 contract OxBridgeAVS is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
-    using BN254 for BN254.G1Point;
+    // using BN254 for BN254.G1Point;
 
     // Errors
+    error TaskNotApproved();
     error TaskNotFound();
     error InvalidTask();
     error TaskAlreadyCompleted();
+    error InvalidSignatures();
 
     // Constants
-    uint256 internal constant _THRESHOLD_DENOMINATOR = 100;
+    bytes32 internal constant TASK_DOMAIN = keccak256("OxBridgeAVSTask"); // TODO: Update this
+    uint16 internal constant TASK_DEFINITION_ID = 1; // For task-specific voting power
+    uint32 internal constant DEFAULT_QUORUM_THRESHOLD = 66; // 66% threshold
 
+    // TODO: Optimize the storage of the below struct
     // Task storage
     struct TaskData {
         bytes32 blockHash;
@@ -32,13 +37,12 @@ contract OxBridgeAVS is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256 index;
         bytes psbtData;
         bytes options;
+        bytes quorumNumbers;
+        uint32 quorumThresholdPct;
     }
 
-    mapping(uint32 => TaskData) public taskData;
-    mapping(uint32 => bool) public completedTasks;
-
-    // mapping of task indices to hash of abi.encode(taskResponse, taskResponseMetadata)
-    // mapping(uint32 => bytes32) public allTaskResponses;
+    mapping(uint32 => TaskData) private taskData;
+    mapping(uint32 => bool) private completedTasks;
 
     uint32 private latestTaskNum;
     address private performer;
@@ -91,7 +95,9 @@ contract OxBridgeAVS is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         bytes32[] calldata _proof,
         uint256 _index,
         bytes calldata _psbtData,
-        bytes calldata _options
+        bytes calldata _options,
+        bytes calldata _quorumNumbers,
+        uint32 _quorumThresholdPct
     ) external onlyTaskPerformer {
         // Store task data
         TaskData memory newTask = TaskData({
@@ -100,7 +106,9 @@ contract OxBridgeAVS is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
             proof: _proof,
             index: _index,
             psbtData: _psbtData,
-            options: _options
+            options: _options,
+            quorumNumbers: _quorumNumbers,
+            quorumThresholdPct: _quorumThresholdPct
         });
         taskData[latestTaskNum] = newTask;
 
@@ -118,32 +126,57 @@ contract OxBridgeAVS is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256[2] calldata _taSignature,
         uint256[] calldata _attestersIds
     ) external onlyAttestationCenter {
-        uint32 taskId;
-        // check that the task is valid, hasn't been responsed yet
+        // Decode task ID from taskInfo data
+        uint32 taskId = abi.decode(_taskInfo.data, (uint32));
+
+        // Check that the task is valid, hasn't been responsed yet
+        if (!_isApproved) revert TaskNotApproved();
         if (!isTaskValid(taskId)) revert InvalidTask();
         if (isTaskCompleted(taskId)) revert TaskAlreadyCompleted();
 
-        /* CHECKING SIGNATURES & WHETHER THRESHOLD IS MET OR NOT */
+        TaskData memory task = taskData[taskId];
 
-        // check the BLS signature
-        // (QuorumStakeTotals memory quorumStakeTotals, bytes32 hashOfNonSigners) =
-        //     checkSignatures(message, quorumNumbers, taskCreatedBlock, nonSignerStakesAndSignature);
+        // Prepare message for signature verification
+        bytes memory messageBytes = abi.encode(
+            taskId,
+            task.blockHash,
+            task.btcTxnHash,
+            task.proof,
+            task.index,
+            keccak256(task.psbtData),
+            keccak256(task.options)
+        );
 
-        // // check that signatories own at least a threshold percentage of each quourm
-        // for (uint256 i = 0; i < quorumNumbers.length; i++) {
-        //     // we don't check that the quorumThresholdPercentages are not >100 because a greater value would trivially fail the check, implying
-        //     // signed stake > total stake
-        //     require(
-        //         quorumStakeTotals.signedStakeForQuorum[i] * _THRESHOLD_DENOMINATOR
-        //             >= quorumStakeTotals.totalStakeForQuorum[i] * uint8(quorumThresholdPercentage),
-        //         "Signatories do not own at least threshold percentage of a quorum"
-        //     );
-        // }
+        // Get message point for BLS verification
+        uint256[2] memory messagePoint = obls.hashToPoint(TASK_DOMAIN, messageBytes);
 
-        // TaskResponseMetadata memory taskResponseMetadata = TaskResponseMetadata(uint32(block.number), hashOfNonSigners);
-        // // updating the storage with task responsea
-        // allTaskResponses[taskResponse.referenceTaskIndex] = keccak256(abi.encode(taskResponse, taskResponseMetadata));
+        // Calculate required voting power for each quorum
+        uint256 requiredPower = 0;
+        for (uint256 i = 0; i < task.quorumNumbers.length; i++) {
+            uint256 quorumTotalPower = obls.totalVotingPowerPerTaskDefinition(TASK_DEFINITION_ID);
+            requiredPower = (quorumTotalPower * task.quorumThresholdPct) / 100;
+        }
 
+        // Verify signatures meet quorum
+        try obls.verifySignature(
+            messagePoint,
+            _taSignature,
+            _attestersIds,
+            requiredPower,
+            0 // No minimum per-operator requirement
+        ) {
+            // TODO: Replace address(this).balance with value from an external function or ZRO token method to to pay gas fees
+            // Send message after successful verification
+            homeChainCoordinator.sendMessage{value: address(this).balance}(
+                task.blockHash, task.btcTxnHash, task.proof, task.index, task.psbtData, task.options
+            );
+
+            // Mark task as completed
+            completedTasks[taskId] = true;
+            emit TaskCompleted(taskId);
+        } catch {
+            revert InvalidSignatures();
+        }
         // emitting event
         emit TaskCompleted(taskId);
     }
@@ -175,5 +208,28 @@ contract OxBridgeAVS is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     function isTaskValid(uint32 _taskId) public view returns (bool) {
         TaskData storage task = taskData[_taskId];
         return task.blockHash != bytes32(0) && task.btcTxnHash != bytes32(0);
+    }
+
+    // Create a getter to fetch the task data
+    function getTaskData(uint32 _taskId) external view returns (TaskData memory) {
+        return taskData[_taskId];
+    }
+
+    // Add receive and fallback functions
+    receive() external payable {}
+
+    fallback() external payable {}
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function withdraw() external onlyOwner nonReentrant {
+        (bool success,) = msg.sender.call{value: address(this).balance}("");
+        if (!success) revert("Withdrawal failed");
     }
 }
