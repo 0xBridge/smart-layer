@@ -343,4 +343,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         (bool success,) = msg.sender.call{value: address(this).balance}("");
         if (!success) revert WithdrawalFailed();
     }
+
+    // Added back to receive refund from LayerZero as refund address has been removed
+    receive() external payable {}
 }

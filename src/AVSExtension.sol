@@ -82,7 +82,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         _setPerformer(_performer);
         obls = IOBLS(_iobls);
         attestationCenter = _attestationCenter;
-        homeChainCoordinator = HomeChainCoordinator(_homeChainCoordinator);
+        homeChainCoordinator = HomeChainCoordinator(payable(_homeChainCoordinator));
     }
 
     function setPerformer(address newPerformer) external onlyOwner {
