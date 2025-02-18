@@ -158,7 +158,7 @@ contract HomeChainCoordinatorTest is Test {
         proof[9] = 0xc37d0af040d573fbb7cdba6cd828ee51562fb88158a2e84e6e3cff50c1472be9;
         uint256 index = 28;
         bytes memory type_3_option = abi.encodePacked(uint16(3));
-        bytes memory options = OptionsBuilder.addExecutorLzReceiveOption(type_3_option, 200000, 0);
+        bytes memory options = OptionsBuilder.addExecutorLzReceiveOption(type_3_option, 100000, 0);
         //     .addExecutorNativeDropOption(200000, 0) // gas limit: 200k, value: 0
         //     .build();
         // bytes memory options = hex"0003010011010000000000000000000000000000c350";

@@ -2,14 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Script} from "forge-std/Script.sol";
-
-// Deployed on Holesky at 0x276ef26eEDC3CFE0Cdf22fB033Abc9bF6b6a95B3
-interface IAttestationCenter {
-    // Only AVS Governance Multisig address can call this function - Disburses funds to the respective operators
-    function requestBatchPayment() external;
-
-    // Alternatively, Operators can claim rewards using the withdrawRewards function on L2 AVS treasury contract(deployed on Amoy at 0xa446A9fEd7527BbdbF16305fA2b04Ab4a2F4E386)
-}
+import {IAttestationCenter} from "../src/interfaces/IAttestationCenter.sol";
 
 contract DistributeRewards is Script {
     function run() external {

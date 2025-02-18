@@ -9,7 +9,6 @@ import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {ILayerZeroEndpointV2} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
 import {HomeChainCoordinator} from "./HomeChainCoordinator.sol";
 import {IAttestationCenter, IAvsLogic} from "./interfaces/IAvsLogic.sol";
-import {IOBLS} from "./interfaces/IOBLS.sol";
 
 /**
  * @title AVSExtension
@@ -49,17 +48,15 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     uint32 private latestTaskNum;
     address private performer;
     address private immutable attestationCenter;
-    IOBLS private immutable obls;
     HomeChainCoordinator private immutable homeChainCoordinator;
 
     // Events
     event PerformerUpdated(address oldPerformer, address newPerformer);
     event NewTaskCreated(uint32 indexed taskIndex, TaskData task);
-    // event TaskResponded(TaskResponse taskResponse, TaskResponseMetadata taskResponseMetadata);
     event TaskCompleted(bytes32 indexed taskHash);
 
     modifier onlyAttestationCenter() {
-        require(msg.sender == attestationCenter, "Aggregator must be the caller");
+        require(msg.sender == attestationCenter, "Attestation center must be the caller");
         _;
     }
 
@@ -71,16 +68,11 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     }
 
     // TODO: Add governance layer later (and replace the owner with the governance layer)
-    constructor(
-        address _initialOwner,
-        address _performer,
-        address _iobls,
-        address _attestationCenter,
-        address _homeChainCoordinator
-    ) Ownable() {
+    constructor(address _initialOwner, address _performer, address _attestationCenter, address _homeChainCoordinator)
+        Ownable()
+    {
         _transferOwnership(_initialOwner);
         _setPerformer(_performer);
-        obls = IOBLS(_iobls);
         attestationCenter = _attestationCenter;
         homeChainCoordinator = HomeChainCoordinator(payable(_homeChainCoordinator));
     }

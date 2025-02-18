@@ -5,31 +5,12 @@ import {Test, Vm} from "forge-std/Test.sol";
 import {ISignatureUtils} from
     "@eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import {IAttestationCenter} from "../src/interfaces/IAttestationCenter.sol";
 
 library BLSAuthLibrary {
     struct Signature {
         uint256[2] signature;
     }
-}
-
-interface IAttestationCenter {
-    struct TaskInfo {
-        string proofOfTask;
-        bytes data;
-        address taskPerformer;
-        uint16 taskDefinitionId;
-    }
-
-    function submitTask(
-        TaskInfo calldata _taskInfo,
-        bool _isApproved,
-        bytes calldata _tpSignature,
-        uint256[2] calldata _taSignature,
-        uint256[] calldata _attestersIds
-    ) external;
-
-    function unpause(bytes4 _pausableFlow) external;
-    function requestBatchPayment() external;
 }
 
 // Deployed on Holesky at 0xa44151489861fe9e3055d95adc98fbd462b948e7

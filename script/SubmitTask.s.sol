@@ -2,27 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Script} from "forge-std/Script.sol";
-
-// Deployed on Holesky at 0x276ef26eEDC3CFE0Cdf22fB033Abc9bF6b6a95B3
-interface IAttestationCenter {
-    struct TaskInfo {
-        string proofOfTask;
-        bytes data;
-        address taskPerformer;
-        uint16 taskDefinitionId;
-    }
-
-    function submitTask(
-        TaskInfo calldata _taskInfo,
-        bool _isApproved,
-        bytes calldata _tpSignature,
-        uint256[2] calldata _taSignature,
-        uint256[] calldata _attestersIds
-    ) external;
-
-    // Only AVS Governance Multisig address can call this function - Disburses funds to the respective operators
-    function requestBatchPayment() external;
-}
+import {IAttestationCenter} from "../src/interfaces/IAttestationCenter.sol";
 
 contract SubmitTask is Script {
     function run() external {

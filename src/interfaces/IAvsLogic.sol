@@ -3,14 +3,7 @@ pragma solidity ^0.8.28;
 
 // TODO: NOTE the license provided by Othentic
 
-interface IAttestationCenter {
-    struct TaskInfo {
-        string proofOfTask;
-        bytes data;
-        address taskPerformer;
-        uint16 taskDefinitionId;
-    }
-}
+import {IAttestationCenter} from "./IAttestationCenter.sol";
 
 interface IAvsLogic {
     function afterTaskSubmission(
