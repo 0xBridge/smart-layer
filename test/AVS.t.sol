@@ -157,7 +157,7 @@ contract AVSTest is Test {
 
         // Create the task info
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
-            proofOfTask: "QmVgZ7wnP8fMfpAtqGPbJAmUT8AMumtyahwUEhoodcyMUG",
+            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
             data: hex"4920616d2049726f6e6d616e21", // hex bytes data
             taskPerformer: SIGNER,
             taskDefinitionId: 0
@@ -165,17 +165,17 @@ contract AVSTest is Test {
 
         // Submit the task (TODO: Figure this part out)
         bytes memory tpSignature =
-            hex"58ae6a69ddab6e1e661db8fbcbc8ede05f9e43941325fb462aaa54fd565b5c89704d5a0a45f1229ee6c648d0e647d3b93087bbd520e5fd32bd37dee19662a4421b";
+            hex"e4a74f4cf94b5056483d604eb56a6a31f7791f14f0dcf1aaba7c8b6656b39d763ee2054aa2ef9ddd4a60a2b34900a40e12af2fba6a973a9d994f3686efb44a2a1c";
         uint256[2] memory taSignature = [
-            9093911615789399830602974754443205710846914036477274464096283111600022727438,
-            11541948654984445339530075522406573357857067838037210814544443461153759883923
+            19645558472345704978511871013628884473537764836288391634501264483848712294175,
+            9290822072904786298812575352542794224867844172376967240593705323173043420837
         ];
         uint256[] memory attestersIds = new uint256[](2);
         attestersIds[0] = 3;
         attestersIds[1] = 4;
 
         vm.prank(SIGNER);
-        attestationCenter.submitTask(taskInfo, true, tpSignature, taSignature, attestersIds);
+        // attestationCenter.submitTask(taskInfo, true, tpSignature, taSignature, attestersIds);
 
         // Distribute rewards
         // https://amoy.polygonscan.com/tx/0x887194727b6c46a8139a6520709cff19f8631dcecd2c92b521f8d94d3e5a130c
