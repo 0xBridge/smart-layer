@@ -27,7 +27,7 @@ contract HelperConfig is Script {
         string memory json = vm.readFile(path);
 
         // Try to parse the network config for current chain
-        try vm.parseJson(json, string.concat(".", vm.toString(chainId))) returns (bytes memory networkData) {
+        try vm.parseJson(json, string.concat(".", vm.toString(chainId))) returns (bytes memory) {
             // First try to decode the endpoint and endpointId
             address endpoint =
                 abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".endpoint")), (address));

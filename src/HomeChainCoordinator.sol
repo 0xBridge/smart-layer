@@ -8,7 +8,7 @@ import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {BitcoinTxnParser} from "./libraries/BitcoinTxnParser.sol";
 import {TxidCalculator} from "./libraries/TxidCalculator.sol";
 import {BitcoinUtils} from "./libraries/BitcoinUtils.sol";
-import {PSBTMetadata, IHomeChainCoordinator} from "./interfaces/IHomeChainCoordinator.sol";
+import {PSBTData, IHomeChainCoordinator} from "./interfaces/IHomeChainCoordinator.sol";
 import {BitcoinLightClient} from "./BitcoinLightClient.sol";
 
 /**
@@ -31,7 +31,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     BitcoinLightClient private immutable lightClient;
 
     address private taskManager;
-    mapping(bytes32 => PSBTMetadata) private btcTxnHash_psbtMetadata;
+    mapping(bytes32 => PSBTData) private btcTxnHash_psbtData;
 
     uint256 public maxGasTokenAmount = 1 ether; // Max amount that can be put as the native token amount
     uint256 public minBTCAmount = 1000; // Min BTC amount / satoshis that needs to be locked
@@ -154,7 +154,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         uint32 _dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
 
         // 2. Check if the message already exists or is processed
-        if (btcTxnHash_psbtMetadata[_btcTxnHash].isMinted) {
+        if (btcTxnHash_psbtData[_btcTxnHash].isMinted) {
             revert TxnAlreadyProcessed(_btcTxnHash);
         }
 
@@ -169,7 +169,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         // TODO: This needs to come from the metadata itself as this will keep on changing
         bytes32 networkPublicKey;
         // 6. Store PSBT metadata
-        PSBTMetadata memory psbtMetaData = PSBTMetadata({
+        PSBTData memory psbtData = PSBTData({
             isMinted: true,
             chainId: metadata.chainId,
             user: metadata.receiverAddress,
@@ -178,7 +178,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             networkPublicKey: networkPublicKey,
             psbtData: _psbtData
         });
-        btcTxnHash_psbtMetadata[_btcTxnHash] = psbtMetaData;
+        btcTxnHash_psbtData[_btcTxnHash] = psbtData;
 
         // 7. Send message through LayerZerobytes memory payload
         bytes memory payload =
@@ -201,7 +201,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param _psbtData The PSBT data to validate.
      * @return metadata The extracted transaction metadata.
      */
-    function _validatePSBTData(bytes calldata _psbtData)
+    function _validatePSBTData(bytes memory _psbtData)
         internal
         view
         returns (BitcoinTxnParser.TransactionMetadata memory)
@@ -237,12 +237,12 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param _options LayerZero message options.
      */
     function sendMessageFor(address _receiver, bytes32 _btcTxnHash, bytes calldata _options) external payable {
-        if (btcTxnHash_psbtMetadata[_btcTxnHash].user != _receiver) {
+        if (btcTxnHash_psbtData[_btcTxnHash].user != _receiver) {
             revert InvalidReceiver(_receiver); // This also ensures that the txn is already present
         }
 
-        // 1. Parse and get metadata from psbtMetaData
-        PSBTMetadata memory metadata = btcTxnHash_psbtMetadata[_btcTxnHash];
+        // 1. Parse and get metadata from psbtData
+        PSBTData memory metadata = btcTxnHash_psbtData[_btcTxnHash];
 
         // TODO: Remove this after updating the test with the correct chainId in the metadata
         uint32 _dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
@@ -272,13 +272,31 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
     }
 
+    /* @dev Quotes the gas needed to pay for the full omnichain transaction.
+    * @return nativeFee Estimated gas fee in native gas.
+    * @return lzTokenFee Estimated gas fee in ZRO token.
+    */
+    function quote(
+        bytes32 _btcTxnHash, // The BTC transaction hash
+        bytes memory _psbtData, // The _psbtData message to send
+        bytes memory _options, // Message execution options
+        bool _payInLzToken // boolean for which token to return fee in
+    ) public view returns (uint256 nativeFee, uint256 lzTokenFee) {
+        bytes memory opReturnData = BitcoinTxnParser.decodeBitcoinTxn(_psbtData);
+        BitcoinTxnParser.TransactionMetadata memory metadata = BitcoinTxnParser.decodeMetadata(opReturnData);
+        bytes memory payload =
+            abi.encode(metadata.receiverAddress, _btcTxnHash, metadata.lockedAmount, metadata.nativeTokenAmount);
+        MessagingFee memory fee = _quote(metadata.chainId, payload, _options, _payInLzToken);
+        return (fee.nativeFee, fee.lzTokenFee);
+    }
+
     /**
      * @dev Retrieves the PSBT metadata for a given BTC transaction hash.
      * @param _btcTxnHash The BTC transaction hash.
      * @return The PSBT metadata associated with the transaction hash.
      */
-    function getPSBTData(bytes32 _btcTxnHash) external view returns (PSBTMetadata memory) {
-        return btcTxnHash_psbtMetadata[_btcTxnHash];
+    function getPSBTData(bytes32 _btcTxnHash) external view returns (PSBTData memory) {
+        return btcTxnHash_psbtData[_btcTxnHash];
     }
 
     /**

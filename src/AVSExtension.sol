@@ -5,6 +5,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {BN254} from "@eigenlayer-middleware/src/libraries/BN254.sol";
+import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
+import {ILayerZeroEndpointV2} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroEndpointV2.sol";
 import {HomeChainCoordinator} from "./HomeChainCoordinator.sol";
 import {IAttestationCenter, IAvsLogic} from "./interfaces/IAvsLogic.sol";
 import {IOBLS} from "./interfaces/IOBLS.sol";
@@ -26,7 +28,6 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     // Constants
     bytes32 internal constant TASK_DOMAIN = keccak256("TasksManager");
     uint16 internal constant TASK_DEFINITION_ID = 1; // For task-specific voting power
-    uint32 internal constant DEFAULT_QUORUM_THRESHOLD = 66; // 66% threshold
     uint32 internal constant MINIMUM_QUORUM_NUMBER = 2; // TODO: Change this via governance
 
     // TODO: Optimize the storage of the below struct
@@ -38,12 +39,12 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256 index;
         bytes psbtData;
         bytes options;
-        bytes quorumNumbers;
-        uint32 quorumThresholdPct;
     }
+    // bytes quorumNumbers;
+    // uint32 quorumThresholdPct;
 
-    mapping(uint32 => TaskData) private taskData;
-    mapping(uint32 => bool) private completedTasks;
+    mapping(bytes32 taskHash => TaskData) private taskData;
+    mapping(bytes32 taskHash => bool) private completedTasks;
 
     uint32 private latestTaskNum;
     address private performer;
@@ -55,7 +56,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     event PerformerUpdated(address oldPerformer, address newPerformer);
     event NewTaskCreated(uint32 indexed taskIndex, TaskData task);
     // event TaskResponded(TaskResponse taskResponse, TaskResponseMetadata taskResponseMetadata);
-    event TaskCompleted(uint32 indexed taskIndex);
+    event TaskCompleted(bytes32 indexed taskHash);
 
     modifier onlyAttestationCenter() {
         require(msg.sender == attestationCenter, "Aggregator must be the caller");
@@ -96,10 +97,13 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         bytes32[] calldata _proof,
         uint256 _index,
         bytes calldata _psbtData,
-        bytes calldata _options,
-        bytes calldata _quorumNumbers,
-        uint32 _quorumThresholdPct
-    ) external onlyTaskPerformer {
+        bytes calldata _options
+    )
+        // bytes calldata _quorumNumbers,
+        // uint32 _quorumThresholdPct
+        external
+        onlyTaskPerformer
+    {
         // Store task data
         TaskData memory newTask = TaskData({
             blockHash: _blockHash,
@@ -107,14 +111,14 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
             proof: _proof,
             index: _index,
             psbtData: _psbtData,
-            options: _options,
-            quorumNumbers: _quorumNumbers,
-            quorumThresholdPct: _quorumThresholdPct
+            options: _options
         });
-        taskData[latestTaskNum] = newTask;
+        // quorumNumbers: _quorumNumbers,
+        // quorumThresholdPct: _quorumThresholdPct
 
         // Encode task data hash
         bytes32 taskHash = keccak256(abi.encode(_blockHash, _btcTxnHash, _proof, _index, _psbtData, _options));
+        taskData[taskHash] = newTask;
 
         emit NewTaskCreated(latestTaskNum++, newTask);
     }
@@ -123,84 +127,61 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     function beforeTaskSubmission(
         IAttestationCenter.TaskInfo calldata _taskInfo,
         bool _isApproved,
-        bytes calldata _tpSignature,
-        uint256[2] calldata _taSignature,
-        uint256[] calldata _attestersIds
-    ) external onlyAttestationCenter {
-        // Decode task ID from taskInfo data
-        uint32 taskId = abi.decode(_taskInfo.data, (uint32));
+        bytes calldata,
+        uint256[2] calldata,
+        uint256[] calldata
+    ) external view onlyAttestationCenter {
+        // Decode task hash from taskInfo data
+        bytes32 taskHash = abi.decode(_taskInfo.data, (bytes32));
 
         // Check that the task is valid, hasn't been responsed yet
         if (!_isApproved) revert TaskNotApproved();
-        if (!isTaskValid(taskId)) revert InvalidTask();
-        if (isTaskCompleted(taskId)) revert TaskAlreadyCompleted();
-
-        TaskData memory task = taskData[taskId];
-
-        // Prepare message for signature verification
+        if (!isTaskValid(taskHash)) revert InvalidTask();
+        if (isTaskCompleted(taskHash)) revert TaskAlreadyCompleted();
     }
 
     function afterTaskSubmission(
         IAttestationCenter.TaskInfo calldata _taskInfo,
-        bool _isApproved,
-        bytes calldata _tpSignature,
-        uint256[2] calldata _taSignature,
-        uint256[] calldata _attestersIds
+        bool,
+        bytes calldata,
+        uint256[2] calldata,
+        uint256[] calldata
     ) external onlyAttestationCenter {
-        // Decode task ID from taskInfo data
-        uint32 taskId = abi.decode(_taskInfo.data, (uint32));
+        // Decode task hash from taskInfo data
+        bytes32 taskHash = abi.decode(_taskInfo.data, (bytes32));
 
-        // Check that the task is valid, hasn't been responsed yet
-        if (!_isApproved) revert TaskNotApproved();
-        if (!isTaskValid(taskId)) revert InvalidTask();
-        if (isTaskCompleted(taskId)) revert TaskAlreadyCompleted();
+        // Get task data wrt task Id
+        TaskData memory task = taskData[taskHash];
 
-        TaskData memory task = taskData[taskId];
+        // Mark task as completed
+        completedTasks[taskHash] = true;
 
-        // Prepare message for signature verification
-        bytes memory messageBytes = abi.encode(
-            taskId,
-            task.blockHash,
-            task.btcTxnHash,
-            task.proof,
-            task.index,
-            keccak256(task.psbtData),
-            keccak256(task.options)
+        // Quote the gas fee
+        (uint256 nativeFee,) = quote(task.btcTxnHash, task.psbtData, task.options, false);
+        // Send message after successful verification
+        homeChainCoordinator.sendMessage{value: nativeFee}(
+            task.blockHash, task.btcTxnHash, task.proof, task.index, task.psbtData, task.options
         );
 
-        // Get message point for BLS verification
-        uint256[2] memory messagePoint = obls.hashToPoint(TASK_DOMAIN, messageBytes);
-
-        // Calculate required voting power for each quorum
-        uint256 requiredPower = 0;
-        for (uint256 i = 0; i < task.quorumNumbers.length; i++) {
-            uint256 quorumTotalPower = obls.totalVotingPowerPerTaskDefinition(TASK_DEFINITION_ID);
-            requiredPower = (quorumTotalPower * task.quorumThresholdPct) / 100;
-        }
-
-        // Verify signatures meet quorum
-        try obls.verifySignature(
-            messagePoint,
-            _taSignature,
-            _attestersIds,
-            requiredPower,
-            0 // No minimum per-operator requirement
-        ) {
-            // TODO: Replace address(this).balance with value from an external function or ZRO token method to to pay the required gas fees
-            // TODO: Add a quoteFee function to calculate the required gas fees
-            // Send message after successful verification
-            homeChainCoordinator.sendMessage{value: address(this).balance}(
-                task.blockHash, task.btcTxnHash, task.proof, task.index, task.psbtData, task.options
-            );
-
-            // Mark task as completed
-            completedTasks[taskId] = true;
-            emit TaskCompleted(taskId);
-        } catch {
-            revert InvalidSignatures();
-        }
         // emitting event
-        emit TaskCompleted(taskId);
+        emit TaskCompleted(taskHash);
+    }
+
+    /* @dev Quotes the gas needed to pay for the sending the message of btcTxnHash
+    /* @param _btcTxnHash The BTC transaction hash
+    /* @param _psbtData The _psbtData message to send
+    /* @param _options Message execution options
+    /* @param _payInLzToken boolean for which token to return fee in
+    * @return nativeFee Estimated gas fee in native gas.
+    * @return lzTokenFee Estimated gas fee in ZRO token.
+    */
+    function quote(
+        bytes32 _btcTxnHash, // The BTC transaction hash
+        bytes memory _psbtData, // The _psbtData message to send
+        bytes memory _options, // Message execution options
+        bool _payInLzToken // boolean for which token to return fee in
+    ) public view returns (uint256 nativeFee, uint256 lzTokenFee) {
+        (nativeFee, lzTokenFee) = homeChainCoordinator.quote(_btcTxnHash, _psbtData, _options, _payInLzToken);
     }
 
     function taskNumber() external view returns (uint32) {
@@ -215,26 +196,25 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
 
     /**
      * @notice Checks if a specific task is completed
-     * @param _taskId The task ID to check
+     * @param _taskHash The task hash to check
      * @return bool True if task is completed
      */
-    function isTaskCompleted(uint32 _taskId) public view returns (bool) {
-        return completedTasks[_taskId];
+    function isTaskCompleted(bytes32 _taskHash) public view returns (bool) {
+        return completedTasks[_taskHash];
     }
 
     /**
      * @notice Checks if a task is valid by verifying its data exists
-     * @param _taskId The task ID to check
+     * @param _taskHash The task hash to check
      * @return bool True if task exists and is valid
      */
-    function isTaskValid(uint32 _taskId) public view returns (bool) {
-        TaskData storage task = taskData[_taskId];
+    function isTaskValid(bytes32 _taskHash) public view returns (bool) {
+        TaskData storage task = taskData[_taskHash];
         return task.blockHash != bytes32(0) && task.btcTxnHash != bytes32(0);
     }
 
-    // Create a getter to fetch the task data
-    function getTaskData(uint32 _taskId) external view returns (TaskData memory) {
-        return taskData[_taskId];
+    function getTaskData(bytes32 _taskHash) external view returns (TaskData memory) {
+        return taskData[_taskHash];
     }
 
     // Add receive and fallback functions

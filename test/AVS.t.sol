@@ -139,7 +139,7 @@ contract AVSTest is Test {
         IAttestationCenter(ATTESTATION_CENTER).unpause(REWARDS_FLOW); // Deployer (AVS_MULTISIG_OWNER)
 
         // 7. Claim Rewards - Can be done post submitTask (Didn't see the rewards disbursed on L1)
-        // https://amoy.polygonscan.com/tx/0xa733561e71a50530177c8c92e08c95cefb0263f92572a99f8f9c80d63895b5af
+        // https://amoy.polygonscan.com/tx/0x887194727b6c46a8139a6520709cff19f8631dcecd2c92b521f8d94d3e5a130c
         // IAttestationCenter(ATTESTATION_CENTER).requestBatchPayment(); // Deployer (AVS_MULTISIG_OWNER)
     }
 
@@ -178,6 +178,8 @@ contract AVSTest is Test {
         attestationCenter.submitTask(taskInfo, true, tpSignature, taSignature, attestersIds);
 
         // Distribute rewards
+        // https://amoy.polygonscan.com/tx/0x887194727b6c46a8139a6520709cff19f8631dcecd2c92b521f8d94d3e5a130c
+        // https://holesky.etherscan.io/tx/0x3c343b47ccd27f02683b74d77bc8bc2d206cba800a8290875b71b60d213ef441 (C)
         // attestationCenter.requestBatchPayment(); // Deployer (AVS_MULTISIG_OWNER)
     }
 }
