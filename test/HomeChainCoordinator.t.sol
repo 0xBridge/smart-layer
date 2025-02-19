@@ -118,10 +118,10 @@ contract HomeChainCoordinatorTest is Test {
         // Set the receiver
         bytes32 receiver = bytes32(uint256(uint160(address(baseChainCoordinator))));
         vm.prank(owner);
-        homeChainCoordinator.setPeer(destNetworkConfig.endpointId, receiver);
+        homeChainCoordinator.setPeer(destNetworkConfig.chainEid, receiver);
 
         // Assert that the receiver is set correctly
-        assertEq(homeChainCoordinator.peers(destNetworkConfig.endpointId), receiver);
+        assertEq(homeChainCoordinator.peers(destNetworkConfig.chainEid), receiver);
     }
 
     // TODO: Add test for submitBlockAndSendMessage
@@ -134,13 +134,13 @@ contract HomeChainCoordinatorTest is Test {
         // Set receivers and peers on both chains
         vm.selectFork(sourceForkId);
         vm.startPrank(owner);
-        homeChainCoordinator.setPeer(destNetworkConfig.endpointId, receiver);
+        homeChainCoordinator.setPeer(destNetworkConfig.chainEid, receiver);
         vm.stopPrank();
 
         // Set up peer on destination chain
         vm.selectFork(destForkId);
         vm.prank(owner);
-        baseChainCoordinator.setPeer(srcNetworkConfig.endpointId, sender);
+        baseChainCoordinator.setPeer(srcNetworkConfig.chainEid, sender);
 
         // Back to source chain for sending message
         vm.selectFork(sourceForkId);

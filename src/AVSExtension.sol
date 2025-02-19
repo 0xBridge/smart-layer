@@ -23,6 +23,9 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     error InvalidTask();
     error TaskAlreadyCompleted();
     error InvalidSignatures();
+    error CallerNotAttestationCenter();
+    error CallerNotTaskGenerator();
+    error WithdrawalFailed();
 
     // Constants
     bytes32 internal constant TASK_DOMAIN = keccak256("TasksManager");
@@ -56,14 +59,18 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     event TaskCompleted(bytes32 indexed taskHash);
 
     modifier onlyAttestationCenter() {
-        require(msg.sender == attestationCenter, "Attestation center must be the caller");
+        if (msg.sender != attestationCenter) {
+            revert CallerNotAttestationCenter();
+        }
         _;
     }
 
     // onlyTaskPerformer is used to restrict createNewTask from only being called by a permissioned entity
     // in a real world scenario, this would be removed by instead making createNewTask a payable function
     modifier onlyTaskPerformer() {
-        require(msg.sender == performer, "Task performer must be the caller");
+        if (msg.sender != performer) {
+            revert CallerNotTaskGenerator();
+        }
         _;
     }
 
@@ -224,6 +231,6 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
 
     function withdraw() external onlyOwner nonReentrant {
         (bool success,) = msg.sender.call{value: address(this).balance}("");
-        if (!success) revert("Withdrawal failed");
+        if (!success) revert WithdrawalFailed();
     }
 }

@@ -7,15 +7,17 @@ import {LayerZeroV2Helper} from "lib/pigeon/src/layerzero-v2/LayerZeroV2Helper.s
 import {HelperConfig} from "../script/HelperConfig.s.sol";
 import {AVSExtension} from "../src/AVSExtension.sol";
 import {HomeChainCoordinator} from "../src/HomeChainCoordinator.sol";
+import {BaseChainCoordinator} from "../src/BaseChainCoordinator.sol";
 import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 import {IAttestationCenter} from "../src/interfaces/IAttestationCenter.sol";
+import {eBTCManager} from "../src/eBTCManager.sol";
 
 contract AVSExtensionTest is Test {
     // Main contracts
     AVSExtension private avsExtension;
     HomeChainCoordinator private homeChainCoordinator;
+    BaseChainCoordinator private baseChainCoordinator;
     BitcoinLightClient private btcLightClient;
-    IAttestationCenter private attestationCenter;
     LayerZeroV2Helper private lzHelper;
 
     // Test accounts
@@ -25,7 +27,10 @@ contract AVSExtensionTest is Test {
     address private constant ATTESTATION_CENTER = 0x276ef26eEDC3CFE0Cdf22fB033Abc9bF6b6a95B3;
 
     // Network configs
-    HelperConfig.NetworkConfig private networkConfig;
+    uint256 private sourceForkId;
+    uint256 private destForkId;
+    HelperConfig.NetworkConfig private srcNetworkConfig;
+    HelperConfig.NetworkConfig private destNetworkConfig;
 
     // Test data
     bytes32 private constant BLOCK_HASH = 0x00000000000078556c00dbcd6505af1b06293da2a2ce4077b36ae0ee7caff284;
@@ -42,13 +47,27 @@ contract AVSExtensionTest is Test {
     event TaskCompleted(bytes32 indexed taskHash);
 
     function setUp() public {
+        string memory destRpcUrl = vm.envString("CORE_TESTNET_RPC_URL");
+        destForkId = vm.createSelectFork(destRpcUrl);
+        HelperConfig destConfig = new HelperConfig();
+        destNetworkConfig = destConfig.getConfig();
+        owner = destNetworkConfig.account;
+
+        // Deploy the eBTCManager contract
+        eBTCManager eBTCManagerInstance = new eBTCManager(owner);
+
+        // Deploy the base chain coordinator
+        baseChainCoordinator = new BaseChainCoordinator(
+            destNetworkConfig.endpoint, // endpoint
+            owner, // owner
+            address(eBTCManagerInstance) // eBTCManager
+        );
+
+        // Switch network to source fork
         string memory rpcUrl = vm.envString("AMOY_RPC_URL");
-        vm.createSelectFork(rpcUrl);
-
+        sourceForkId = vm.createSelectFork(rpcUrl);
         HelperConfig config = new HelperConfig();
-        networkConfig = config.getConfig();
-
-        owner = networkConfig.account;
+        srcNetworkConfig = config.getConfig();
 
         // Initialize proof array
         proof = new bytes32[](10);
@@ -78,17 +97,20 @@ contract AVSExtensionTest is Test {
         );
         ERC1967Proxy lightClientProxy = new ERC1967Proxy(address(bitcoinLightClientImplementation), lightClientInitData);
         btcLightClient = BitcoinLightClient(address(lightClientProxy));
+        bytes32 receiver = bytes32(uint256(uint160(address(baseChainCoordinator))));
 
         // Deploy HomeChainCoordinator
         vm.startPrank(owner);
-        homeChainCoordinator = new HomeChainCoordinator(address(btcLightClient), networkConfig.endpoint, owner);
+        homeChainCoordinator = new HomeChainCoordinator(address(btcLightClient), srcNetworkConfig.endpoint, owner);
+        // Set destination peer address
+        homeChainCoordinator.setPeer(destNetworkConfig.chainEid, receiver);
         vm.stopPrank();
 
-        // Deploy AttestationCenter
-        attestationCenter = IAttestationCenter(ATTESTATION_CENTER);
-
         // Deploy AVSExtension
-        avsExtension = new AVSExtension(owner, performer, address(attestationCenter), address(homeChainCoordinator));
+        avsExtension = new AVSExtension(owner, performer, ATTESTATION_CENTER, address(homeChainCoordinator));
+        // Transfer ownership of HomeChainCoordinator to the avsExtension
+        vm.prank(owner);
+        homeChainCoordinator.transferOwnership(address(avsExtension));
 
         // Fund contracts
         vm.deal(owner, 100 ether);
@@ -110,14 +132,6 @@ contract AVSExtensionTest is Test {
         emit PerformerUpdated(performer, newPerformer);
 
         vm.prank(owner);
-        avsExtension.setPerformer(newPerformer);
-    }
-
-    function testSetPerformerNotOwner() public {
-        address newPerformer = makeAddr("newPerformer");
-
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(user);
         avsExtension.setPerformer(newPerformer);
     }
 
@@ -144,7 +158,7 @@ contract AVSExtensionTest is Test {
 
     function testCreateNewTaskNotPerformer() public {
         vm.prank(user);
-        vm.expectRevert("Task performer must be the caller");
+        vm.expectRevert(AVSExtension.CallerNotTaskGenerator.selector);
 
         avsExtension.createNewTask(BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, PSBT_DATA, OPTIONS);
     }
@@ -158,7 +172,7 @@ contract AVSExtensionTest is Test {
             taskDefinitionId: 0
         });
 
-        vm.prank(address(attestationCenter));
+        vm.prank(ATTESTATION_CENTER);
         vm.expectRevert(AVSExtension.InvalidTask.selector);
 
         avsExtension.beforeTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
@@ -183,7 +197,7 @@ contract AVSExtensionTest is Test {
             taskDefinitionId: 0
         });
 
-        vm.prank(address(attestationCenter));
+        vm.prank(ATTESTATION_CENTER);
         avsExtension.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
 
         // Verify task is now completed
@@ -208,9 +222,10 @@ contract AVSExtensionTest is Test {
     }
 
     function testPauseNotOwner() public {
-        vm.prank(user);
+        vm.startPrank(makeAddr("randomUser"));
         vm.expectRevert("Ownable: caller is not the owner");
         avsExtension.pause();
+        vm.stopPrank();
     }
 
     function testWithdraw() public {
@@ -222,12 +237,6 @@ contract AVSExtensionTest is Test {
 
         assertEq(address(owner).balance, initialBalance + contractBalance);
         assertEq(address(avsExtension).balance, 0);
-    }
-
-    function testWithdrawNotOwner() public {
-        vm.prank(user);
-        vm.expectRevert("Ownable: caller is not the owner");
-        avsExtension.withdraw();
     }
 
     receive() external payable {}

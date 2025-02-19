@@ -7,7 +7,7 @@ contract HelperConfig is Script {
     error HelperConfig__InvalidChainId();
 
     struct NetworkConfig {
-        uint32 endpointId;
+        uint32 chainEid;
         address endpoint;
         address account;
     }
@@ -28,14 +28,14 @@ contract HelperConfig is Script {
 
         // Try to parse the network config for current chain
         try vm.parseJson(json, string.concat(".", vm.toString(chainId))) returns (bytes memory) {
-            // First try to decode the endpoint and endpointId
+            // First try to decode the endpoint and chainEid
             address endpoint =
                 abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".endpoint")), (address));
-            uint32 endpointId =
-                abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".endpointId")), (uint32));
+            uint32 chainEid =
+                abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".chainEid")), (uint32));
 
             // Set the local network config
-            localNetworkConfig = NetworkConfig({endpointId: endpointId, endpoint: endpoint, account: OWNER_WALLET});
+            localNetworkConfig = NetworkConfig({chainEid: chainEid, endpoint: endpoint, account: OWNER_WALLET});
         } catch {
             revert HelperConfig__InvalidChainId();
         }

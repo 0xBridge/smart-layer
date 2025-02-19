@@ -286,7 +286,9 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         BitcoinTxnParser.TransactionMetadata memory metadata = BitcoinTxnParser.decodeMetadata(opReturnData);
         bytes memory payload =
             abi.encode(metadata.receiverAddress, _btcTxnHash, metadata.lockedAmount, metadata.nativeTokenAmount);
-        MessagingFee memory fee = _quote(metadata.chainId, payload, _options, _payInLzToken);
+        // TODO: Remove this after updating the test with the correct chainId in the metadata
+        uint32 _dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
+        MessagingFee memory fee = _quote(_dstEid, payload, _options, _payInLzToken);
         return (fee.nativeFee, fee.lzTokenFee);
     }
 

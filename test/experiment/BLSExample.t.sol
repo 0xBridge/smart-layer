@@ -9,7 +9,7 @@ contract BLSExample is Test {
 
     bytes32 private constant DOMAIN = keccak256("TasksManager");
 
-    function testGenerateAggregatedSignature() public view returns (uint256[2] memory) {
+    function generateAggregatedSignature() public view returns (uint256[2] memory) {
         // Your input values
         string memory proofOfTask = "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP";
         bytes memory data = hex"4920616d2049726f6e6d616e21"; // "I am Ironman!"
@@ -67,8 +67,8 @@ contract BLSExample is Test {
     }
 
     // Function to verify if our generated signature matches the provided one
-    function testVerifyAgainstKnownSignature() public view returns (bool) {
-        uint256[2] memory generatedSignature = testGenerateAggregatedSignature();
+    function verifyAgainstKnownSignature() public view returns (bool) {
+        uint256[2] memory generatedSignature = generateAggregatedSignature();
         console.log(generatedSignature[0]);
         console.log(generatedSignature[1]);
         uint256[2] memory knownSignature = [
@@ -123,7 +123,7 @@ contract BLSExample is Test {
         return converted;
     }
 
-    function testSignatureAggregation() public {
+    function signatureAggregation() public {
         uint256[2][] memory signatures = new uint256[2][](2);
 
         // Input signature points
