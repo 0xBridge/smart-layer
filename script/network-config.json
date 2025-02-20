@@ -63,5 +63,15 @@
     "name": "CoreDAO Testnet",
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
     "chainEid": 40153
+  },
+  "56": {
+    "name": "Binance Smart Chain",
+    "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
+    "chainEid": 30102
+  },
+  "97": {
+    "name": "Binance Smart Chain Testnet",
+    "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
+    "chainEid": 40102
   }
 }
