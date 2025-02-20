@@ -12,7 +12,7 @@ import {eBTCManager} from "../src/eBTCManager.sol";
 import {eBTC} from "../src/eBTC.sol";
 import {eBTCMock} from "../src/mocks/eBTCMock.sol";
 
-contract BaseChainCoordinatorTest is Script {
+contract BaseChainCoordinatorDeployment is Script {
     HomeChainCoordinator private homeChainCoordinator;
     BaseChainCoordinator private baseChainCoordinator;
     BitcoinLightClient private btcLightClient;

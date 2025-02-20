@@ -9,7 +9,7 @@ import {HomeChainCoordinator} from "../src/HomeChainCoordinator.sol";
 import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 import {Utils} from "./utils/Utils.sol";
 
-contract Deployment is Script, Utils {
+contract HomeChainCoordinatorDeployment is Script, Utils {
     // Main contracts
     AVSExtension private avsExtension;
     HomeChainCoordinator private homeChainCoordinator;
@@ -41,15 +41,15 @@ contract Deployment is Script, Utils {
         // Get the environment variables
         // Get the private key and address of the deployer / owner
         uint256 privateKey = vm.envUint("OWNER_PRIVATE_KEY");
-        owner = address(uint160(privateKey));
+        owner = vm.addr(privateKey);
 
         // Get the private key and address of the performer / generator
         uint256 generatorPrivateKey = vm.envUint("GENERATOR_PRIVATE_KEY");
-        generator = address(uint160(generatorPrivateKey));
+        generator = vm.addr(generatorPrivateKey);
 
         // Get the private key and address of the aggregator
         uint256 aggregatorPrivateKey = vm.envUint("AGGREGATOR_PRIVATE_KEY");
-        aggregator = address(uint160(aggregatorPrivateKey));
+        aggregator = vm.addr(aggregatorPrivateKey);
 
         // Get home chain network - In case we change this to Holesky, we need to change this url to HOLESKY_TESTNET_RPC_URL
         string memory rpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
@@ -57,7 +57,7 @@ contract Deployment is Script, Utils {
         HelperConfig config = new HelperConfig();
         srcNetworkConfig = config.getConfig();
 
-        vm.startBroadcast(owner);
+        vm.startBroadcast(privateKey);
         // Deploy Bitcoin Light Client and HomeChainCoordinator
         BitcoinLightClient bitcoinLightClientImplementation = new BitcoinLightClient();
         console.log("Deployed BitcoinLightClient");
