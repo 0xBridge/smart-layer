@@ -8,7 +8,7 @@ import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {BitcoinTxnParser} from "./libraries/BitcoinTxnParser.sol";
 import {TxidCalculator} from "./libraries/TxidCalculator.sol";
 import {BitcoinUtils} from "./libraries/BitcoinUtils.sol";
-import {PSBTMetadata, IHomeChainCoordinator} from "./interfaces/IHomeChainCoordinator.sol";
+import {PSBTData, IHomeChainCoordinator} from "./interfaces/IHomeChainCoordinator.sol";
 import {BitcoinLightClient} from "./BitcoinLightClient.sol";
 
 /**
@@ -28,10 +28,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     error WithdrawalFailed();
 
     // State variables
-    BitcoinLightClient private lightClient;
+    BitcoinLightClient private immutable lightClient;
 
     address private taskManager;
-    mapping(bytes32 => PSBTMetadata) private btcTxnHash_psbtMetadata;
+    mapping(bytes32 => PSBTData) private btcTxnHash_psbtData;
 
     uint256 public maxGasTokenAmount = 1 ether; // Max amount that can be put as the native token amount
     uint256 public minBTCAmount = 1000; // Min BTC amount / satoshis that needs to be locked
@@ -85,7 +85,6 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param _index The index of the transaction in the block.
      * @param _psbtData The PSBT data to be processed.
      * @param _options LayerZero message options.
-     * @param _refundAddress The address to refund in case of failure.
      */
     function submitBlockAndSendMessage(
         bytes calldata rawHeader,
@@ -94,15 +93,14 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes32[] calldata _proof,
         uint256 _index,
         bytes calldata _psbtData,
-        bytes calldata _options,
-        address _refundAddress
+        bytes calldata _options
     ) external payable whenNotPaused nonReentrant onlyOwner {
         // 0. Submit block header along with intermediate headers to light client
         bytes32 blockHash = lightClient.submitRawBlockHeader(rawHeader, intermediateHeaders);
         // 1. Get merkle root to validate txn
         bytes32 merkleRoot = lightClient.getMerkleRootForBlock(blockHash);
         // 2. Send message
-        _sendMessage(merkleRoot, _btcTxnHash, _proof, _index, _psbtData, _options, _refundAddress);
+        _sendMessage(merkleRoot, _btcTxnHash, _proof, _index, _psbtData, _options);
     }
 
     /**
@@ -113,7 +111,6 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param _index The index of the transaction in the block.
      * @param _psbtData The PSBT data to be processed.
      * @param _options LayerZero message options.
-     * @param _refundAddress The address to refund in case of failure.
      */
     function sendMessage(
         bytes32 _blockHash,
@@ -121,11 +118,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes32[] calldata _proof,
         uint256 _index,
         bytes calldata _psbtData,
-        bytes calldata _options,
-        address _refundAddress
+        bytes calldata _options
     ) external payable whenNotPaused nonReentrant onlyOwner {
         bytes32 merkleRoot = lightClient.getMerkleRootForBlock(_blockHash);
-        _sendMessage(merkleRoot, _btcTxnHash, _proof, _index, _psbtData, _options, _refundAddress);
+        _sendMessage(merkleRoot, _btcTxnHash, _proof, _index, _psbtData, _options);
     }
 
     /**
@@ -136,7 +132,6 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param _index The index of the transaction in the block.
      * @param _psbtData The PSBT data to be processed.
      * @param _options LayerZero message options.
-     * @param _refundAddress The address to refund in case of failure.
      */
     function _sendMessage(
         bytes32 _merkleRoot,
@@ -144,8 +139,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes32[] calldata _proof,
         uint256 _index,
         bytes calldata _psbtData,
-        bytes calldata _options,
-        address _refundAddress
+        bytes calldata _options
     ) internal {
         // 0. btcTxnHash generated from the psbt data being shared should be the same as the one passed
         bytes32 txid = TxidCalculator.calculateTxid(_psbtData);
@@ -157,10 +151,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_psbtData);
 
         // TODO: Remove this after updating the test with the correct chainId in the metadata
-        uint32 _dstEid = metadata.chainId == 8453 ? 30184 : metadata.chainId;
+        uint32 _dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
 
         // 2. Check if the message already exists or is processed
-        if (btcTxnHash_psbtMetadata[_btcTxnHash].isMinted) {
+        if (btcTxnHash_psbtData[_btcTxnHash].isMinted) {
             revert TxnAlreadyProcessed(_btcTxnHash);
         }
 
@@ -175,7 +169,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         // TODO: This needs to come from the metadata itself as this will keep on changing
         bytes32 networkPublicKey;
         // 6. Store PSBT metadata
-        PSBTMetadata memory psbtMetaData = PSBTMetadata({
+        PSBTData memory psbtData = PSBTData({
             isMinted: true,
             chainId: metadata.chainId,
             user: metadata.receiverAddress,
@@ -184,7 +178,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             networkPublicKey: networkPublicKey,
             psbtData: _psbtData
         });
-        btcTxnHash_psbtMetadata[_btcTxnHash] = psbtMetaData;
+        btcTxnHash_psbtData[_btcTxnHash] = psbtData;
 
         // 7. Send message through LayerZerobytes memory payload
         bytes memory payload =
@@ -196,7 +190,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             payload,
             _options,
             MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
-            _refundAddress // Refund address in case of failed source message.
+            address(this) // Refund address in case of failed source message.
         );
 
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
@@ -207,7 +201,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param _psbtData The PSBT data to validate.
      * @return metadata The extracted transaction metadata.
      */
-    function _validatePSBTData(bytes calldata _psbtData)
+    function _validatePSBTData(bytes memory _psbtData)
         internal
         view
         returns (BitcoinTxnParser.TransactionMetadata memory)
@@ -241,21 +235,17 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param _receiver The address of the receiver.
      * @param _btcTxnHash The BTC transaction hash.
      * @param _options LayerZero message options.
-     * @param _refundAddress The address to refund in case of failure.
      */
-    function sendMessageFor(address _receiver, bytes32 _btcTxnHash, bytes calldata _options, address _refundAddress)
-        external
-        payable
-    {
-        if (btcTxnHash_psbtMetadata[_btcTxnHash].user != _receiver) {
+    function sendMessageFor(address _receiver, bytes32 _btcTxnHash, bytes calldata _options) external payable {
+        if (btcTxnHash_psbtData[_btcTxnHash].user != _receiver) {
             revert InvalidReceiver(_receiver); // This also ensures that the txn is already present
         }
 
-        // 1. Parse and get metadata from psbtMetaData
-        PSBTMetadata memory metadata = btcTxnHash_psbtMetadata[_btcTxnHash];
+        // 1. Parse and get metadata from psbtData
+        PSBTData memory metadata = btcTxnHash_psbtData[_btcTxnHash];
 
         // TODO: Remove this after updating the test with the correct chainId in the metadata
-        uint32 _dstEid = metadata.chainId == 8453 ? 30184 : metadata.chainId;
+        uint32 _dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
 
         // 2. Validate receiver is set for destination chain
         if (peers[_dstEid] == bytes32(0)) {
@@ -276,10 +266,30 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             payload,
             _options,
             MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
-            _refundAddress // Refund address in case of failed source message.
+            address(this) // Refund address in case of failed source message.
         );
 
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
+    }
+
+    /* @dev Quotes the gas needed to pay for the full omnichain transaction.
+    * @return nativeFee Estimated gas fee in native gas.
+    * @return lzTokenFee Estimated gas fee in ZRO token.
+    */
+    function quote(
+        bytes32 _btcTxnHash, // The BTC transaction hash
+        bytes memory _psbtData, // The _psbtData message to send
+        bytes memory _options, // Message execution options
+        bool _payInLzToken // boolean for which token to return fee in
+    ) public view returns (uint256 nativeFee, uint256 lzTokenFee) {
+        bytes memory opReturnData = BitcoinTxnParser.decodeBitcoinTxn(_psbtData);
+        BitcoinTxnParser.TransactionMetadata memory metadata = BitcoinTxnParser.decodeMetadata(opReturnData);
+        bytes memory payload =
+            abi.encode(metadata.receiverAddress, _btcTxnHash, metadata.lockedAmount, metadata.nativeTokenAmount);
+        // TODO: Remove this after updating the test with the correct chainId in the metadata
+        uint32 _dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
+        MessagingFee memory fee = _quote(_dstEid, payload, _options, _payInLzToken);
+        return (fee.nativeFee, fee.lzTokenFee);
     }
 
     /**
@@ -287,8 +297,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param _btcTxnHash The BTC transaction hash.
      * @return The PSBT metadata associated with the transaction hash.
      */
-    function getPSBTData(bytes32 _btcTxnHash) external view returns (PSBTMetadata memory) {
-        return btcTxnHash_psbtMetadata[_btcTxnHash];
+    function getPSBTData(bytes32 _btcTxnHash) external view returns (PSBTData memory) {
+        return btcTxnHash_psbtData[_btcTxnHash];
     }
 
     /**
@@ -335,4 +345,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         (bool success,) = msg.sender.call{value: address(this).balance}("");
         if (!success) revert WithdrawalFailed();
     }
+
+    // Added back to receive refund from LayerZero as refund address has been removed
+    receive() external payable {}
 }
