@@ -26,7 +26,9 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
     // Events
     event MessageSent(uint32 dstEid, string message, bytes32 receiver, uint256 nativeFee);
-    event MessageProcessed(bytes32 guid, uint32 srcEid, bytes32 sender);
+    event MessageProcessed(
+        bytes32 guid, uint32 srcEid, bytes32 sender, address user, bytes32 btcTxnHash, uint256 lockedAmount
+    );
 
     constructor(address _endpoint, address _owner, address _eBTCManager) OApp(_endpoint, _owner) {
         _transferOwnership(_owner);
@@ -86,7 +88,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         // 2. Process the message
         _processMessage(btcTxnHash, user, lockedAmount);
 
-        emit MessageProcessed(_guid, _origin.srcEid, _origin.sender);
+        emit MessageProcessed(_guid, _origin.srcEid, _origin.sender, user, btcTxnHash, lockedAmount);
     }
 
     function _validateMessageUniqueness(bytes32 _btcTxnHash) internal view {
