@@ -9,44 +9,59 @@
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
     "chainEid": 40161
   },
+  "17000": {
+    "name": "Ethereum Holesky",
+    "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
+    "chainEid": 40217
+  },
   "137": {
     "name": "Polygon Mainnet",
     "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
     "chainEid": 30109
   },
-  "421614": {
-    "name": "Arbitrum Sepolia",
+  "80002": {
+    "name": "Polygon Amoy",
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
-    "chainEid": 40231
+    "chainEid": 40267
   },
   "42161": {
     "name": "Arbitrum One",
     "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
     "chainEid": 30110
   },
+  "421614": {
+    "name": "Arbitrum Sepolia",
+    "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
+    "chainEid": 40231
+  },
   "8453": {
     "name": "Base",
     "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
     "chainEid": 30184
-  },
-  "10": {
-    "name": "OP Mainnet",
-    "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
-    "chainEid": 30111
-  },
-  "1115": {
-    "name": "Core Testnet",
-    "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
-    "chainEid": 40153
   },
   "84532": {
     "name": "Base Sepolia",
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
     "chainEid": 40245
   },
-  "80002": {
-    "name": "Polygon Amoy",
+  "10": {
+    "name": "OP Mainnet",
+    "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
+    "chainEid": 30111
+  },
+  "11155420": {
+    "name": "OP Sepolia",
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
-    "chainEid": 40267
+    "chainEid": 40232
+  },
+  "1116": {
+    "name": "CoreDAO Mainnet",
+    "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
+    "chainEid": 30153
+  },
+  "1115": {
+    "name": "CoreDAO Testnet",
+    "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
+    "chainEid": 40153
   }
 }
