@@ -1,0 +1,60 @@
+Compiling 1 files with Solc 0.8.28
+Solc 0.8.28 finished in 6.53s
+Compiler run successful with warnings:
+Warning (2072): Unused local variable.
+  --> src/BaseChainCoordinator.sol:82:66:
+   |
+82 |         (address user, bytes32 btcTxnHash, uint256 lockedAmount, uint256 nativeTokenAmount) =
+   |                                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Script ran successfully.
+Gas used: 10319623
+
+== Logs ==
+  Deployed eBTCManager 0x749C98aD9891f17D308492043588A61C4132313e
+  Deployed BaseChainCoordinator 0x03E311aa26eD1797dA3F8BA3e2117DA5BBB70709
+  Deployed eBTC 0xb97D435d27FC5fe82580e59FB2F05f27148b9928
+  Set minter role for eBTCManager
+  Set eBTC address in eBTCManager
+  0x00000000000000000000000003e311aa26ed1797da3f8ba3e2117da5bbb70709
+  Deployed BitcoinLightClient 0xD8aA406E62b0175CBB0F4D26c1Ff2024ECfA6b16
+  Deployed HomeChainCoordinator 0x2Aac1d80852DC28889b640DB25E4B963eC520175
+  Set peer in HomeChainCoordinator
+  Transferred ownership of HomeChainCoordinator
+  Set peer in BaseChainCoordinator
+
+## Setting up 2 EVMs.
+
+==========================
+
+Chain 97
+
+Estimated gas price: 1 gwei
+
+Estimated total gas used for script: 6019684
+
+Estimated amount required: 0.006019684 ETH
+
+==========================
+
+==========================
+
+Chain 17000
+
+Estimated gas price: 0.001031854 gwei
+
+Estimated total gas used for script: 7883718
+
+Estimated amount required: 0.000008134845953172 ETH
+
+==========================
+
+
+==========================
+
+ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
+
+Transactions saved to: /Users/ayushgupta/Downloads/0xBridge/smart-layer/broadcast/multi/BaseChainDeployment.s.sol-latest/run.json
+
+Sensitive details saved to: /Users/ayushgupta/Downloads/0xBridge/smart-layer/cache/multi/BaseChainDeployment.s.sol-latest/run.json
+

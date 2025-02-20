@@ -151,7 +151,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_psbtData);
 
         // TODO: Remove this after updating the test with the correct chainId in the metadata
-        uint32 _dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
+        uint32 _dstEid = metadata.chainId == 8453 ? 40102 : metadata.chainId;
 
         // 2. Check if the message already exists or is processed
         if (btcTxnHash_psbtData[_btcTxnHash].isMinted) {
@@ -245,7 +245,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         PSBTData memory metadata = btcTxnHash_psbtData[_btcTxnHash];
 
         // TODO: Remove this after updating the test with the correct chainId in the metadata
-        uint32 _dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
+        uint32 _dstEid = metadata.chainId == 8453 ? 40102 : metadata.chainId;
 
         // 2. Validate receiver is set for destination chain
         if (peers[_dstEid] == bytes32(0)) {
@@ -287,7 +287,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes memory payload =
             abi.encode(metadata.receiverAddress, _btcTxnHash, metadata.lockedAmount, metadata.nativeTokenAmount);
         // TODO: Remove this after updating the test with the correct chainId in the metadata
-        uint32 _dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
+        uint32 _dstEid = metadata.chainId == 8453 ? 40102 : metadata.chainId;
         MessagingFee memory fee = _quote(_dstEid, payload, _options, _payInLzToken);
         return (fee.nativeFee, fee.lzTokenFee);
     }

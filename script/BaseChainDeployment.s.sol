@@ -17,8 +17,8 @@ contract BaseChainCoordinatorDeployment is Script {
     BaseChainCoordinator private baseChainCoordinator;
     BitcoinLightClient private btcLightClient;
     eBTCManager private eBTCManagerInstance;
-    // eBTC private eBTCToken;
-    eBTCMock private eBTCToken;
+    eBTC private eBTCToken;
+    // eBTCMock private eBTCToken;
 
     HelperConfig.NetworkConfig private srcNetworkConfig;
     HelperConfig.NetworkConfig private destNetworkConfig;
@@ -39,18 +39,16 @@ contract BaseChainCoordinatorDeployment is Script {
     bytes32 private constant merkleRoot = 0x58863b7cb847987c2a0f711e1bb3b910d9a748636c6a7c34cf865ab9ac2048ac;
 
     function run() public {
-        string memory destRpcUrl = vm.envString("CORE_TESTNET_RPC_URL");
+        string memory destRpcUrl = vm.envString("BNB_TESTNET_RPC_URL");
         destForkId = vm.createSelectFork(destRpcUrl);
         HelperConfig destConfig = new HelperConfig();
         destNetworkConfig = destConfig.getConfig();
 
         uint256 privateKey = vm.envUint("OWNER_PRIVATE_KEY");
-        // owner = address(uint160(privateKey));
-        console.log("Owner: ", owner);
         vm.startBroadcast(privateKey);
         // Deploy the eBTCManager contract
         eBTCManagerInstance = new eBTCManager(owner);
-        console.log("Deployed eBTCManager");
+        console.log("Deployed eBTCManager", address(eBTCManagerInstance));
 
         // Deploy the base chain coordinator
         baseChainCoordinator = new BaseChainCoordinator(
@@ -58,15 +56,15 @@ contract BaseChainCoordinatorDeployment is Script {
             owner, // owner
             address(eBTCManagerInstance) // eBTCManager
         );
-        console.log("Deployed BaseChainCoordinator");
+        console.log("Deployed BaseChainCoordinator", address(baseChainCoordinator));
 
         // Deploy implementation and proxy for eBTC using ERC1967Proxy
-        // eBTC eBTCImplementation = new eBTC();
-        // bytes memory initData = abi.encodeWithSelector(eBTC.initialize.selector, address(eBTCManagerInstance));
-        // ERC1967Proxy proxy = new ERC1967Proxy(address(eBTCImplementation), initData);
-        // eBTCToken = eBTC(address(proxy));
-        eBTCToken = new eBTCMock(address(eBTCManagerInstance)); // TODO: Remove this and use the above code
-        console.log("Deployed eBTC and created proxy");
+        eBTC eBTCImplementation = new eBTC();
+        bytes memory initData = abi.encodeWithSelector(eBTC.initialize.selector, address(eBTCManagerInstance));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(eBTCImplementation), initData);
+        eBTCToken = eBTC(address(proxy));
+        // eBTCToken = new eBTCMock(address(eBTCManagerInstance)); // TODO: Remove this and use the above code
+        console.log("Deployed eBTC and created proxy", address(eBTCToken));
 
         // Set the minter role for the eBTCManager contract
         eBTCManagerInstance.setMinterRole(address(baseChainCoordinator));
@@ -98,10 +96,10 @@ contract BaseChainCoordinatorDeployment is Script {
         );
         ERC1967Proxy lightClientProxy = new ERC1967Proxy(address(bitcoinLightClientImplementation), lightClientInitData);
         btcLightClient = BitcoinLightClient(address(lightClientProxy));
-        console.log("Deployed BitcoinLightClient and created proxy");
+        console.log("Deployed BitcoinLightClient and created proxy", address(btcLightClient));
 
         homeChainCoordinator = new HomeChainCoordinator(address(btcLightClient), srcNetworkConfig.endpoint, owner);
-        console.log("Deployed HomeChainCoordinator");
+        console.log("Deployed HomeChainCoordinator", address(homeChainCoordinator));
         homeChainCoordinator.setPeer(destNetworkConfig.chainEid, receiver);
         console.log("Set peer in HomeChainCoordinator");
         homeChainCoordinator.transferOwnership(aggregator);

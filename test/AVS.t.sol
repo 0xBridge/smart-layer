@@ -107,6 +107,8 @@ contract AVSTest is Test {
         // 5. Register operators to AVS (same as step 1) - to be executed by the operators individually
         // https://holesky.etherscan.io/tx/0xbec6a362cf15c06cfc3932684518fe9367e851cdbac873531d5d6c16e45b2ce6
         // https://holesky.etherscan.io/tx/0x8b61105ecfc3cd2207b58fade0784039d67c21f353f9bda681ba7c63713daaee
+        // https://holesky.etherscan.io/tx/0x98bec0dedea862d9f6bfeae17eb5120d2b7459f3f9283d03a66e890f4bbed8a2
+        // https://holesky.etherscan.io/tx/0x42ae1fc91f36ea155a4422a0f546fdb519e2abe9b35e16a1881763215914c147
         // IAVSGovernance(AVS_GOVERNANCE_ADDRESS).registerOperatorToEigenLayer(_eigenSig);
         // IAVSGovernance(AVS_GOVERNANCE_ADDRESS).registerAsOperator(uint256[4] calldata _blsKey, address _rewardsReceiver, ISignatureUtils.SignatureWithSaltAndExpiry memory _operatorSignature, BLSAuthLibrary.Signature calldata _blsRegistrationSignature);
 
