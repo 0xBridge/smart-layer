@@ -9,7 +9,7 @@ contract SendMessageScript is Script {
     HomeChainCoordinator public coordinator;
 
     // Update these values according to your deployment
-    address constant COORDINATOR_ADDRESS = 0x2Aac1d80852DC28889b640DB25E4B963eC520175; // Replace with actual address
+    address constant COORDINATOR_ADDRESS = 0x3505bb3aC00E33c1463689F1987ADce0466215D3; // Replace with actual address
     bytes32 constant BLOCK_HASH = 0x00000000000078556c00dbcd6505af1b06293da2a2ce4077b36ae0ee7caff284; // Replace with actual block hash
     bytes32 BTC_TXN_HASH = 0x0b050a87ba271963ba19dc5ab6a53b6dcf4b5c4f5852033ea92aa78030a9f381; // Replace with actual BTC transaction hash
     bytes psbtData =
@@ -51,8 +51,8 @@ contract SendMessageScript is Script {
         // console.log("Required native fee:", nativeFee);
 
         // Send the message
-        // coordinator.sendMessage{value: 0.1 ether}(BLOCK_HASH, BTC_TXN_HASH, proof, index, psbtData, options);
-        coordinator.sendMessageFor{value: 0.1 ether}(0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E, BTC_TXN_HASH, options);
+        coordinator.sendMessage{value: 0.1 ether}(BLOCK_HASH, BTC_TXN_HASH, proof, index, psbtData, options);
+        // coordinator.sendMessageFor{value: nativeFee}(0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E, BTC_TXN_HASH, options);
 
         vm.stopBroadcast();
     }

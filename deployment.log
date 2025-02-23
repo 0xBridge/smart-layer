@@ -1,6 +1,24 @@
-Compiling 1 files with Solc 0.8.28
-Solc 0.8.28 finished in 6.53s
+Compiling 5 files with Solc 0.8.28
+Solc 0.8.28 finished in 7.97s
 Compiler run successful with warnings:
+Warning (5667): Unused function parameter. Remove or comment out the variable name to silence this warning.
+   --> src/HomeChainCoordinator.sol:137:9:
+    |
+137 |         bytes32 _merkleRoot,
+    |         ^^^^^^^^^^^^^^^^^^^
+
+Warning (5667): Unused function parameter. Remove or comment out the variable name to silence this warning.
+   --> src/HomeChainCoordinator.sol:139:9:
+    |
+139 |         bytes32[] calldata _proof,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Warning (5667): Unused function parameter. Remove or comment out the variable name to silence this warning.
+   --> src/HomeChainCoordinator.sol:140:9:
+    |
+140 |         uint256 _index,
+    |         ^^^^^^^^^^^^^^
+
 Warning (2072): Unused local variable.
   --> src/BaseChainCoordinator.sol:82:66:
    |
@@ -8,17 +26,17 @@ Warning (2072): Unused local variable.
    |                                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Script ran successfully.
-Gas used: 10319623
+Gas used: 10310200
 
 == Logs ==
-  Deployed eBTCManager 0x749C98aD9891f17D308492043588A61C4132313e
-  Deployed BaseChainCoordinator 0x03E311aa26eD1797dA3F8BA3e2117DA5BBB70709
-  Deployed eBTC 0xb97D435d27FC5fe82580e59FB2F05f27148b9928
+  Deployed eBTCManager 0x8B3E1b9364B840E87b09ad12a4776690265dBc24
+  Deployed BaseChainCoordinator 0xfE27cC48d26ff921bB533C8D0699Ac30308dDd26
+  Deployed eBTC and created proxy 0x4356d8B1B91eAA3990D020d22b5aB2a92A7B77eA
   Set minter role for eBTCManager
   Set eBTC address in eBTCManager
-  0x00000000000000000000000003e311aa26ed1797da3f8ba3e2117da5bbb70709
-  Deployed BitcoinLightClient 0xD8aA406E62b0175CBB0F4D26c1Ff2024ECfA6b16
-  Deployed HomeChainCoordinator 0x2Aac1d80852DC28889b640DB25E4B963eC520175
+  0x000000000000000000000000fe27cc48d26ff921bb533c8d0699ac30308ddd26
+  Deployed BitcoinLightClient and created proxy 0xF31C62518bCe967b92D0f77e85fe1E8E5931Dcd4
+  Deployed HomeChainCoordinator 0x4BC1e6545c8964357386b835a03dbb0B1551433c
   Set peer in HomeChainCoordinator
   Transferred ownership of HomeChainCoordinator
   Set peer in BaseChainCoordinator
@@ -31,9 +49,9 @@ Chain 97
 
 Estimated gas price: 1 gwei
 
-Estimated total gas used for script: 6019684
+Estimated total gas used for script: 6008698
 
-Estimated amount required: 0.006019684 ETH
+Estimated amount required: 0.006008698 ETH
 
 ==========================
 
@@ -41,11 +59,11 @@ Estimated amount required: 0.006019684 ETH
 
 Chain 17000
 
-Estimated gas price: 0.001031854 gwei
+Estimated gas price: 0.003770496 gwei
 
-Estimated total gas used for script: 7883718
+Estimated total gas used for script: 7881484
 
-Estimated amount required: 0.000008134845953172 ETH
+Estimated amount required: 0.000029717103896064 ETH
 
 ==========================
 

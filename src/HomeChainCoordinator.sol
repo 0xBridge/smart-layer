@@ -154,9 +154,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         uint32 _dstEid = metadata.chainId == 8453 ? 40102 : metadata.chainId;
 
         // 2. Check if the message already exists or is processed
-        if (btcTxnHash_psbtData[_btcTxnHash].isMinted) {
-            revert TxnAlreadyProcessed(_btcTxnHash);
-        }
+        // TODO: Removed for Amit and Rahul's testing | Please add this back | Also, currently light client is not being populated by the performer / generator
+        // if (btcTxnHash_psbtData[_btcTxnHash].isMinted) {
+        //     revert TxnAlreadyProcessed(_btcTxnHash);
+        // }
 
         // 3. Validate receiver is set for destination chain
         if (peers[_dstEid] == bytes32(0)) {
@@ -164,7 +165,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         }
 
         // 5. Validate txn with SPV data
-        if (!BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index)) revert BitcoinTxnNotFound();
+        // TODO: Removed for Amit and Rahul's testing | Please add this back
+        // if (!BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index)) revert BitcoinTxnNotFound();
 
         // TODO: This needs to come from the metadata itself as this will keep on changing
         bytes32 networkPublicKey;

@@ -14,6 +14,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
     error INVALID_HEADER_CHAIN();
     error CHAIN_NOT_CONNECTED();
     error INVALID_TRANSACTION_INDEX();
+    error BLOCK_NOT_FOUND();
 
     // Roles
     bytes32 private constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
@@ -224,6 +225,8 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
      * @notice Get the merkle root for a block
      */
     function getMerkleRootForBlock(bytes32 blockHash) external view returns (bytes32) {
+        // TODO: Removed for Amit and Rahul's testing | Please add this back
+        // if (headers[blockHash].height == 0) revert BLOCK_NOT_FOUND();
         return headers[blockHash].merkleRoot;
     }
 
