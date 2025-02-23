@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.19;
 
 import {BitcoinUtils} from "./BitcoinUtils.sol";
 import {BitcoinTxnParser} from "./BitcoinTxnParser.sol";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.19;
 
 /// @title BitcoinTxnParser
 /// @notice Library for parsing Bitcoin transactions and extracting OP_RETURN metadata

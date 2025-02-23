@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.19;
 
 import {Script, console} from "forge-std/Script.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
@@ -9,10 +9,12 @@ import {HomeChainCoordinator} from "../src/HomeChainCoordinator.sol";
 import {BaseChainCoordinator} from "../src/BaseChainCoordinator.sol";
 import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 import {eBTCManager} from "../src/eBTCManager.sol";
+import {AVSExtension} from "../src/AVSExtension.sol";
 import {eBTC} from "../src/eBTC.sol";
 import {eBTCMock} from "../src/mocks/eBTCMock.sol";
 
 contract BaseChainCoordinatorDeployment is Script {
+    AVSExtension private avsExtension;
     HomeChainCoordinator private homeChainCoordinator;
     BaseChainCoordinator private baseChainCoordinator;
     BitcoinLightClient private btcLightClient;
@@ -25,6 +27,8 @@ contract BaseChainCoordinatorDeployment is Script {
 
     address private owner = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
     address private constant aggregator = 0x534e9B3EA1F77f687074685a5F7C8a568eF6D586;
+    address private constant generator = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
+    address private constant ATTESTATION_CENTER = 0x276ef26eEDC3CFE0Cdf22fB033Abc9bF6b6a95B3;
 
     uint256 private sourceForkId;
     uint256 private destForkId;
@@ -39,7 +43,7 @@ contract BaseChainCoordinatorDeployment is Script {
     bytes32 private constant merkleRoot = 0x58863b7cb847987c2a0f711e1bb3b910d9a748636c6a7c34cf865ab9ac2048ac;
 
     function run() public {
-        string memory destRpcUrl = vm.envString("BNB_TESTNET_RPC_URL");
+        string memory destRpcUrl = vm.envString("CORE_TESTNET_RPC_URL");
         destForkId = vm.createSelectFork(destRpcUrl);
         HelperConfig destConfig = new HelperConfig();
         destNetworkConfig = destConfig.getConfig();
@@ -73,7 +77,7 @@ contract BaseChainCoordinatorDeployment is Script {
         console.log("Set eBTC address in eBTCManager");
         vm.stopBroadcast();
 
-        string memory srcRpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
+        string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
         sourceForkId = vm.createSelectFork(srcRpcUrl);
         HelperConfig srcConfig = new HelperConfig();
         srcNetworkConfig = srcConfig.getConfig();
@@ -104,6 +108,8 @@ contract BaseChainCoordinatorDeployment is Script {
         console.log("Set peer in HomeChainCoordinator");
         homeChainCoordinator.transferOwnership(aggregator);
         console.log("Transferred ownership of HomeChainCoordinator");
+        avsExtension = new AVSExtension(owner, generator, ATTESTATION_CENTER, address(homeChainCoordinator));
+        console.log("Deployed AVSExtension", address(avsExtension));
         vm.stopBroadcast();
 
         vm.selectFork(destForkId);

@@ -1,0 +1,14 @@
+No files changed, compilation skipped
+Traces:
+  [12184530] → new BaseChainCoordinatorDeployment@0x9f7cF1d1F558E57ef88a59ac3D47214eF25B6A06
+    └─ ← [Return] 60609 bytes of code
+
+  [4098] BaseChainCoordinatorDeployment::run()
+    ├─ [0] VM::envString("CORE_TESTNET_RPC_URL") [staticcall]
+    │   └─ ← [Return] <env var value>
+    ├─ [0] VM::createSelectFork("<rpc url>")
+    │   └─ ← [Revert] vm.createSelectFork: Could not instantiate forked environment with provider rpc.test.btcs.network
+    └─ ← [Revert] vm.createSelectFork: Could not instantiate forked environment with provider rpc.test.btcs.network
+
+
+Gas used: 25162
