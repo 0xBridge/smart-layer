@@ -1,14 +1,35 @@
 No files changed, compilation skipped
-Traces:
-  [12184530] → new BaseChainCoordinatorDeployment@0x9f7cF1d1F558E57ef88a59ac3D47214eF25B6A06
-    └─ ← [Return] 60609 bytes of code
+Script ran successfully.
+Gas used: 4763972
 
-  [4098] BaseChainCoordinatorDeployment::run()
-    ├─ [0] VM::envString("CORE_TESTNET_RPC_URL") [staticcall]
-    │   └─ ← [Return] <env var value>
-    ├─ [0] VM::createSelectFork("<rpc url>")
-    │   └─ ← [Revert] vm.createSelectFork: Could not instantiate forked environment with provider rpc.test.btcs.network
-    └─ ← [Revert] vm.createSelectFork: Could not instantiate forked environment with provider rpc.test.btcs.network
+== Logs ==
+  Deployed eBTCManager 0x0F3BfC0Ddf2901EE5f9E522d2F236d4b9b6d2AC4
+  Deployed BaseChainCoordinator 0xbA7C8D4AF95687D6AC14EC61ADa5096eD00a946f
+  Deployed eBTC and created proxy 0xCe4CDfB9876adE075843Ec0951667fe016CEC00e
+  Set minter role for eBTCManager
+  Set eBTC address in eBTCManager
+  Set peer in BaseChainCoordinator
+
+## Setting up 1 EVM.
+
+==========================
+
+Chain 1115
+
+Estimated gas price: 100 gwei
+
+Estimated total gas used for script: 6358282
+
+Estimated amount required: 0.6358282 ETH
+
+==========================
 
 
-Gas used: 25162
+==========================
+
+ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
+
+Transactions saved to: /Users/ayushgupta/Downloads/0xBridge/smart-layer/broadcast/BaseChainDeployment.s.sol/1115/run-latest.json
+
+Sensitive values saved to: /Users/ayushgupta/Downloads/0xBridge/smart-layer/cache/BaseChainDeployment.s.sol/1115/run-latest.json
+

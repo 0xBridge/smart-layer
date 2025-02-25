@@ -114,7 +114,7 @@ contract BaseChainCoordinatorDeployment is Script {
 
         vm.selectFork(destForkId);
         bytes32 sender = bytes32(uint256(uint160(address(homeChainCoordinator))));
-        vm.startBroadcast(owner);
+        vm.startBroadcast(privateKey);
         baseChainCoordinator.setPeer(srcNetworkConfig.chainEid, sender);
         console.log("Set peer in BaseChainCoordinator");
         vm.stopBroadcast();
