@@ -10,15 +10,15 @@ contract SendMessageScript is Script {
     BaseChainCoordinator private baseChainCoordinator;
 
     // Update these values according to your deployment
-    address constant HOME_CHAIN_COORDINATOR_ADDRESS = 0xFd0e3af7503F07b06a69d5a35C4dc21501b9315f; // HomeChainCoordinator contract address on Amoy (destination == BSC)
-    address constant BASE_CHAIN_COORDINATOR_ADDRESS = 0x7Ad135dC73bf483E74869e61B51442B54D498ab4; // BaseChainCoordinator contract address on BSC (source == Amoy)
+    address constant HOME_CHAIN_COORDINATOR_ADDRESS = 0xEE35AB43127933562c65A7942cbf1ccAac4BE86F; // HomeChainCoordinator contract address on Amoy (destination == Core)
+    address constant BASE_CHAIN_COORDINATOR_ADDRESS = 0xbA7C8D4AF95687D6AC14EC61ADa5096eD00a946f; // BaseChainCoordinator contract address on Core (source == Amoy)
 
     // Ethereum ID of the source chain
     uint32 constant srcEid = 40267; // Amoy
-    uint32 constant destEid = 40102; // BSC
+    uint32 constant destEid = 40153; // Core
 
     function run() public {
-        string memory destRpcUrl = vm.envString("BNB_TESTNET_RPC_URL");
+        string memory destRpcUrl = vm.envString("CORE_TESTNET_RPC_URL");
         uint256 destForkId = vm.createSelectFork(destRpcUrl);
 
         uint256 privateKey = vm.envUint("OWNER_PRIVATE_KEY");
