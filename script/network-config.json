@@ -64,6 +64,11 @@
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
     "chainEid": 40153
   },
+  "1114": {
+    "name": "CoreDAO Testnet2",
+    "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
+    "chainEid": 40153
+  },
   "56": {
     "name": "Binance Smart Chain",
     "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",

@@ -60,7 +60,8 @@ contract AVSExtensionTest is Test {
         baseChainCoordinator = new BaseChainCoordinator(
             destNetworkConfig.endpoint, // endpoint
             owner, // owner
-            address(eBTCManagerInstance) // eBTCManager
+            address(eBTCManagerInstance), // eBTCManager
+            destNetworkConfig.chainEid // chainEid
         );
 
         // Switch network to source fork
@@ -101,7 +102,9 @@ contract AVSExtensionTest is Test {
 
         // Deploy HomeChainCoordinator
         vm.startPrank(owner);
-        homeChainCoordinator = new HomeChainCoordinator(address(btcLightClient), srcNetworkConfig.endpoint, owner);
+        homeChainCoordinator = new HomeChainCoordinator(
+            address(btcLightClient), srcNetworkConfig.endpoint, owner, srcNetworkConfig.chainEid
+        );
         // Set destination peer address
         homeChainCoordinator.setPeer(destNetworkConfig.chainEid, receiver);
         vm.stopPrank();

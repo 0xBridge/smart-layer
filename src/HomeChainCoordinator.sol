@@ -8,8 +8,9 @@ import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {BitcoinTxnParser} from "./libraries/BitcoinTxnParser.sol";
 import {TxidCalculator} from "./libraries/TxidCalculator.sol";
 import {BitcoinUtils} from "./libraries/BitcoinUtils.sol";
-import {PSBTData, IHomeChainCoordinator} from "./interfaces/IHomeChainCoordinator.sol";
 import {BitcoinLightClient} from "./BitcoinLightClient.sol";
+import {PSBTData, IHomeChainCoordinator} from "./interfaces/IHomeChainCoordinator.sol";
+import {Origin, IBaseChainCoordinator} from "./interfaces/IBaseChainCoordinator.sol";
 
 /**
  * @title HomeChainCoordinator
@@ -28,10 +29,11 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     error WithdrawalFailed();
 
     // State variables
-    BitcoinLightClient private immutable lightClient;
+    BitcoinLightClient internal immutable lightClient;
+    uint32 internal immutable chainEid;
 
-    address private taskManager;
-    mapping(bytes32 => PSBTData) private btcTxnHash_psbtData;
+    address internal taskManager;
+    mapping(bytes32 => PSBTData) internal btcTxnHash_psbtData;
 
     uint256 public maxGasTokenAmount = 1 ether; // Max amount that can be put as the native token amount
     uint256 public minBTCAmount = 1000; // Min BTC amount / satoshis that needs to be locked
@@ -40,9 +42,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     event MessageSent(uint32 indexed dstEid, bytes32 indexed psbtHash, address indexed operator, uint256 timestamp);
     event OperatorStatusChanged(address indexed operator, bool status);
 
-    constructor(address _lightClient, address _endpoint, address _owner) OApp(_endpoint, _owner) {
+    constructor(address _lightClient, address _endpoint, address _owner, uint32 _chainEid) OApp(_endpoint, _owner) {
         _transferOwnership(_owner);
         lightClient = BitcoinLightClient(_lightClient);
+        chainEid = _chainEid;
     }
 
     /**
@@ -141,61 +144,91 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes calldata _psbtData,
         bytes calldata _options
     ) internal {
-        // 0. btcTxnHash generated from the psbt data being shared should be the same as the one passed
-        bytes32 txid = TxidCalculator.calculateTxid(_psbtData);
-        if (txid != _btcTxnHash) {
-            revert BitcoinTxnAndPSBTMismatch();
-        }
-
-        // 1. Parse and validate PSBT data
+        // 0. Parse and validate PSBT data
         BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_psbtData);
 
         // TODO: Remove this after updating the test with the correct chainId in the metadata
         uint32 _dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
 
-        // 2. Check if the message already exists or is processed
-        // TODO: Removed for Amit and Rahul's testing | Please add this back | Also, currently light client is not being populated by the performer / generator
-        // if (btcTxnHash_psbtData[_btcTxnHash].isMinted) {
-        //     revert TxnAlreadyProcessed(_btcTxnHash);
-        // }
-
-        // 3. Validate receiver is set for destination chain
-        if (peers[_dstEid] == bytes32(0)) {
-            revert InvalidDestination();
-        }
-
-        // 5. Validate txn with SPV data
-        // TODO: Removed for Amit and Rahul's testing | Please add this back
-        // if (!BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index)) revert BitcoinTxnNotFound();
-
-        // TODO: This needs to come from the metadata itself as this will keep on changing
-        bytes32 networkPublicKey;
-        // 6. Store PSBT metadata
-        PSBTData memory psbtData = PSBTData({
-            isMinted: true,
-            chainId: metadata.chainId,
-            user: metadata.receiverAddress,
-            lockedAmount: metadata.lockedAmount,
-            nativeTokenAmount: metadata.nativeTokenAmount,
-            networkPublicKey: networkPublicKey,
-            psbtData: _psbtData
-        });
-        btcTxnHash_psbtData[_btcTxnHash] = psbtData;
+        // 1-4. Validate input
+        _validateInput(_merkleRoot, _btcTxnHash, _proof, _index, _psbtData, _dstEid);
 
         // 7. Send message through LayerZerobytes memory payload
         bytes memory payload =
             abi.encode(metadata.receiverAddress, _btcTxnHash, metadata.lockedAmount, metadata.nativeTokenAmount);
 
-        // TODO: Create a function to get the correct MessageFee for the user
-        _lzSend(
-            _dstEid,
-            payload,
-            _options,
-            MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
-            address(this) // Refund address in case of failed source message.
-        );
+        // 5. Check if the message is to be sent to the same chain
+        if (_dstEid == chainEid) {
+            address baseChainCoordinator = address(uint160(uint256(peers[_dstEid])));
+            bytes32 thisAddressInBytes32 = bytes32(uint256(uint160(address(this))));
+            IBaseChainCoordinator(baseChainCoordinator).lzReceive(
+                Origin(chainEid, thisAddressInBytes32, 0), _btcTxnHash, payload, msg.sender, _options
+            );
+        } else {
+            // TODO: This needs to come from the metadata itself as this will keep on changing
+            bytes32 networkPublicKey;
+            // 6. Store PSBT metadata
+            PSBTData memory psbtData = PSBTData({
+                isMinted: true,
+                chainId: metadata.chainId,
+                user: metadata.receiverAddress,
+                lockedAmount: metadata.lockedAmount,
+                nativeTokenAmount: metadata.nativeTokenAmount,
+                networkPublicKey: networkPublicKey,
+                psbtData: _psbtData
+            });
+            btcTxnHash_psbtData[_btcTxnHash] = psbtData;
 
+            // TODO: Create a function to get the correct MessageFee for the user
+            _lzSend(
+                _dstEid,
+                payload,
+                _options,
+                MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
+                address(this) // Refund address in case of failed source message.
+            );
+        }
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
+    }
+
+    /**
+     * @dev Internal function to send a cross-chain message with PSBT data.
+     * @param _merkleRoot The merkle root for the block.
+     * @param _btcTxnHash The BTC transaction hash.
+     * @param _proof The proof for the transaction.
+     * @param _index The index of the transaction in the block.
+     * @param _psbtData The PSBT data to be processed.
+     * @param _dstEid The destination chain endpoint ID.
+     */
+    function _validateInput(
+        bytes32 _merkleRoot,
+        bytes32 _btcTxnHash,
+        bytes32[] calldata _proof,
+        uint256 _index,
+        bytes calldata _psbtData,
+        // bytes calldata _options,
+        uint32 _dstEid
+    ) internal view {
+        // 1. btcTxnHash generated from the psbt data being shared should be the same as the one passed
+        bytes32 txid = TxidCalculator.calculateTxid(_psbtData);
+        if (txid != _btcTxnHash) {
+            revert BitcoinTxnAndPSBTMismatch();
+        }
+
+        // 2. Check if the message already exists or is processed
+        // TODO: Removed for Amit and Rahul's testing | Please add this back | Also, currently light client is not being populated by the performer / generator
+        if (btcTxnHash_psbtData[_btcTxnHash].isMinted) {
+            revert TxnAlreadyProcessed(_btcTxnHash);
+        }
+
+        // 3. Validate txn with SPV data
+        // TODO: Removed for Amit and Rahul's testing | Please add this back
+        // if (!BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index)) revert BitcoinTxnNotFound();
+
+        // 4. Validate receiver is set for destination chain
+        if (peers[_dstEid] == bytes32(0)) {
+            revert InvalidDestination();
+        }
     }
 
     /**

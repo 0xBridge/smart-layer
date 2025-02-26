@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+// import {console} from "forge-std/console.sol";
+import {OApp, Origin, MessagingFee, OAppReceiver} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
-import {MintData, IBaseChainCoordinator} from "./interfaces/IBaseChainCoordinator.sol";
+import {MintData, IBaseChainCoordinator, ILayerZeroReceiver} from "./interfaces/IBaseChainCoordinator.sol";
 import {eBTCManager} from "./eBTCManager.sol";
 
 /**
@@ -21,8 +21,9 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     error WithdrawalFailed();
 
     // Mapping to store corresponding receiver addresses on different chains
-    mapping(bytes32 => MintData) private btcTxnHash_mintData;
-    eBTCManager private eBTCManagerInstance;
+    mapping(bytes32 => MintData) internal btcTxnHash_mintData;
+    eBTCManager internal eBTCManagerInstance;
+    uint32 internal immutable chainEid;
 
     // Events
     event MessageSent(uint32 dstEid, string message, bytes32 receiver, uint256 nativeFee);
@@ -30,9 +31,10 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         bytes32 guid, uint32 srcEid, bytes32 sender, address user, bytes32 btcTxnHash, uint256 lockedAmount
     );
 
-    constructor(address _endpoint, address _owner, address _eBTCManager) OApp(_endpoint, _owner) {
+    constructor(address _endpoint, address _owner, address _eBTCManager, uint32 _chainEid) OApp(_endpoint, _owner) {
         _transferOwnership(_owner);
         eBTCManagerInstance = eBTCManager(_eBTCManager);
+        chainEid = _chainEid;
     }
 
     /**
@@ -71,13 +73,25 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         eBTCManagerInstance = eBTCManager(payable(_eBTCManager));
     }
 
+    function lzReceive(
+        Origin calldata _origin,
+        bytes32 _guid,
+        bytes calldata _message,
+        address _executor,
+        bytes calldata _extraData
+    ) public payable virtual override(OAppReceiver, ILayerZeroReceiver) whenNotPaused {
+        _lzReceive(_origin, _guid, _message, _executor, _extraData);
+    }
+
     function _lzReceive(Origin calldata _origin, bytes32 _guid, bytes calldata _message, address, bytes calldata)
         internal
         virtual
         override
         whenNotPaused
     {
-        if (msg.sender != address(endpoint)) revert InvalidMessageSender();
+        if (!(msg.sender == address(endpoint) || msg.sender == address(uint160(uint256(peers[chainEid]))))) {
+            revert InvalidMessageSender();
+        }
 
         (address user, bytes32 btcTxnHash, uint256 lockedAmount, uint256 nativeTokenAmount) =
             abi.decode(_message, (address, bytes32, uint256, uint256));
