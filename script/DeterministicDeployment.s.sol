@@ -46,7 +46,7 @@ contract DeterministicTokenDeployer is Script {
      * @return proxyAddress Address of the deployed token proxy
      */
     function deployToken(address owner_, bytes32 salt_) public returns (address proxyAddress) {
-        bytes memory bytecode = _generateEBTCBytecode(owner_);
+        bytes memory bytecode = _generateEBTCBytecode(owner_, salt_);
 
         assembly {
             proxyAddress := create2(0, add(bytecode, 32), mload(bytecode), salt_)
@@ -64,8 +64,12 @@ contract DeterministicTokenDeployer is Script {
      * @param owner_ Address that will manage the token
      * @return Bytecode for the token contract
      */
-    function _generateEBTCBytecode(address owner_) internal returns (bytes memory) {
-        address tokenImplementation = address(new eBTC());
+    function _generateEBTCBytecode(address owner_, bytes32 salt_) internal returns (bytes memory) {
+        address tokenImplementation;
+        bytes memory tokenBytecode = type(eBTC).creationCode;
+        assembly {
+            tokenImplementation := create2(0, add(tokenBytecode, 32), mload(tokenBytecode), salt_)
+        }
         // Generate initialization data
         bytes memory initData = abi.encodeWithSelector(eBTC.initialize.selector, owner_);
         // Generate proxy constructor data
