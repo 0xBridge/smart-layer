@@ -3,9 +3,16 @@ pragma solidity ^0.8.19;
 
 import {Script} from "forge-std/Script.sol";
 
+/**
+ * @title HelperConfig
+ * @notice Configuration helper for network-specific settings
+ * @dev Loads configuration from JSON files based on the current chain ID
+ */
 contract HelperConfig is Script {
+    // Custom errors
     error HelperConfig__InvalidChainId();
 
+    // Data structures
     struct NetworkConfig {
         uint32 chainEid;
         address endpoint;
@@ -13,10 +20,15 @@ contract HelperConfig is Script {
     }
 
     // Constants
-    address constant OWNER_WALLET = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
+    address internal constant OWNER_WALLET = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
 
-    NetworkConfig public localNetworkConfig;
+    // State variables
+    NetworkConfig internal _localNetworkConfig;
 
+    /**
+     * @notice Contract constructor
+     * @dev Loads network configuration based on current chain ID
+     */
     constructor() {
         // Get current chainId
         uint256 chainId = block.chainid;
@@ -35,16 +47,21 @@ contract HelperConfig is Script {
                 abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".chainEid")), (uint32));
 
             // Set the local network config
-            localNetworkConfig = NetworkConfig({chainEid: chainEid, endpoint: endpoint, account: OWNER_WALLET});
+            _localNetworkConfig = NetworkConfig({chainEid: chainEid, endpoint: endpoint, account: OWNER_WALLET});
         } catch {
             revert HelperConfig__InvalidChainId();
         }
     }
 
+    /**
+     * @notice Gets the network configuration
+     * @dev Reverts if chain ID is invalid or configuration is missing
+     * @return Network configuration for the current chain
+     */
     function getConfig() public view returns (NetworkConfig memory) {
-        if (localNetworkConfig.endpoint == address(0)) {
+        if (_localNetworkConfig.endpoint == address(0)) {
             revert HelperConfig__InvalidChainId();
         }
-        return localNetworkConfig;
+        return _localNetworkConfig;
     }
 }

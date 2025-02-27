@@ -5,43 +5,59 @@ import {Script, console} from "forge-std/Script.sol";
 import {HomeChainCoordinator} from "../src/HomeChainCoordinator.sol";
 import {BaseChainCoordinator} from "../src/BaseChainCoordinator.sol";
 
+/**
+ * @title SendMessageScript
+ * @notice Script to configure cross-chain communication between networks
+ * @dev Sets up peer relationships between HomeChainCoordinator and BaseChainCoordinator
+ */
 contract SendMessageScript is Script {
-    HomeChainCoordinator private homeChainCoordinator;
-    BaseChainCoordinator private baseChainCoordinator;
+    // Contract instances
+    HomeChainCoordinator internal _homeChainCoordinator;
+    BaseChainCoordinator internal _baseChainCoordinator;
 
-    // Update these values according to your deployment
-    address constant HOME_CHAIN_COORDINATOR_ADDRESS = 0xEE35AB43127933562c65A7942cbf1ccAac4BE86F; // HomeChainCoordinator contract address on Amoy (destination == Core)
-    address constant BASE_CHAIN_COORDINATOR_ADDRESS = 0xbA7C8D4AF95687D6AC14EC61ADa5096eD00a946f; // BaseChainCoordinator contract address on Core (source == Amoy)
+    // Constants
+    address internal constant HOME_CHAIN_COORDINATOR_ADDRESS = 0xEE35AB43127933562c65A7942cbf1ccAac4BE86F; // on Amoy
+    address internal constant BASE_CHAIN_COORDINATOR_ADDRESS = 0xbA7C8D4AF95687D6AC14EC61ADa5096eD00a946f; // on Core
 
-    // Ethereum ID of the source chain
-    uint32 constant srcEid = 40267; // Amoy
-    uint32 constant destEid = 40153; // Core
+    // Chain identification
+    uint32 internal constant SRC_EID = 40267; // Amoy
+    uint32 internal constant DEST_EID = 40153; // Core
 
+    /**
+     * @notice Main execution function
+     * @dev Configures peer relationships between coordinators on different chains
+     */
     function run() public {
+        // Set up destination chain fork
         string memory destRpcUrl = vm.envString("CORE_TESTNET_RPC_URL");
         uint256 destForkId = vm.createSelectFork(destRpcUrl);
 
         uint256 privateKey = vm.envUint("OWNER_PRIVATE_KEY");
         vm.startBroadcast(privateKey);
+
         // Create an instance of already deployed BaseChainCoordinator contract
-        baseChainCoordinator = BaseChainCoordinator(BASE_CHAIN_COORDINATOR_ADDRESS);
-        console.log("BaseChainCoordinator", address(baseChainCoordinator));
+        _baseChainCoordinator = BaseChainCoordinator(BASE_CHAIN_COORDINATOR_ADDRESS);
+        console.log("BaseChainCoordinator", address(_baseChainCoordinator));
+
         // Set HomeChainCoordinator contract address as peer on BaseChainCoordinator
         // Convert address to bytes32
         bytes32 receiver = bytes32(uint256(uint160(HOME_CHAIN_COORDINATOR_ADDRESS)));
-        baseChainCoordinator.setPeer(srcEid, receiver);
+        _baseChainCoordinator.setPeer(SRC_EID, receiver);
         vm.stopBroadcast();
 
+        // Set up source chain fork
         string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
         uint256 srcForkId = vm.createSelectFork(srcRpcUrl);
         uint256 aggregatorPrivateKey = vm.envUint("AGGREGATOR_PRIVATE_KEY");
         vm.startBroadcast(aggregatorPrivateKey);
+
         // Create an instance of already deployed HomeChainCoordinator contract
-        homeChainCoordinator = HomeChainCoordinator(payable(HOME_CHAIN_COORDINATOR_ADDRESS));
-        console.log("HomeChainCoordinator", address(homeChainCoordinator));
+        _homeChainCoordinator = HomeChainCoordinator(payable(HOME_CHAIN_COORDINATOR_ADDRESS));
+        console.log("HomeChainCoordinator", address(_homeChainCoordinator));
+
         // Set BaseChainCoordinator contract address as peer on HomeChainCoordinator
         bytes32 baseChainReceiver = bytes32(uint256(uint160(BASE_CHAIN_COORDINATOR_ADDRESS)));
-        homeChainCoordinator.setPeer(destEid, baseChainReceiver);
+        _homeChainCoordinator.setPeer(DEST_EID, baseChainReceiver);
         vm.stopBroadcast();
     }
 }

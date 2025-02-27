@@ -5,7 +5,18 @@ import {Script} from "forge-std/Script.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 
+/**
+ * @title DeployBitcoinLightClient
+ * @notice Script to deploy a Bitcoin Light Client contract with proxy
+ * @dev Uses a proxy pattern for upgradeability
+ */
 contract DeployBitcoinLightClient is Script {
+    /**
+     * @notice Main deployment function
+     * @dev Deploys the BitcoinLightClient implementation and proxy with real Bitcoin block data
+     * @return proxy_ Address of the deployed proxy
+     * @return implementation_ Address of the deployed implementation
+     */
     function run() external returns (address proxy_, address implementation_) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address admin = vm.envAddress("ADMIN_ADDRESS");

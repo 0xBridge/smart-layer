@@ -13,69 +13,80 @@ import {AVSExtension} from "../src/AVSExtension.sol";
 import {eBTC} from "../src/eBTC.sol";
 import {eBTCMock} from "../src/mocks/eBTCMock.sol";
 
+/**
+ * @title BaseChainCoordinatorDeployment
+ * @notice Script for deploying all contracts needed for the base chain functionality
+ * @dev Sets up the required contracts and configures their relationships
+ */
 contract BaseChainCoordinatorDeployment is Script {
-    AVSExtension private avsExtension;
-    HomeChainCoordinator private homeChainCoordinator;
-    BaseChainCoordinator private baseChainCoordinator;
-    BitcoinLightClient private btcLightClient;
-    eBTCManager private eBTCManagerInstance;
-    eBTC private eBTCToken;
-    // eBTCMock private eBTCToken;
+    // Contract instances
+    AVSExtension internal _avsExtension;
+    HomeChainCoordinator internal _homeChainCoordinator;
+    BaseChainCoordinator internal _baseChainCoordinator;
+    BitcoinLightClient internal _btcLightClient;
+    eBTCManager internal _eBTCManagerInstance;
+    eBTC internal _eBTCToken;
 
-    HelperConfig.NetworkConfig private srcNetworkConfig;
-    HelperConfig.NetworkConfig private destNetworkConfig;
+    // Network configurations
+    HelperConfig.NetworkConfig internal _srcNetworkConfig;
+    HelperConfig.NetworkConfig internal _destNetworkConfig;
 
-    address private owner = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
-    address private constant aggregator = 0x534e9B3EA1F77f687074685a5F7C8a568eF6D586;
-    address private constant generator = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
-    address private constant ATTESTATION_CENTER = 0x276ef26eEDC3CFE0Cdf22fB033Abc9bF6b6a95B3;
+    // Constants
+    address internal constant OWNER = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
+    address internal constant AGGREGATOR = 0x534e9B3EA1F77f687074685a5F7C8a568eF6D586;
+    address internal constant GENERATOR = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
+    address internal constant ATTESTATION_CENTER = 0x276ef26eEDC3CFE0Cdf22fB033Abc9bF6b6a95B3;
 
-    uint256 private sourceForkId;
-    uint256 private destForkId;
+    // Fork IDs
+    uint256 internal _sourceForkId;
+    uint256 internal _destForkId;
 
     // Bitcoin SPV Testnet constants (Block #68741)
-    uint32 private constant blockVersion = 536870912;
-    uint32 private constant blockTimestamp = 1738656278;
-    uint32 private constant difficultyBits = 486604799;
-    uint32 private constant nonce = 4059174314;
-    uint32 private constant height = 68741;
-    bytes32 private constant prevBlock = 0x000000000000123625879059bc5035363bcc5d4dde895f427bbe9b8866d51d7f;
-    bytes32 private constant merkleRoot = 0x58863b7cb847987c2a0f711e1bb3b910d9a748636c6a7c34cf865ab9ac2048ac;
+    uint32 internal constant BLOCK_VERSION = 536870912;
+    uint32 internal constant BLOCK_TIMESTAMP = 1738656278;
+    uint32 internal constant DIFFICULTY_BITS = 486604799;
+    uint32 internal constant NONCE = 4059174314;
+    uint32 internal constant HEIGHT = 68741;
+    bytes32 internal constant PREV_BLOCK = 0x000000000000123625879059bc5035363bcc5d4dde895f427bbe9b8866d51d7f;
+    bytes32 internal constant MERKLE_ROOT = 0x58863b7cb847987c2a0f711e1bb3b910d9a748636c6a7c34cf865ab9ac2048ac;
 
+    /**
+     * @notice Main deployment function
+     * @dev Deploys and configures all necessary contracts on both source and destination chains
+     */
     function run() public {
         string memory destRpcUrl = vm.envString("CORE_TESTNET_RPC_URL");
-        destForkId = vm.createSelectFork(destRpcUrl);
+        _destForkId = vm.createSelectFork(destRpcUrl);
         HelperConfig destConfig = new HelperConfig();
-        destNetworkConfig = destConfig.getConfig();
+        _destNetworkConfig = destConfig.getConfig();
 
         uint256 privateKey = vm.envUint("OWNER_PRIVATE_KEY");
 
         vm.startBroadcast(privateKey);
-        eBTCManagerInstance = new eBTCManager(owner);
-        console.log("Deployed eBTCManager", address(eBTCManagerInstance));
-        baseChainCoordinator = new BaseChainCoordinator(
-            destNetworkConfig.endpoint, // endpoint
-            owner, // owner
-            address(eBTCManagerInstance), // eBTCManager,
-            destNetworkConfig.chainEid // chainEid
+        _eBTCManagerInstance = new eBTCManager(OWNER);
+        console.log("Deployed eBTCManager", address(_eBTCManagerInstance));
+        _baseChainCoordinator = new BaseChainCoordinator(
+            _destNetworkConfig.endpoint, // endpoint
+            OWNER, // owner
+            address(_eBTCManagerInstance), // eBTCManager,
+            _destNetworkConfig.chainEid // chainEid
         );
-        console.log("Deployed BaseChainCoordinator", address(baseChainCoordinator));
+        console.log("Deployed BaseChainCoordinator", address(_baseChainCoordinator));
         eBTC eBTCImplementation = new eBTC();
-        bytes memory initData = abi.encodeWithSelector(eBTC.initialize.selector, address(eBTCManagerInstance));
+        bytes memory initData = abi.encodeWithSelector(eBTC.initialize.selector, address(_eBTCManagerInstance));
         ERC1967Proxy proxy = new ERC1967Proxy(address(eBTCImplementation), initData);
-        eBTCToken = eBTC(address(proxy));
-        // eBTCToken = new eBTCMock(address(eBTCManagerInstance)); // TODO: Remove this and use the above code
-        console.log("Deployed eBTC and created proxy", address(eBTCToken));
-        eBTCManagerInstance.setMinterRole(address(baseChainCoordinator));
+        _eBTCToken = eBTC(address(proxy));
+        console.log("Deployed eBTC and created proxy", address(_eBTCToken));
+        _eBTCManagerInstance.setMinterRole(address(_baseChainCoordinator));
         console.log("Set minter role for eBTCManager");
-        eBTCManagerInstance.setEBTC(address(eBTCToken));
+        _eBTCManagerInstance.setEBTC(address(_eBTCToken));
         console.log("Set eBTC address in eBTCManager");
         vm.stopBroadcast();
 
         string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
-        sourceForkId = vm.createSelectFork(srcRpcUrl);
+        _sourceForkId = vm.createSelectFork(srcRpcUrl);
         HelperConfig srcConfig = new HelperConfig();
-        srcNetworkConfig = srcConfig.getConfig();
+        _srcNetworkConfig = srcConfig.getConfig();
         bytes32 receiver = bytes32(uint256(uint160(address(0x2908ba527aE590F9C7c5fCcDaC47598E28179Cf4))));
         console.logBytes32(receiver);
 
@@ -83,36 +94,36 @@ contract BaseChainCoordinatorDeployment is Script {
         BitcoinLightClient bitcoinLightClientImplementation = new BitcoinLightClient();
         bytes memory lightClientInitData = abi.encodeWithSelector(
             BitcoinLightClient.initialize.selector,
-            owner,
-            blockVersion,
-            blockTimestamp,
-            difficultyBits,
-            nonce,
-            height,
-            prevBlock,
-            merkleRoot
+            OWNER,
+            BLOCK_VERSION,
+            BLOCK_TIMESTAMP,
+            DIFFICULTY_BITS,
+            NONCE,
+            HEIGHT,
+            PREV_BLOCK,
+            MERKLE_ROOT
         );
         ERC1967Proxy lightClientProxy = new ERC1967Proxy(address(bitcoinLightClientImplementation), lightClientInitData);
-        btcLightClient = BitcoinLightClient(address(lightClientProxy));
-        console.log("Deployed BitcoinLightClient and created proxy", address(btcLightClient));
+        _btcLightClient = BitcoinLightClient(address(lightClientProxy));
+        console.log("Deployed BitcoinLightClient and created proxy", address(_btcLightClient));
 
-        homeChainCoordinator = new HomeChainCoordinator(
-            address(btcLightClient), srcNetworkConfig.endpoint, owner, srcNetworkConfig.chainEid
+        _homeChainCoordinator = new HomeChainCoordinator(
+            address(_btcLightClient), _srcNetworkConfig.endpoint, OWNER, _srcNetworkConfig.chainEid
         );
-        console.log("Deployed HomeChainCoordinator", address(homeChainCoordinator));
-        homeChainCoordinator.setPeer(destNetworkConfig.chainEid, receiver);
+        console.log("Deployed HomeChainCoordinator", address(_homeChainCoordinator));
+        _homeChainCoordinator.setPeer(_destNetworkConfig.chainEid, receiver);
         console.log("Set peer in HomeChainCoordinator");
-        homeChainCoordinator.transferOwnership(aggregator);
+        _homeChainCoordinator.transferOwnership(AGGREGATOR);
         console.log("Transferred ownership of HomeChainCoordinator");
-        avsExtension = new AVSExtension(owner, generator, ATTESTATION_CENTER, address(homeChainCoordinator));
-        console.log("Deployed AVSExtension", address(avsExtension));
+        _avsExtension = new AVSExtension(OWNER, GENERATOR, ATTESTATION_CENTER, address(_homeChainCoordinator));
+        console.log("Deployed AVSExtension", address(_avsExtension));
         vm.stopBroadcast();
 
-        vm.selectFork(destForkId);
+        vm.selectFork(_destForkId);
         console.log("Entered the last piece");
-        bytes32 sender = bytes32(uint256(uint160(address(homeChainCoordinator))));
+        bytes32 sender = bytes32(uint256(uint160(address(_homeChainCoordinator))));
         vm.startBroadcast(privateKey);
-        baseChainCoordinator.setPeer(srcNetworkConfig.chainEid, sender);
+        _baseChainCoordinator.setPeer(_srcNetworkConfig.chainEid, sender);
         console.log("Set peer in BaseChainCoordinator");
         vm.stopBroadcast();
     }

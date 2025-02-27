@@ -5,7 +5,18 @@ import {Script} from "forge-std/Script.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {eBTC} from "../src/eBTC.sol";
 
+/**
+ * @title DeployEBTC
+ * @notice Script to deploy the eBTC token with proxy
+ * @dev Implements upgradeability via ERC1967Proxy
+ */
 contract DeployEBTC is Script {
+    /**
+     * @notice Main deployment function
+     * @dev Deploys both implementation and proxy contracts
+     * @return proxy_ Address of the deployed proxy
+     * @return implementation_ Address of the deployed implementation
+     */
     function run() external returns (address proxy_, address implementation_) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address minter = vm.envAddress("ADMIN_ADDRESS");
