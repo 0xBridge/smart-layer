@@ -19,3 +19,6 @@ broadcast/*
 
 # Gas files
 gas-report.txt
+
+# Deployment files
+deployments/
