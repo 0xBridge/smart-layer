@@ -13,7 +13,7 @@ import {Script, console} from "forge-std/Script.sol";
  */
 contract DeterministicTokenDeployer is Script {
     // Constants
-    address internal constant OWNER_ADDRESS = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
+    address public constant OWNER_ADDRESS = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
 
     // Events
     event TokenDeployed(address indexed tokenAddress);

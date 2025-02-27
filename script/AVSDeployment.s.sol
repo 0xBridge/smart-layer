@@ -14,11 +14,11 @@ import {eBTC} from "../src/eBTC.sol";
 import {eBTCMock} from "../src/mocks/eBTCMock.sol";
 
 /**
- * @title BaseChainCoordinatorDeployment
+ * @title AVSDeployment
  * @notice Script for deploying all contracts needed for the base chain functionality
  * @dev Sets up the required contracts and configures their relationships
  */
-contract BaseChainCoordinatorDeployment is Script {
+contract AVSDeployment is Script {
     // Contract instances
     AVSExtension internal _avsExtension;
     HomeChainCoordinator internal _homeChainCoordinator;
