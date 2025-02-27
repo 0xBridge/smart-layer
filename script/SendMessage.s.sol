@@ -63,12 +63,11 @@ contract SendMessageScript is Script {
         console.logBytes(options);
 
         // Calculate required messaging fee
-        // (uint256 nativeFee,) = coordinator.quote(BTC_TXN_HASH, psbtData, options, false);
-        // console.log("Required native fee:", nativeFee);
+        (uint256 nativeFee,) = _coordinator.quote(BTC_TXN_HASH, PSBT_DATA, options, false);
+        console.log("Required native fee:", nativeFee);
 
         // Send the message
-        _coordinator.sendMessage{value: 2.5 ether}(BLOCK_HASH, BTC_TXN_HASH, proof, index, PSBT_DATA, options);
-        // coordinator.sendMessageFor{value: nativeFee}(0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E, BTC_TXN_HASH, options);
+        _coordinator.sendMessage{value: nativeFee}(BLOCK_HASH, BTC_TXN_HASH, proof, index, PSBT_DATA, options);
 
         vm.stopBroadcast();
     }

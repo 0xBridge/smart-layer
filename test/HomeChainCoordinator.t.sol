@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {console} from "forge-std/console.sol";
 import {Test, Vm} from "forge-std/Test.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -81,10 +80,6 @@ contract HomeChainCoordinatorTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(eBTCImplementation), initData);
         eBTCToken = eBTC(address(proxy));
 
-        console.log("Deployed baseChainCoordinator", address(baseChainCoordinator));
-        console.log("Deployed eBTCManager", address(eBTCManagerInstance));
-        console.log("Deployed eBTC and created proxy", address(eBTCToken));
-
         vm.makePersistent(address(baseChainCoordinator), address(eBTCManagerInstance), address(eBTCToken));
 
         vm.startPrank(owner);
@@ -118,7 +113,6 @@ contract HomeChainCoordinatorTest is Test {
         homeChainCoordinator = new HomeChainCoordinator(
             address(btcLightClient), srcNetworkConfig.endpoint, owner, srcNetworkConfig.chainEid
         );
-        console.log("Deployed homeChainCoordinator", address(homeChainCoordinator));
         vm.makePersistent(address(homeChainCoordinator));
 
         // Fund the contract
