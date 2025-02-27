@@ -12,7 +12,8 @@ import {IAttestationCenter, IAvsLogic} from "./interfaces/IAvsLogic.sol";
 
 /**
  * @title AVSExtension
- * @dev Implementation of a secure 0xBridge AVS logic with ownership and pause functionality
+ * @notice Implementation of a secure 0xBridge AVS logic with ownership and pause functionality
+ * @dev Manages tasks and processes attestations for bridge operations
  */
 contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     // using BN254 for BN254.G1Point;
@@ -45,51 +46,75 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     // bytes quorumNumbers;
     // uint32 quorumThresholdPct;
 
-    mapping(bytes32 taskHash => TaskData) private taskData;
-    mapping(bytes32 taskHash => bool) private completedTasks;
+    mapping(bytes32 taskHash => TaskData) internal _taskData;
+    mapping(bytes32 taskHash => bool) internal _completedTasks;
 
-    uint32 private latestTaskNum;
-    address private performer;
-    address private immutable attestationCenter;
-    HomeChainCoordinator private immutable homeChainCoordinator;
+    uint32 internal _latestTaskNum;
+    address internal _performer;
+    address internal immutable _attestationCenter;
+    HomeChainCoordinator internal immutable _homeChainCoordinator;
 
     // Events
     event PerformerUpdated(address oldPerformer, address newPerformer);
     event NewTaskCreated(uint32 indexed taskIndex, TaskData task);
     event TaskCompleted(bytes32 indexed taskHash);
 
+    /**
+     * @notice Ensures the caller is the attestation center
+     */
     modifier onlyAttestationCenter() {
-        if (msg.sender != attestationCenter) {
+        if (msg.sender != _attestationCenter) {
             revert CallerNotAttestationCenter();
         }
         _;
     }
 
-    // onlyTaskPerformer is used to restrict createNewTask from only being called by a permissioned entity
-    // in a real world scenario, this would be removed by instead making createNewTask a payable function
+    /**
+     * @notice Ensures the caller is the task performer
+     * @dev Used to restrict createNewTask from only being called by a permissioned entity
+     */
     modifier onlyTaskPerformer() {
-        if (msg.sender != performer) {
+        if (msg.sender != _performer) {
             revert CallerNotTaskGenerator();
         }
         _;
     }
 
-    // TODO: Add governance layer later (and replace the owner with the governance layer)
-    constructor(address _initialOwner, address _performer, address _attestationCenter, address _homeChainCoordinator)
+    /**
+     * @notice Initializes the AVSExtension contract
+     * @param initialOwner_ Address of the initial owner of the contract
+     * @param performer_ Address authorized to create new tasks
+     * @param attestationCenter_ Address of the attestation center contract
+     * @param homeChainCoordinator_ Address of the home chain coordinator contract
+     */
+    constructor(address initialOwner_, address performer_, address attestationCenter_, address homeChainCoordinator_)
         Ownable()
     {
-        _transferOwnership(_initialOwner);
-        _setPerformer(_performer);
-        attestationCenter = _attestationCenter;
-        homeChainCoordinator = HomeChainCoordinator(payable(_homeChainCoordinator));
+        _transferOwnership(initialOwner_);
+        _setPerformer(performer_);
+        _attestationCenter = attestationCenter_;
+        _homeChainCoordinator = HomeChainCoordinator(payable(homeChainCoordinator_));
     }
 
+    /**
+     * @notice Sets a new performer address
+     * @param newPerformer The address of the new performer
+     * @dev Only callable by the contract owner
+     */
     function setPerformer(address newPerformer) external onlyOwner {
         _setPerformer(newPerformer);
     }
 
-    // TODO: Optimis this function
-    // NOTE: this function creates new task, assigns it a taskId
+    /**
+     * @notice Creates a new task for verification
+     * @param _blockHash The hash of the Bitcoin block
+     * @param _btcTxnHash The hash of the Bitcoin transaction
+     * @param _proof The merkle proof for transaction verification
+     * @param _index The index of the transaction in the block
+     * @param _psbtData The PSBT data to be processed
+     * @param _options Additional options for task processing
+     * @dev Only the authorized performer can create new tasks
+     */
     function createNewTask(
         bytes32 _blockHash,
         bytes32 _btcTxnHash,
@@ -97,12 +122,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256 _index,
         bytes calldata _psbtData,
         bytes calldata _options
-    )
-        // bytes calldata _quorumNumbers,
-        // uint32 _quorumThresholdPct
-        external
-        onlyTaskPerformer
-    {
+    ) external onlyTaskPerformer {
         // Store task data
         TaskData memory newTask = TaskData({
             blockHash: _blockHash,
@@ -117,12 +137,20 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
 
         // Encode task data hash
         bytes32 taskHash = keccak256(abi.encode(_blockHash, _btcTxnHash, _proof, _index, _psbtData, _options));
-        taskData[taskHash] = newTask;
+        _taskData[taskHash] = newTask;
 
-        emit NewTaskCreated(latestTaskNum++, newTask);
+        emit NewTaskCreated(_latestTaskNum++, newTask);
     }
 
-    // TODO: beforeTaskSubmission - check if the task is valid, exists
+    /**
+     * @notice Validates task before submission to the attestation center
+     * @param _taskInfo The task information struct
+     * @param _isApproved Whether the task is approved
+     * @dev The task performer's signature (unused but kept for interface compatibility)
+     * @dev The attesters' signature (unused but kept for interface compatibility)
+     * @dev The attesters' IDs (unused but kept for interface compatibility)
+     * @dev Called by the attestation center before task submission
+     */
     function beforeTaskSubmission(
         IAttestationCenter.TaskInfo calldata _taskInfo,
         bool _isApproved,
@@ -139,6 +167,15 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         if (isTaskCompleted(taskHash)) revert TaskAlreadyCompleted();
     }
 
+    /**
+     * @notice Processes task after submission to the attestation center
+     * @param _taskInfo The task information struct
+     * @dev The approval status (unused but kept for interface compatibility)
+     * @dev The task performer's signature (unused but kept for interface compatibility)
+     * @dev The attesters' signature (unused but kept for interface compatibility)
+     * @dev The attesters' IDs (unused but kept for interface compatibility)
+     * @dev Called by the attestation center after task submission
+     */
     function afterTaskSubmission(
         IAttestationCenter.TaskInfo calldata _taskInfo,
         bool,
@@ -150,15 +187,15 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         bytes32 taskHash = abi.decode(_taskInfo.data, (bytes32));
 
         // Get task data wrt task Id
-        TaskData memory task = taskData[taskHash];
+        TaskData memory task = _taskData[taskHash];
 
         // Mark task as completed
-        completedTasks[taskHash] = true;
+        _completedTasks[taskHash] = true;
 
         // Quote the gas fee
         (uint256 nativeFee,) = quote(task.btcTxnHash, task.psbtData, task.options, false);
         // Send message after successful verification
-        homeChainCoordinator.sendMessage{value: nativeFee}(
+        _homeChainCoordinator.sendMessage{value: nativeFee}(
             task.blockHash, task.btcTxnHash, task.proof, task.index, task.psbtData, task.options
         );
 
@@ -166,69 +203,99 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         emit TaskCompleted(taskHash);
     }
 
-    /* @dev Quotes the gas needed to pay for the sending the message of btcTxnHash
-    /* @param _btcTxnHash The BTC transaction hash
-    /* @param _psbtData The _psbtData message to send
-    /* @param _options Message execution options
-    /* @param _payInLzToken boolean for which token to return fee in
-    * @return nativeFee Estimated gas fee in native gas.
-    * @return lzTokenFee Estimated gas fee in ZRO token.
-    */
-    function quote(
-        bytes32 _btcTxnHash, // The BTC transaction hash
-        bytes memory _psbtData, // The _psbtData message to send
-        bytes memory _options, // Message execution options
-        bool _payInLzToken // boolean for which token to return fee in
-    ) public view returns (uint256 nativeFee, uint256 lzTokenFee) {
-        (nativeFee, lzTokenFee) = homeChainCoordinator.quote(_btcTxnHash, _psbtData, _options, _payInLzToken);
+    /**
+     * @notice Quotes the gas needed to pay for sending the message
+     * @param _btcTxnHash The BTC transaction hash
+     * @param _psbtData The PSBT data message to send
+     * @param _options Message execution options
+     * @param _payInLzToken Boolean for which token to return fee in
+     * @return nativeFee Estimated gas fee in native gas
+     * @return lzTokenFee Estimated gas fee in ZRO token
+     */
+    function quote(bytes32 _btcTxnHash, bytes memory _psbtData, bytes memory _options, bool _payInLzToken)
+        public
+        view
+        returns (uint256 nativeFee, uint256 lzTokenFee)
+    {
+        (nativeFee, lzTokenFee) = _homeChainCoordinator.quote(_btcTxnHash, _psbtData, _options, _payInLzToken);
     }
 
+    /**
+     * @notice Returns the current task number
+     * @return The current task number
+     */
     function taskNumber() external view returns (uint32) {
-        return latestTaskNum;
+        return _latestTaskNum;
     }
 
+    /**
+     * @notice Internal function to set the performer address
+     * @param newPerformer Address of the new performer
+     */
     function _setPerformer(address newPerformer) internal {
-        address oldPerformer = performer;
-        performer = newPerformer;
+        address oldPerformer = _performer;
+        _performer = newPerformer;
         emit PerformerUpdated(oldPerformer, newPerformer);
     }
 
     /**
      * @notice Checks if a specific task is completed
      * @param _taskHash The task hash to check
-     * @return bool True if task is completed
+     * @return True if task is completed
      */
     function isTaskCompleted(bytes32 _taskHash) public view returns (bool) {
-        return completedTasks[_taskHash];
+        return _completedTasks[_taskHash];
     }
 
     /**
      * @notice Checks if a task is valid by verifying its data exists
      * @param _taskHash The task hash to check
-     * @return bool True if task exists and is valid
+     * @return True if task exists and is valid
      */
     function isTaskValid(bytes32 _taskHash) public view returns (bool) {
-        TaskData storage task = taskData[_taskHash];
+        TaskData storage task = _taskData[_taskHash];
         return task.blockHash != bytes32(0) && task.btcTxnHash != bytes32(0);
     }
 
+    /**
+     * @notice Retrieves the data for a specific task
+     * @param _taskHash The hash of the task to retrieve
+     * @return The task data
+     */
     function getTaskData(bytes32 _taskHash) external view returns (TaskData memory) {
-        return taskData[_taskHash];
+        return _taskData[_taskHash];
     }
 
-    // Add receive and fallback functions
+    /**
+     * @notice Allows receiving ETH
+     */
     receive() external payable {}
 
+    /**
+     * @notice Fallback function to receive ETH
+     */
     fallback() external payable {}
 
+    /**
+     * @notice Pauses the contract
+     * @dev Only callable by contract owner
+     */
     function pause() external onlyOwner {
         _pause();
     }
 
+    /**
+     * @notice Unpauses the contract
+     * @dev Only callable by contract owner
+     */
     function unpause() external onlyOwner {
         _unpause();
     }
 
+    /**
+     * @notice Withdraws all ETH from the contract
+     * @dev Only callable by contract owner
+     */
     function withdraw() external onlyOwner nonReentrant {
         (bool success,) = msg.sender.call{value: address(this).balance}("");
         if (!success) revert WithdrawalFailed();

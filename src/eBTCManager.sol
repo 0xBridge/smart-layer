@@ -9,7 +9,8 @@ import {eBTC} from "./eBTC.sol";
 
 /**
  * @title eBTCManager
- * @dev Implementation of a secure eBTCManager contract with ownership and pause functionality
+ * @notice Implementation of a secure eBTCManager contract with ownership and pause functionality
+ * @dev Manages the minting and burning of eBTC tokens
  */
 contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
     // Errors
@@ -18,66 +19,79 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
 
     // State variables
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    eBTC private eBTCToken;
+    eBTC internal _eBTCToken;
 
     // Events
     event Minted(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
 
     /**
-     * @dev Contract constructor
-     * @param _initialOwner The address that will own the contract
+     * @notice Initializes the eBTCManager contract
+     * @param initialOwner_ The address that will own the contract
+     * @dev Sets up initial access control roles
      */
-    constructor(address _initialOwner) {
+    constructor(address initialOwner_) {
         // Give baseChainCoordinator access to mint and burn functions
-        _setupRole(DEFAULT_ADMIN_ROLE, _initialOwner);
+        _setupRole(DEFAULT_ADMIN_ROLE, initialOwner_);
     }
 
-    // Add function to set and remove base chain coordinator address
+    /**
+     * @notice Sets the minter role for a contract
+     * @param _baseChainCoordinator Address to grant the minter role to
+     * @dev Only callable by accounts with the DEFAULT_ADMIN_ROLE
+     */
     function setMinterRole(address _baseChainCoordinator) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setupRole(MINTER_ROLE, _baseChainCoordinator);
     }
 
-    // Add function to set and remove eBTC token address
+    /**
+     * @notice Sets the eBTC token contract address
+     * @param _eBTC Address of the eBTC token contract
+     * @dev Only callable by accounts with the DEFAULT_ADMIN_ROLE
+     */
     function setEBTC(address _eBTC) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        eBTCToken = eBTC(_eBTC);
+        _eBTCToken = eBTC(_eBTC);
     }
 
     /**
-     * @dev Deposits funds into the contract
-     * @notice This function is pausable and protected against reentrancy
+     * @notice Mints eBTC tokens to a recipient
+     * @param to Address of the recipient
+     * @param amount Amount of tokens to mint
+     * @dev Only callable by accounts with the MINTER_ROLE
      */
     function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) nonReentrant whenNotPaused {
         if (to == address(0)) revert InvalidRecipient();
         if (amount == 0) revert InvalidAmount();
-        eBTCToken.mint(to, amount);
+        _eBTCToken.mint(to, amount);
         emit Minted(to, amount);
     }
 
     /**
-     * @dev Withdraws funds from the contract
-     * @notice This function is pausable and protected against reentrancy
+     * @notice Burns eBTC tokens
+     * @param to Address associated with the burn (for event tracking)
+     * @param amount Amount of tokens to burn
+     * @dev Only callable by accounts with the MINTER_ROLE
      */
     function burn(address to, uint256 amount) external onlyRole(MINTER_ROLE) nonReentrant whenNotPaused {
         if (to == address(0)) revert InvalidRecipient();
         if (amount == 0) revert InvalidAmount();
-        eBTCToken.burn(amount);
+        _eBTCToken.burn(amount);
         emit Withdrawn(to, amount);
     }
 
     // TODO: Add function to support mint with proofs via other bridge contracts
 
     /**
-     * @dev Pauses all contract operations
-     * @notice Only callable by contract owner
+     * @notice Pauses all contract operations
+     * @dev Only callable by accounts with the DEFAULT_ADMIN_ROLE
      */
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _pause();
     }
 
     /**
-     * @dev Unpauses all contract operations
-     * @notice Only callable by contract owner
+     * @notice Unpauses all contract operations
+     * @dev Only callable by accounts with the DEFAULT_ADMIN_ROLE
      */
     function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
