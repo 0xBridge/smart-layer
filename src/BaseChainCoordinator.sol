@@ -144,10 +144,9 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      */
     function _validateMessageUniqueness(bytes32 _btcTxnHash) internal view {
         // Check if this message has already been processed
-        // TODO: Removed for Amit and Rahul's testing | Please add this back
-        // if (isMessageProcessed(_btcTxnHash)) {
-        //     revert MessageAlreadyProcessed(_btcTxnHash);
-        // }
+        if (isMessageProcessed(_btcTxnHash)) {
+            revert MessageAlreadyProcessed(_btcTxnHash);
+        }
     }
 
     /**

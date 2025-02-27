@@ -158,51 +158,86 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes calldata _psbtData,
         bytes calldata _options
     ) internal {
+        // Break down the function into smaller parts to avoid stack too deep
         // 0. Parse and validate PSBT data
         BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_psbtData);
 
         // TODO: Remove this after updating the test with the correct chainId in the metadata
-        uint32 _dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
+        uint32 dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
 
-        // 1-4. Validate input
-        _validateInput(_merkleRoot, _btcTxnHash, _proof, _index, _psbtData, _dstEid);
+        // 1-4. Validate input in a separate function call
+        _validateInput(_merkleRoot, _btcTxnHash, _proof, _index, _psbtData, dstEid);
 
-        // 7. Send message through LayerZerobytes memory payload
+        // Handle message sending in a separate function
+        _handleMessageSending(dstEid, _btcTxnHash, metadata, _psbtData, _options);
+    }
+
+    /**
+     * @notice Handles the actual message sending logic
+     * @param _dstEid The destination chain ID
+     * @param _btcTxnHash The Bitcoin transaction hash
+     * @param _metadata The transaction metadata
+     * @param _psbtData The PSBT data
+     * @param _options The LayerZero options
+     */
+    function _handleMessageSending(
+        uint32 _dstEid,
+        bytes32 _btcTxnHash,
+        BitcoinTxnParser.TransactionMetadata memory _metadata,
+        bytes calldata _psbtData,
+        bytes calldata _options
+    ) internal {
         bytes memory payload =
-            abi.encode(metadata.receiverAddress, _btcTxnHash, metadata.lockedAmount, metadata.nativeTokenAmount);
+            abi.encode(_metadata.receiverAddress, _btcTxnHash, _metadata.lockedAmount, _metadata.nativeTokenAmount);
 
-        // 5. Check if the message is to be sent to the same chain
         if (_dstEid == _chainEid) {
-            address baseChainCoordinator = address(uint160(uint256(peers[_dstEid])));
-            bytes32 thisAddressInBytes32 = bytes32(uint256(uint160(address(this))));
-            IBaseChainCoordinator(baseChainCoordinator).lzReceive(
-                Origin(_chainEid, thisAddressInBytes32, 0), _btcTxnHash, payload, msg.sender, _options
-            );
+            _handleSameChainMessage(_dstEid, _btcTxnHash, payload, _options);
         } else {
-            // TODO: This needs to come from the metadata itself as this will keep on changing
-            bytes32 networkPublicKey;
-            // 6. Store PSBT metadata
-            PSBTData memory psbtData = PSBTData({
-                isMinted: true,
-                chainId: metadata.chainId,
-                user: metadata.receiverAddress,
-                lockedAmount: metadata.lockedAmount,
-                nativeTokenAmount: metadata.nativeTokenAmount,
-                networkPublicKey: networkPublicKey,
-                psbtData: _psbtData
-            });
-            _btcTxnHash_psbtData[_btcTxnHash] = psbtData;
-
-            // TODO: Create a function to get the correct MessageFee for the user
-            _lzSend(
-                _dstEid,
-                payload,
-                _options,
-                MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
-                address(this) // Refund address in case of failed source message.
-            );
+            _handleCrossChainMessage(_dstEid, _btcTxnHash, _metadata, _psbtData, payload, _options);
         }
+
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
+    }
+
+    /**
+     * @notice Handles message sending within the same chain
+     */
+    function _handleSameChainMessage(
+        uint32 _dstEid,
+        bytes32 _btcTxnHash,
+        bytes memory _payload,
+        bytes calldata _options
+    ) internal {
+        address baseChainCoordinator = address(uint160(uint256(peers[_dstEid])));
+        bytes32 senderAddressInBytes32 = bytes32(uint256(uint160(address(this))));
+        IBaseChainCoordinator(baseChainCoordinator).lzReceive(
+            Origin(_chainEid, senderAddressInBytes32, 0), _btcTxnHash, _payload, msg.sender, _options
+        );
+    }
+
+    /**
+     * @notice Handles cross-chain message sending
+     */
+    function _handleCrossChainMessage(
+        uint32 _dstEid,
+        bytes32 _btcTxnHash,
+        BitcoinTxnParser.TransactionMetadata memory _metadata,
+        bytes calldata _psbtData,
+        bytes memory _payload,
+        bytes calldata _options
+    ) internal {
+        PSBTData memory psbtData = PSBTData({
+            isMinted: true,
+            chainId: _metadata.chainId,
+            user: _metadata.receiverAddress,
+            lockedAmount: _metadata.lockedAmount,
+            nativeTokenAmount: _metadata.nativeTokenAmount,
+            networkPublicKey: bytes32(0), // TODO: This needs to come from the metadata itself
+            psbtData: _psbtData
+        });
+        _btcTxnHash_psbtData[_btcTxnHash] = psbtData;
+
+        _lzSend(_dstEid, _payload, _options, MessagingFee(msg.value, 0), address(this));
     }
 
     /**
@@ -230,14 +265,12 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         }
 
         // 2. Check if the message already exists or is processed
-        // TODO: Removed for Amit and Rahul's testing | Please add this back
         if (_btcTxnHash_psbtData[_btcTxnHash].isMinted) {
             revert TxnAlreadyProcessed(_btcTxnHash);
         }
 
         // 3. Validate txn with SPV data
-        // TODO: Removed for Amit and Rahul's testing | Please add this back
-        // if (!BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index)) revert BitcoinTxnNotFound();
+        if (!BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index)) revert BitcoinTxnNotFound();
 
         // 4. Validate receiver is set for destination chain
         if (peers[_dstEid] == bytes32(0)) {
