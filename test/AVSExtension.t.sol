@@ -47,6 +47,11 @@ contract AVSExtensionTest is Test {
     event TaskCompleted(bytes32 indexed taskHash);
 
     function setUp() public {
+        string memory rpcUrl = vm.envString("AMOY_RPC_URL");
+        sourceForkId = vm.createSelectFork(rpcUrl);
+        HelperConfig config = new HelperConfig();
+        srcNetworkConfig = config.getConfig();
+
         string memory destRpcUrl = vm.envString("CORE_TESTNET_RPC_URL");
         destForkId = vm.createSelectFork(destRpcUrl);
         HelperConfig destConfig = new HelperConfig();
@@ -61,14 +66,12 @@ contract AVSExtensionTest is Test {
             destNetworkConfig.endpoint, // endpoint
             owner, // owner
             address(eBTCManagerInstance), // eBTCManager
-            destNetworkConfig.chainEid // chainEid
+            destNetworkConfig.chainEid, // chainEid
+            srcNetworkConfig.chainEid // HomeChainCoordinator chainEid
         );
 
         // Switch network to source fork
-        string memory rpcUrl = vm.envString("AMOY_RPC_URL");
-        sourceForkId = vm.createSelectFork(rpcUrl);
-        HelperConfig config = new HelperConfig();
-        srcNetworkConfig = config.getConfig();
+        vm.selectFork(sourceForkId);
 
         // Initialize proof array
         proof = new bytes32[](10);
@@ -242,5 +245,5 @@ contract AVSExtensionTest is Test {
         assertEq(address(avsExtension).balance, 0);
     }
 
-    receive() external payable {}
+    // receive() external payable {}
 }

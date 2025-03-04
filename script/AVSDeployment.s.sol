@@ -55,7 +55,12 @@ contract AVSDeployment is Script {
      * @dev Deploys and configures all necessary contracts on both source and destination chains
      */
     function run() public {
-        string memory destRpcUrl = vm.envString("CORE_TESTNET_RPC_URL");
+        string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
+        _sourceForkId = vm.createSelectFork(srcRpcUrl);
+        HelperConfig srcConfig = new HelperConfig();
+        _srcNetworkConfig = srcConfig.getConfig();
+
+        string memory destRpcUrl = vm.envString("SEPOLIA_RPC_URL");
         _destForkId = vm.createSelectFork(destRpcUrl);
         HelperConfig destConfig = new HelperConfig();
         _destNetworkConfig = destConfig.getConfig();
@@ -69,7 +74,8 @@ contract AVSDeployment is Script {
             _destNetworkConfig.endpoint, // endpoint
             OWNER, // owner
             address(_eBTCManagerInstance), // eBTCManager,
-            _destNetworkConfig.chainEid // chainEid
+            _destNetworkConfig.chainEid, // chainEid
+            _srcNetworkConfig.chainEid // HomeChainCoordinator chainEid
         );
         console.log("Deployed BaseChainCoordinator", address(_baseChainCoordinator));
         eBTC eBTCImplementation = new eBTC();
@@ -77,17 +83,14 @@ contract AVSDeployment is Script {
         ERC1967Proxy proxy = new ERC1967Proxy(address(eBTCImplementation), initData);
         _eBTCToken = eBTC(address(proxy));
         console.log("Deployed eBTC and created proxy", address(_eBTCToken));
-        _eBTCManagerInstance.setMinterRole(address(_baseChainCoordinator));
+        _eBTCManagerInstance.setBaseChainCoordinator(address(_baseChainCoordinator));
         console.log("Set minter role for eBTCManager");
         _eBTCManagerInstance.setEBTC(address(_eBTCToken));
         console.log("Set eBTC address in eBTCManager");
         vm.stopBroadcast();
 
-        string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
-        _sourceForkId = vm.createSelectFork(srcRpcUrl);
-        HelperConfig srcConfig = new HelperConfig();
-        _srcNetworkConfig = srcConfig.getConfig();
-        bytes32 receiver = bytes32(uint256(uint160(address(0x2908ba527aE590F9C7c5fCcDaC47598E28179Cf4))));
+        vm.selectFork(_sourceForkId);
+        bytes32 receiver = bytes32(uint256(uint160(address(_baseChainCoordinator))));
         console.logBytes32(receiver);
 
         vm.startBroadcast(privateKey);

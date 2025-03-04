@@ -245,8 +245,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
      * @dev Reverts if block not found (commented out for testing)
      */
     function getMerkleRootForBlock(bytes32 blockHash) external view returns (bytes32) {
-        // TODO: Removed for Amit and Rahul's testing | Please add this back
-        // if (_headers[blockHash].height == 0) revert BLOCK_NOT_FOUND();
+        if (_headers[blockHash].height == 0) revert BLOCK_NOT_FOUND();
         return _headers[blockHash].merkleRoot;
     }
 

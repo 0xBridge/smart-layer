@@ -17,11 +17,11 @@ contract SendMessageScript is Script {
 
     // Constants
     address internal constant HOME_CHAIN_COORDINATOR_ADDRESS = 0xEE35AB43127933562c65A7942cbf1ccAac4BE86F; // on Amoy
-    address internal constant BASE_CHAIN_COORDINATOR_ADDRESS = 0xbA7C8D4AF95687D6AC14EC61ADa5096eD00a946f; // on Core
+    address internal constant BASE_CHAIN_COORDINATOR_ADDRESS = 0x2908ba527aE590F9C7c5fCcDaC47598E28179Cf4; // on Sepolia
 
     // Chain identification
     uint32 internal constant SRC_EID = 40267; // Amoy
-    uint32 internal constant DEST_EID = 40153; // Core
+    uint32 internal constant DEST_EID = 40161; // Sepolia
 
     /**
      * @notice Main execution function
@@ -29,7 +29,7 @@ contract SendMessageScript is Script {
      */
     function run() public {
         // Set up destination chain fork
-        string memory destRpcUrl = vm.envString("CORE_TESTNET_RPC_URL");
+        string memory destRpcUrl = vm.envString("SEPOLIA_RPC_URL");
         uint256 destForkId = vm.createSelectFork(destRpcUrl);
 
         uint256 privateKey = vm.envUint("OWNER_PRIVATE_KEY");

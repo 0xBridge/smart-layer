@@ -4,6 +4,9 @@ pragma solidity ^0.8.19;
 import {OApp, Origin, MessagingFee, OAppReceiver} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 import {MintData, IBaseChainCoordinator, ILayerZeroReceiver} from "./interfaces/IBaseChainCoordinator.sol";
 import {eBTCManager} from "./eBTCManager.sol";
 
@@ -19,14 +22,16 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     error InvalidPeer();
     error ReceiverNotSet();
     error WithdrawalFailed();
+    error InvalidAmount(uint256 minAmount);
 
     // State variables
     mapping(bytes32 => MintData) internal _btcTxnHash_mintData;
     eBTCManager internal _eBTCManagerInstance;
     uint32 internal immutable _chainEid;
+    uint32 internal immutable _homeEid;
 
     // Events
-    event MessageSent(uint32 dstEid, string message, bytes32 receiver, uint256 nativeFee);
+    event MessageSent(uint32 dstEid, bytes message, bytes32 receiver, uint256 nativeFee);
     event MessageProcessed(
         bytes32 guid, uint32 srcEid, bytes32 sender, address user, bytes32 btcTxnHash, uint256 lockedAmount
     );
@@ -38,10 +43,13 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      * @param eBTCManager_ Address of the eBTC manager contract
      * @param chainEid_ The endpoint ID of the current chain
      */
-    constructor(address endpoint_, address owner_, address eBTCManager_, uint32 chainEid_) OApp(endpoint_, owner_) {
+    constructor(address endpoint_, address owner_, address eBTCManager_, uint32 chainEid_, uint32 homeEid_)
+        OApp(endpoint_, owner_)
+    {
         _transferOwnership(owner_);
         _eBTCManagerInstance = eBTCManager(eBTCManager_);
         _chainEid = chainEid_;
+        _homeEid = homeEid_;
     }
 
     /**
@@ -53,29 +61,6 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     function setPeer(uint32 _dstEid, bytes32 _peer) public override onlyOwner {
         if (_peer == bytes32(0)) revert InvalidPeer();
         super.setPeer(_dstEid, _peer);
-    }
-
-    /**
-     * @notice Sends a message to the specified chain
-     * @param _dstEid The endpoint ID of the destination chain
-     * @param _message The message to send
-     * @param _options Message execution options (e.g., for sending gas to destination)
-     * @dev Payable function that accepts native gas for message fee
-     */
-    function sendMessage(uint32 _dstEid, string memory _message, bytes calldata _options) external payable {
-        if (peers[_dstEid] == bytes32(0)) revert ReceiverNotSet();
-
-        // Prepare send payload
-        bytes memory _payload = abi.encode(_message);
-        _lzSend(
-            _dstEid,
-            _payload,
-            _options,
-            MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
-            payable(msg.sender) // Refund address in case of failed source message.
-        );
-
-        emit MessageSent(_dstEid, _message, peers[_dstEid], msg.value);
     }
 
     /**
@@ -144,10 +129,9 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      */
     function _validateMessageUniqueness(bytes32 _btcTxnHash) internal view {
         // Check if this message has already been processed
-        // TODO: Removed for Amit and Rahul's testing | Please add this back
-        // if (isMessageProcessed(_btcTxnHash)) {
-        //     revert MessageAlreadyProcessed(_btcTxnHash);
-        // }
+        if (isMessageProcessed(_btcTxnHash)) {
+            revert MessageAlreadyProcessed(_btcTxnHash);
+        }
     }
 
     /**
@@ -230,4 +214,62 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         (bool success,) = msg.sender.call{value: address(this).balance}("");
         if (!success) revert WithdrawalFailed();
     }
+
+    /**
+     * @notice Sends a message to the specified chain
+     * @param _psbtData The PSBT data for the burn transaction
+     * @param _amount The amount of BTC to burn
+     * @param _deadline Expiration time for the permit signature
+     * @param _v v of the permit signature
+     * @param _r r of the permit signature
+     * @param _s s of the permit signature
+     * @dev Payable function that accepts native gas for message fee
+     */
+    function burnAndUnlock(
+        bytes calldata _psbtData,
+        uint256 _amount,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s,
+        bytes calldata _options
+    ) external {
+        // TODO: This should already be knowing on which chainEid is HomeChainCoordinator deployed to make the _lzSend call
+
+        // Validate inputs and process the burn transaction - BaseChainCoordinator doesn't have the brains to validate the burn transaction, it just passes the psbt data to the HomeChainCoordinator
+
+        // Tell eBTCManager to burn the eBTC tokens
+        address _eBTCToken = _eBTCManagerInstance.getEBTCTokenAddress();
+        IERC20 eBTCToken = IERC20(_eBTCToken);
+        SafeERC20.safePermit(
+            IERC20Permit(address(eBTCToken)), msg.sender, address(this), _amount, _deadline, _v, _r, _s
+        );
+        SafeERC20.safeTransferFrom(eBTCToken, msg.sender, address(this), _amount);
+        _eBTCManagerInstance.burn(_amount);
+
+        // Pass the psbt data to the HomeChainCoordinator in the burn transaction
+        MessagingFee memory messagingFee = _quote(_homeEid, _psbtData, _options, false);
+        _lzSend(
+            _homeEid, // HomeChainCoordinator chainEid
+            _psbtData,
+            _options,
+            messagingFee, // Fee in native gas and ZRO token.
+            address(this) // Refund address in case of failed source message.
+        );
+
+        emit MessageSent(_homeEid, _psbtData, peers[_homeEid], messagingFee.nativeFee);
+
+        // HomeChainCoordinator should be able to create a task on the AVSExntension post validating the psbt data
+
+        // If the psbt is corresponding to the burn transaction, the HomeChainCoordinator has the correct data to validate the burn transaction
+
+        // If the psbt is not corresponding to the burn transaction, the HomeChainCoordinator should reject the burn transaction - the secondary state would be set to true but it's the primary state that would be used to validate the burn transaction
+
+        // Confirm this - Also, for a burn transaction there would be a mint transaction by the same user (same Bitcoin wallet address) for whom the mint must have happened of the same eBTC amount earlier (confirm this part with Yogendra), recording the network key along with operator addresses as well as other required fields
+    }
+
+    /**
+     * @notice Receive function to receive native tokens
+     */
+    receive() external payable {} // This is to receive the fund for the message fee
 }

@@ -56,6 +56,11 @@ contract HomeChainCoordinatorTest is Test {
     event MessageSent(uint32 dstEid, string message, bytes32 receiver, uint256 nativeFee);
 
     function setUp() public {
+        string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
+        sourceForkId = vm.createSelectFork(srcRpcUrl);
+        HelperConfig srcConfig = new HelperConfig();
+        srcNetworkConfig = srcConfig.getConfig();
+
         string memory destRpcUrl = vm.envString("CORE_TESTNET_RPC_URL");
         destForkId = vm.createSelectFork(destRpcUrl);
         HelperConfig destConfig = new HelperConfig();
@@ -71,7 +76,8 @@ contract HomeChainCoordinatorTest is Test {
             destNetworkConfig.endpoint, // endpoint
             owner, // owner
             address(eBTCManagerInstance), // eBTCManager
-            destNetworkConfig.chainEid // chainEid
+            destNetworkConfig.chainEid, // chainEid
+            srcNetworkConfig.chainEid // HomeChainCoordinator chainEid
         );
 
         // Deploy implementation and proxy for eBTC using ERC1967Proxy
@@ -83,14 +89,11 @@ contract HomeChainCoordinatorTest is Test {
         vm.makePersistent(address(baseChainCoordinator), address(eBTCManagerInstance), address(eBTCToken));
 
         vm.startPrank(owner);
-        eBTCManagerInstance.setMinterRole(address(baseChainCoordinator));
+        eBTCManagerInstance.setBaseChainCoordinator(address(baseChainCoordinator));
         eBTCManagerInstance.setEBTC(address(eBTCToken));
         vm.stopPrank();
 
-        string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
-        sourceForkId = vm.createSelectFork(srcRpcUrl);
-        HelperConfig srcConfig = new HelperConfig();
-        srcNetworkConfig = srcConfig.getConfig();
+        vm.selectFork(sourceForkId);
         lzHelper = new LayerZeroV2Helper();
 
         // Deploy implementation and proxy for BitcoinLightClient using ERC1967Proxy
