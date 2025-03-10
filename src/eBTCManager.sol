@@ -48,9 +48,8 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
      * @dev Only callable by accounts with the DEFAULT_ADMIN_ROLE
      */
     function setBaseChainCoordinator(address baseChainCoordinator) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        // TODO: Register baseChainCoordinator contract instance here so that it can be called to pass the message of burn
         _setupRole(MINTER_ROLE, baseChainCoordinator);
-        _baseChainCoordinator = BaseChainCoordinator(baseChainCoordinator);
+        _baseChainCoordinator = BaseChainCoordinator(payable(baseChainCoordinator));
     }
 
     /**
@@ -80,19 +79,20 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
      * @param amount Amount of tokens to burn
      */
     function burn(uint256 amount) external nonReentrant whenNotPaused {
-        // address(_eBTCToken).safeTransferFrom(msg.sender, address(this), amount);
-        _burn(amount);
+        if (amount < minBTCAmount) revert InvalidAmount(amount);
+        _eBTCToken.burn(amount);
+        emit Burn(msg.sender, amount);
     }
 
     /**
      * @notice Burns eBTC tokens
      * @param amount Amount of tokens to burn
      */
-    function _burn(uint256 amount) internal {
-        if (amount < minBTCAmount) revert InvalidAmount(amount);
-        _eBTCToken.burn(amount);
-        emit Burn(msg.sender, amount);
-    }
+    // function _burn(uint256 amount) internal {
+    //     if (amount < minBTCAmount) revert InvalidAmount(amount);
+    //     _eBTCToken.burn(amount);
+    //     emit Burn(msg.sender, amount);
+    // }
 
     // TODO: Add function to support mint with proofs via other bridge contracts
 

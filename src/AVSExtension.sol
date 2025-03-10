@@ -113,6 +113,9 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      * @param _index The index of the transaction in the block
      * @param _psbtData The PSBT data to be processed
      * @param _options Additional options for task processing
+     * @param _taprootAddress The taproot address where the btc will be getting locked
+     * @param _networkKey The network key for the AVS created from the participated operators
+     * @param _operators The addresses of the operators for the network key creation
      * @dev Only the authorized performer can create new tasks
      */
     function createNewTask(
@@ -121,7 +124,10 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         bytes32[] calldata _proof,
         uint256 _index,
         bytes calldata _psbtData,
-        bytes calldata _options
+        bytes calldata _options,
+        string calldata _taprootAddress,
+        string calldata _networkKey,
+        address[] memory _operators
     ) external onlyTaskPerformer {
         // Store task data
         TaskData memory newTask = TaskData({

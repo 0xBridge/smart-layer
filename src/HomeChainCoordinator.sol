@@ -35,6 +35,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
     address internal _taskManager;
     mapping(bytes32 => PSBTData) internal _btcTxnHash_psbtData;
+    mapping(string => string) internal _taprootAddress_networkKey;
+    mapping(string => address[]) internal _networkKey_operators;
 
     uint256 public maxGasTokenAmount = 1 ether; // Max amount that can be put as the native token amount
     uint256 public minBTCAmount = 1000; // Min BTC amount / satoshis that needs to be locked
@@ -42,6 +44,15 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     // Events
     event MessageSent(uint32 indexed dstEid, bytes32 indexed psbtHash, address indexed operator, uint256 timestamp);
     event OperatorStatusChanged(address indexed operator, bool status);
+    event MessageReceived(
+        bytes32 indexed guid,
+        uint32 srcEid,
+        bytes32 sender,
+        bytes32 indexed btcTxnHash,
+        address indexed receiver,
+        uint256 amount,
+        uint256 timestamp
+    );
 
     /**
      * @notice Initializes the HomeChainCoordinator contract
@@ -158,18 +169,12 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes calldata _psbtData,
         bytes calldata _options
     ) internal {
-        // Break down the function into smaller parts to avoid stack too deep
         // 0. Parse and validate PSBT data
         BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_psbtData);
-
-        // TODO: Remove this after updating the test with the correct chainId in the metadata
-        uint32 dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
-
-        // 1-4. Validate input in a separate function call
-        _validateInput(_merkleRoot, _btcTxnHash, _proof, _index, _psbtData, dstEid);
-
-        // Handle message sending in a separate function
-        _handleMessageSending(dstEid, _btcTxnHash, metadata, _psbtData, _options);
+        // 1. Validate input in a separate function call
+        _validateInput(_merkleRoot, _btcTxnHash, _proof, _index, _psbtData, metadata.chainId);
+        // 2. Handle message sending in a separate function
+        _handleMessageSending(metadata.chainId, _btcTxnHash, metadata, _psbtData, _options);
     }
 
     /**
@@ -227,7 +232,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes calldata _options
     ) internal {
         PSBTData memory psbtData = PSBTData({
-            isMinted: true,
+            status: true,
             chainId: _metadata.chainId,
             user: _metadata.receiverAddress,
             lockedAmount: _metadata.lockedAmount,
@@ -265,7 +270,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         }
 
         // 2. Check if the message already exists or is processed
-        if (_btcTxnHash_psbtData[_btcTxnHash].isMinted) {
+        if (_btcTxnHash_psbtData[_btcTxnHash].status) {
             revert TxnAlreadyProcessed(_btcTxnHash);
         }
 
@@ -328,11 +333,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         // 1. Parse and get metadata from psbtData
         PSBTData memory metadata = _btcTxnHash_psbtData[_btcTxnHash];
 
-        // TODO: Remove this after updating the test with the correct chainId in the metadata
-        uint32 _dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
-
         // 2. Validate receiver is set for destination chain
-        if (peers[_dstEid] == bytes32(0)) {
+        if (peers[metadata.chainId] == bytes32(0)) {
             revert InvalidDestination();
         }
 
@@ -346,14 +348,14 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
         // TODO: Create a function to get the correct MessageFee for the user
         _lzSend(
-            _dstEid,
+            metadata.chainId,
             payload,
             _options,
             MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
             address(this) // Refund address in case of failed source message.
         );
 
-        emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
+        emit MessageSent(metadata.chainId, _btcTxnHash, msg.sender, block.timestamp);
     }
 
     /**
@@ -374,9 +376,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         BitcoinTxnParser.TransactionMetadata memory metadata = BitcoinTxnParser.decodeMetadata(opReturnData);
         bytes memory payload =
             abi.encode(metadata.receiverAddress, _btcTxnHash, metadata.lockedAmount, metadata.nativeTokenAmount);
-        // TODO: Remove this after updating the test with the correct chainId in the metadata
-        uint32 _dstEid = metadata.chainId == 8453 ? 40153 : metadata.chainId;
-        MessagingFee memory fee = _quote(_dstEid, payload, _options, _payInLzToken);
+        MessagingFee memory fee = _quote(metadata.chainId, payload, _options, _payInLzToken);
         return (fee.nativeFee, fee.lzTokenFee);
     }
 
@@ -404,13 +404,64 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes calldata _message,
         address _executor,
         bytes calldata _extraData
-    ) internal virtual override {
-        // Implement the receive logic here
-        // Validate the origin of the message
-        // Validate the message
-        // Decode the message
-        // Execute the message
-        // Emit an event
+    ) internal virtual override whenNotPaused {
+        // 1. Validate the origin of the message
+        if (peers[_origin.srcEid] != _origin.sender) {
+            revert InvalidPeer();
+        }
+
+        // 2. Validate and decode the PSBT data
+        if (_message.length == 0) {
+            revert InvalidPSBTData();
+        }
+
+        // 3. Parse psbt and get eBTC burn amount, taproot address, network key, and receiver BTC address
+
+        // 4. Store PSBT data for burn transaction validation
+        // PSBTData memory psbtData = PSBTData({
+        //     status: false, // This is a burn transaction
+        //     chainId: metadata.chainId,
+        //     user: metadata.receiverAddress,
+        //     lockedAmount: metadata.lockedAmount,
+        //     nativeTokenAmount: metadata.nativeTokenAmount,
+        //     networkPublicKey: metadata.networkPublicKey, // Network key for burn validation
+        //     psbtData: _message
+        // });
+
+        // 5. Calculate and store the Bitcoin transaction hash
+        // bytes32 btcTxnHash = TxidCalculator.calculateTxid(_message);
+        // _btcTxnHash_psbtData[btcTxnHash] = psbtData;
+
+        // 6. Create task for AVS (can be implemented through a TaskManager contract) - This will be done by the task generator
+        // emit MessageReceived(
+        //     _guid,
+        //     _origin.srcEid,
+        //     _origin.sender,
+        //     btcTxnHash,
+        //     metadata.receiverAddress,
+        //     metadata.lockedAmount,
+        //     block.timestamp
+        // );
+    }
+
+    // TODO: Add single function to set whatever is required by the createNewTask function
+    // TODO: Add function to get the taproot address from btc txn hash
+    // TODO: Add natspec comments for all the new functions
+    function setNetworkKey(string calldata _taprootAddress, string calldata _networkKey) external onlyOwner {
+        _taprootAddress_networkKey[_taprootAddress] = _networkKey;
+    }
+
+    function getNetworkKey(string calldata _taprootAddress) external view returns (string memory) {
+        return _taprootAddress_networkKey[_taprootAddress];
+    }
+
+    // TODO: Add function to set the operators for a specific network key
+    function setOperators(string calldata _networkKey, address[] calldata _operators) external onlyOwner {
+        _networkKey_operators[_networkKey] = _operators;
+    }
+
+    function getOperators(string calldata _networkKey) external view returns (address[] memory) {
+        return _networkKey_operators[_networkKey];
     }
 
     /**

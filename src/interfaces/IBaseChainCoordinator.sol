@@ -6,7 +6,7 @@ import {
 } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroReceiver.sol";
 
 struct MintData {
-    bool isMinted;
+    bool status;
     address user;
     uint256 lockedAmount;
 }

@@ -22,10 +22,12 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     error InvalidPeer();
     error ReceiverNotSet();
     error WithdrawalFailed();
+    error InvalidTokenAddress();
     error InvalidAmount(uint256 minAmount);
 
     // State variables
     mapping(bytes32 => MintData) internal _btcTxnHash_mintData;
+    mapping(bytes32 => bytes) internal _psbtHash_psbtData; // TODO: Come back to update this and check if this can be merged with the above mapping
     eBTCManager internal _eBTCManagerInstance;
     uint32 internal immutable _chainEid;
     uint32 internal immutable _homeEid;
@@ -144,7 +146,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     function _processMessage(bytes32 _btcTxnHash, address _user, uint256 _lockedAmount) internal {
         // Decode the message and process it
         MintData memory mintData = _btcTxnHash_mintData[_btcTxnHash];
-        mintData.isMinted = true;
+        mintData.status = true;
         mintData.user = _user;
         mintData.lockedAmount = _lockedAmount;
         _btcTxnHash_mintData[_btcTxnHash] = mintData;
@@ -177,7 +179,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      * @return True if message has been processed
      */
     function isMessageProcessed(bytes32 _btcTxnHash) public view returns (bool) {
-        return _btcTxnHash_mintData[_btcTxnHash].isMinted;
+        return _btcTxnHash_mintData[_btcTxnHash].status;
     }
 
     /**
@@ -234,12 +236,11 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         bytes32 _s,
         bytes calldata _options
     ) external {
-        // TODO: This should already be knowing on which chainEid is HomeChainCoordinator deployed to make the _lzSend call
-
         // Validate inputs and process the burn transaction - BaseChainCoordinator doesn't have the brains to validate the burn transaction, it just passes the psbt data to the HomeChainCoordinator
 
         // Tell eBTCManager to burn the eBTC tokens
         address _eBTCToken = _eBTCManagerInstance.getEBTCTokenAddress();
+        if (_eBTCToken == address(0)) revert InvalidTokenAddress();
         IERC20 eBTCToken = IERC20(_eBTCToken);
         SafeERC20.safePermit(
             IERC20Permit(address(eBTCToken)), msg.sender, address(this), _amount, _deadline, _v, _r, _s
@@ -249,6 +250,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
         // Pass the psbt data to the HomeChainCoordinator in the burn transaction
         MessagingFee memory messagingFee = _quote(_homeEid, _psbtData, _options, false);
+        _psbtHash_psbtData[keccak256(_psbtData)] = _psbtData; // TODO: Update this to use the btcTxnHash
         _lzSend(
             _homeEid, // HomeChainCoordinator chainEid
             _psbtData,
@@ -258,14 +260,6 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         );
 
         emit MessageSent(_homeEid, _psbtData, peers[_homeEid], messagingFee.nativeFee);
-
-        // HomeChainCoordinator should be able to create a task on the AVSExntension post validating the psbt data
-
-        // If the psbt is corresponding to the burn transaction, the HomeChainCoordinator has the correct data to validate the burn transaction
-
-        // If the psbt is not corresponding to the burn transaction, the HomeChainCoordinator should reject the burn transaction - the secondary state would be set to true but it's the primary state that would be used to validate the burn transaction
-
-        // Confirm this - Also, for a burn transaction there would be a mint transaction by the same user (same Bitcoin wallet address) for whom the mint must have happened of the same eBTC amount earlier (confirm this part with Yogendra), recording the network key along with operator addresses as well as other required fields
     }
 
     /**

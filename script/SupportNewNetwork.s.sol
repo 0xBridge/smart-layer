@@ -36,7 +36,7 @@ contract SendMessageScript is Script {
         vm.startBroadcast(privateKey);
 
         // Create an instance of already deployed BaseChainCoordinator contract
-        _baseChainCoordinator = BaseChainCoordinator(BASE_CHAIN_COORDINATOR_ADDRESS);
+        _baseChainCoordinator = BaseChainCoordinator(payable(BASE_CHAIN_COORDINATOR_ADDRESS));
         console.log("BaseChainCoordinator", address(_baseChainCoordinator));
 
         // Set HomeChainCoordinator contract address as peer on BaseChainCoordinator
