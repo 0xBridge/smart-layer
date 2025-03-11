@@ -133,7 +133,7 @@ contract HomeChainCoordinatorTest is Test {
         assertEq(homeChainCoordinator.peers(destNetworkConfig.chainEid), receiver);
     }
 
-    // TODO: Add test for submitBlockAndSendMessage
+    // TODO: Add test for submitBlockAndStoreMessage
 
     function testSendMessage() public {
         // Set the receiver first

@@ -41,7 +41,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
 
     // Events
     event PerformerUpdated(address oldPerformer, address newPerformer);
-    event NewTaskCreated(bytes32 _btcTxnHash); // Can flatten this
+    event NewTaskCreated(bytes32 btcTxnHash);
     event TaskCompleted(bytes32 indexed taskHash);
 
     /**
@@ -101,7 +101,6 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      * @param _taprootAddress The taproot address where the btc will be getting locked
      * @param _networkKey The network key for the AVS created from the participated operators
      * @param _operators The addresses of the operators for the network key creation
-     * @param _options Additional options for task processing
      * @dev Only the authorized performer can create new tasks
      */
     function createNewTask(
@@ -113,20 +112,10 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         bytes calldata _rawTxn,
         string calldata _taprootAddress,
         string calldata _networkKey,
-        address[] calldata _operators,
-        bytes calldata _options // Check if this is required
+        address[] calldata _operators
     ) external onlyTaskPerformer {
         _homeChainCoordinator.storeMessage(
-            _isMint,
-            _blockHash,
-            _btcTxnHash,
-            _proof,
-            _index,
-            _rawTxn,
-            _taprootAddress,
-            _networkKey,
-            _operators,
-            _options
+            _isMint, _blockHash, _btcTxnHash, _proof, _index, _rawTxn, _taprootAddress, _networkKey, _operators
         );
         _taskHashes.push(_btcTxnHash);
 
@@ -183,12 +172,9 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         // Mark task as completed
         _completedTasks[taskHash] = true;
 
-        // Quote the gas fee (TODO: Fix this)
-        // (uint256 nativeFee,) = quote(task.btcTxnHash, task.psbtData, task.options, false);
-        // // Send message after successful verification
-        // _homeChainCoordinator.sendMessage{value: nativeFee}(
-        //     task.blockHash, task.btcTxnHash, task.proof, task.index, task.psbtData, task.options
-        // );
+        (uint256 nativeFee,) = quote(taskHash, task.rawTxn, false);
+        // Send message after successful verification
+        _homeChainCoordinator.sendMessage{value: nativeFee}(taskHash);
 
         // emitting event
         emit TaskCompleted(taskHash);
@@ -198,17 +184,16 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      * @notice Quotes the gas needed to pay for sending the message
      * @param _btcTxnHash The BTC transaction hash
      * @param _psbtData The PSBT data message to send
-     * @param _options Message execution options
      * @param _payInLzToken Boolean for which token to return fee in
      * @return nativeFee Estimated gas fee in native gas
      * @return lzTokenFee Estimated gas fee in ZRO token
      */
-    function quote(bytes32 _btcTxnHash, bytes memory _psbtData, bytes memory _options, bool _payInLzToken)
+    function quote(bytes32 _btcTxnHash, bytes memory _psbtData, bool _payInLzToken)
         public
         view
         returns (uint256 nativeFee, uint256 lzTokenFee)
     {
-        (nativeFee, lzTokenFee) = _homeChainCoordinator.quote(_btcTxnHash, _psbtData, _options, _payInLzToken);
+        (nativeFee, lzTokenFee) = _homeChainCoordinator.quote(_btcTxnHash, _psbtData, _payInLzToken);
     }
 
     /**
