@@ -64,11 +64,11 @@ contract SendMessageScript is Script {
         console.logBytes(options);
 
         // Calculate required messaging fee
-        (uint256 nativeFee,) = _coordinator.quote(BTC_TXN_HASH, PSBT_DATA, options, false);
+        (uint256 nativeFee,) = _coordinator.quote(BTC_TXN_HASH, PSBT_DATA, false);
         console.log("Required native fee:", nativeFee);
 
-        // Send the message (TODO: Update this)
-        // _coordinator.sendMessage{value: nativeFee * 2}(BLOCK_HASH, BTC_TXN_HASH, proof, index, PSBT_DATA, options);
+        // Send the message
+        _coordinator.sendMessage{value: nativeFee * 2}(BTC_TXN_HASH);
 
         vm.stopBroadcast();
     }

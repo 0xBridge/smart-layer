@@ -41,8 +41,8 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
 
     // Events
     event PerformerUpdated(address oldPerformer, address newPerformer);
-    event NewTaskCreated(bytes32 btcTxnHash);
-    event TaskCompleted(bytes32 indexed taskHash);
+    event NewTaskCreated(bytes32 indexed btcTxnHash);
+    event TaskCompleted(bytes32 indexed btcTxnHash);
 
     /**
      * @notice Ensures the caller is the attestation center
@@ -139,12 +139,12 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256[] calldata
     ) external view onlyAttestationCenter {
         // Decode task hash from taskInfo data
-        bytes32 taskHash = abi.decode(_taskInfo.data, (bytes32));
+        bytes32 btcTxnHash = abi.decode(_taskInfo.data, (bytes32));
 
         // Check that the task is valid, hasn't been responsed yet
         if (!_isApproved) revert TaskNotApproved();
-        if (!isTaskValid(taskHash)) revert InvalidTask();
-        if (isTaskCompleted(taskHash)) revert TaskAlreadyCompleted();
+        if (!isTaskValid(btcTxnHash)) revert InvalidTask();
+        if (isTaskCompleted(btcTxnHash)) revert TaskAlreadyCompleted();
     }
 
     /**
@@ -163,21 +163,21 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256[2] calldata,
         uint256[] calldata
     ) external onlyAttestationCenter {
-        // Decode task hash from taskInfo data
-        bytes32 taskHash = abi.decode(_taskInfo.data, (bytes32));
+        // Decode task hash (btcTxnHash) from taskInfo data
+        bytes32 btcTxnHash = abi.decode(_taskInfo.data, (bytes32));
 
         // Get task data wrt task Id
-        PSBTData memory task = _homeChainCoordinator.getPSBTDataForTxnHash(taskHash);
+        PSBTData memory task = _homeChainCoordinator.getPSBTDataForTxnHash(btcTxnHash);
 
         // Mark task as completed
-        _completedTasks[taskHash] = true;
+        _completedTasks[btcTxnHash] = true;
 
-        (uint256 nativeFee,) = quote(taskHash, task.rawTxn, false);
+        (uint256 nativeFee,) = quote(btcTxnHash, task.rawTxn, false);
         // Send message after successful verification
-        _homeChainCoordinator.sendMessage{value: nativeFee}(taskHash);
+        _homeChainCoordinator.sendMessage{value: nativeFee}(btcTxnHash);
 
         // emitting event
-        emit TaskCompleted(taskHash);
+        emit TaskCompleted(btcTxnHash);
     }
 
     /**

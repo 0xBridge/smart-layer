@@ -39,7 +39,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     uint256 public maxGasTokenAmount = 1 ether; // Max amount that can be put as the native token amount
     uint256 public minBTCAmount = 1000; // Min BTC amount / satoshis that needs to be locked
 
-    bytes internal _options; // TODO: Get rid of this
+    bytes internal constant _options = hex"0003010011010000000000000000000000000000c350"; // TODO: Get rid of this
 
     // Events
     event MessageSent(uint32 indexed dstEid, bytes32 indexed psbtHash, address indexed operator, uint256 timestamp);
@@ -60,15 +60,11 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param endpoint_ Address of the LayerZero endpoint
      * @param owner_ Address of the contract owner
      * @param chainEid_ The endpoint ID of the current chain
-     * @param options_ Options for the LayerZero endpoint
      */
-    constructor(address lightClient_, address endpoint_, address owner_, uint32 chainEid_, bytes memory options_)
-        OApp(endpoint_, owner_)
-    {
+    constructor(address lightClient_, address endpoint_, address owner_, uint32 chainEid_) OApp(endpoint_, owner_) {
         _transferOwnership(owner_);
         _lightClient = BitcoinLightClient(lightClient_);
         _chainEid = chainEid_;
-        _options = options_;
     }
 
     /**

@@ -37,9 +37,9 @@ contract AVSExtensionTest is Test {
     bytes32 private constant BTC_TXN_HASH = 0x0b050a87ba271963ba19dc5ab6a53b6dcf4b5c4f5852033ea92aa78030a9f381;
     bytes32[] private proof;
     uint256 private constant INDEX = 28;
-    bytes private constant PSBT_DATA =
+    bytes private constant RAW_TXN =
         hex"020000000001018b1a4ac7b6fc2a0a58ea6345238faae0785115da71e15b46609caa440ec834b90100000000ffffffff04102700000000000022512038b619797eb282894c5e33d554b03e1bb8d81d6d30d3c1a164ed15c8107f0774e80300000000000016001471d044aeb7f41205a9ef0e3d785e7d38a776cfa10000000000000000326a3000144e56a8e3757f167378b38269e1ca0e1a1f124c9e000800000000000003e800040000210500080000000000004e207b84000000000000160014d6a279dc882b830c5562b49e3e25bf3c5767ab7302483045022100b4957432ec426f9f66797305bf0c44d586674d48c260c3d059b81b65a473f717022025b2f1641234dfd3f27eafabdd68a2fa1a0ab286a5292664f7ad9c260aa1455701210226795246077d56dfbc6730ef3a6833206a34f0ba1bd6a570de14d49c42781ddb00000000";
-    bytes private constant OPTIONS = hex"0003010011010000000000000000000000000000c350";
+
     string private constant TAPROOT_ADDRESS = "tb1pk2f9ve04zxjwc9g8m9csvq97ylmer7qpxyr5cmk62uus2dc57vasy6lw4p";
     string private constant NETWORK_KEY = "tb1qk73znvxpcyxzzngmr8gjvwm8jldw86tcv3yrnt";
     address[] private OPERATORS = [
@@ -50,7 +50,8 @@ contract AVSExtensionTest is Test {
 
     // Events to test
     event PerformerUpdated(address oldPerformer, address newPerformer);
-    event TaskCompleted(bytes32 indexed taskHash);
+    event NewTaskCreated(bytes32 indexed btcTxnHash);
+    event TaskCompleted(bytes32 indexed btcTxnHash);
 
     function setUp() public {
         string memory rpcUrl = vm.envString("AMOY_RPC_URL");
@@ -146,38 +147,24 @@ contract AVSExtensionTest is Test {
         avsExtension.setPerformer(newPerformer);
     }
 
-    // TODO: Update the below commented tests
-    // function testCreateNewTask() public {
-    //     vm.prank(performer);
+    function testCreateNewTask() public {
+        uint256 initialTaskHashLength = avsExtension.getTaskHashesLength();
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit NewTaskCreated(
-    //         0,
-    //         AVSExtension.TaskData({
-    //             blockHash: BLOCK_HASH,
-    //             btcTxnHash: BTC_TXN_HASH,
-    //             proof: proof,
-    //             index: INDEX,
-    //             psbtData: PSBT_DATA,
-    //             options: OPTIONS
-    //         })
-    //     );
+        vm.prank(performer);
+        avsExtension.createNewTask(
+            true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
+        );
 
-    //     avsExtension.createNewTask(
-    //         BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, PSBT_DATA, OPTIONS, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
-    //     );
+        assertEq(avsExtension.getTaskHashesLength(), initialTaskHashLength + 1);
+    }
 
-    //     assertEq(avsExtension.taskNumber(), 1);
-    // }
-
-    // function testCreateNewTaskNotPerformer() public {
-    //     vm.prank(user);
-    //     vm.expectRevert(AVSExtension.CallerNotTaskGenerator.selector);
-
-    //     avsExtension.createNewTask(
-    //         BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, PSBT_DATA, OPTIONS, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
-    //     );
-    // }
+    function testCreateNewTaskNotPerformer() public {
+        vm.prank(user);
+        vm.expectRevert(AVSExtension.CallerNotTaskGenerator.selector);
+        avsExtension.createNewTask(
+            true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
+        );
+    }
 
     function testBeforeTaskSubmissionInvalidTask() public {
         bytes32 invalidTaskHash = keccak256("invalid_task");
@@ -194,36 +181,34 @@ contract AVSExtensionTest is Test {
         avsExtension.beforeTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
     }
 
-    // function testTaskLifecycle() public {
-    //     // Create task
-    //     vm.prank(performer);
-    //     avsExtension.createNewTask(
-    //         BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, PSBT_DATA, OPTIONS, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
-    //     );
+    function testTaskLifecycle() public {
+        // Create task
+        vm.prank(performer);
+        avsExtension.createNewTask(
+            true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
+        );
 
-    //     bytes32 taskHash = keccak256(abi.encode(BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, PSBT_DATA, OPTIONS));
+        // Verify task is valid but not completed
+        assertTrue(avsExtension.isTaskValid(BTC_TXN_HASH));
+        assertFalse(avsExtension.isTaskCompleted(BTC_TXN_HASH));
 
-    //     // Verify task is valid but not completed
-    //     assertTrue(avsExtension.isTaskValid(taskHash));
-    //     assertFalse(avsExtension.isTaskCompleted(taskHash));
+        // Simulate task completion through attestation center
+        IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
+            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
+            data: abi.encode(BTC_TXN_HASH),
+            taskPerformer: performer,
+            taskDefinitionId: 0
+        });
 
-    //     // Simulate task completion through attestation center
-    //     IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
-    //         proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
-    //         data: abi.encode(taskHash),
-    //         taskPerformer: performer,
-    //         taskDefinitionId: 0
-    //     });
+        vm.prank(ATTESTATION_CENTER);
+        avsExtension.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
 
-    //     vm.prank(ATTESTATION_CENTER);
-    //     avsExtension.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
-
-    //     // Verify task is now completed
-    //     assertTrue(avsExtension.isTaskCompleted(taskHash));
-    // }
+        // Verify task is now completed
+        assertTrue(avsExtension.isTaskCompleted(BTC_TXN_HASH));
+    }
 
     function testQuoteGasFees() public {
-        (uint256 nativeFee, uint256 lzTokenFee) = avsExtension.quote(BTC_TXN_HASH, PSBT_DATA, OPTIONS, false);
+        (uint256 nativeFee, uint256 lzTokenFee) = avsExtension.quote(BTC_TXN_HASH, RAW_TXN, false);
 
         assertTrue(nativeFee > 0);
         assertEq(lzTokenFee, 0); // When payInLzToken is false
