@@ -29,6 +29,19 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     error InvalidPeer();
     error WithdrawalFailed();
 
+    // Added struct to reduce stack depth
+    struct BlockSubmissionParams {
+        bytes rawHeader;
+        bytes[] intermediateHeaders;
+        bytes32 btcTxnHash;
+        bytes32[] proof;
+        uint256 index;
+        bytes rawTxn;
+        string taprootAddress;
+        string networkKey;
+        address[] operators;
+    }
+
     // State variables
     BitcoinLightClient internal immutable _lightClient;
     uint32 internal immutable _chainEid;
@@ -101,36 +114,30 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     /**
      * @notice Submits a block and sends a message with PSBT data
      * @param _isMint Whether the transaction is a mint or burn
-     * @param rawHeader The raw block header
-     * @param intermediateHeaders The intermediate headers for the block
-     * @param _btcTxnHash The BTC transaction hash
-     * @param _proof The proof for the transaction
-     * @param _index The index of the transaction in the block
-     * @param _rawTxn // Raw hex PSBT data for the mint or burn transaction
-     * @param _taprootAddress The taproot address where the funds are locked or unlocked from
-     * @param _networkKey The network public key for the AVS
-     * @param _operators Array of operators with whom AVS network key is created
+     * @param params Struct containing all the parameters to avoid stack too deep error
      * @dev Only callable by the contract owner
      */
-    // function submitBlockAndStoreMessage(
-    //     bool _isMint,
-    //     bytes calldata rawHeader,
-    //     bytes[] calldata intermediateHeaders,
-    //     bytes32 _btcTxnHash,
-    //     bytes32[] calldata _proof,
-    //     uint256 _index,
-    //     bytes calldata _rawTxn,
-    //     string calldata _taprootAddress,
-    //     string calldata _networkKey,
-    //     address[] calldata _operators
-    // ) external whenNotPaused nonReentrant onlyOwner {
-    //     // 0. Submit block header along with intermediate headers to light client
-    //     bytes32 blockHash = _lightClient.submitRawBlockHeader(rawHeader, intermediateHeaders);
-    //     // 2. Store message with the given BTC transaction hash
-    //     _storeMessage(
-    //         _isMint, blockHash, _btcTxnHash, _proof, _index, _rawTxn, _taprootAddress, _networkKey, _operators
-    //     );
-    // }
+    function submitBlockAndStoreMessage(bool _isMint, BlockSubmissionParams calldata params)
+        external
+        whenNotPaused
+        nonReentrant
+        onlyOwner
+    {
+        // 0. Submit block header along with intermediate headers to light client
+        bytes32 blockHash = _lightClient.submitRawBlockHeader(params.rawHeader, params.intermediateHeaders);
+        // 2. Store message with the given BTC transaction hash
+        _storeMessage(
+            _isMint,
+            blockHash,
+            params.btcTxnHash,
+            params.proof,
+            params.index,
+            params.rawTxn,
+            params.taprootAddress,
+            params.networkKey,
+            params.operators
+        );
+    }
 
     /**
      * @notice Stores a cross-chain message for a given BTC transaction hash
