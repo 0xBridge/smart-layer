@@ -109,27 +109,28 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param _rawTxn // Raw hex PSBT data for the mint or burn transaction
      * @param _taprootAddress The taproot address where the funds are locked or unlocked from
      * @param _networkKey The network public key for the AVS
+     * @param _operators Array of operators with whom AVS network key is created
      * @dev Only callable by the contract owner
      */
-    function submitBlockAndStoreMessage(
-        bool _isMint,
-        bytes calldata rawHeader,
-        bytes[] calldata intermediateHeaders,
-        bytes32 _btcTxnHash,
-        bytes32[] calldata _proof,
-        uint256 _index,
-        bytes calldata _rawTxn,
-        string calldata _taprootAddress,
-        string calldata _networkKey,
-        address[] calldata _operators
-    ) external whenNotPaused nonReentrant onlyOwner {
-        // 0. Submit block header along with intermediate headers to light client
-        bytes32 blockHash = _lightClient.submitRawBlockHeader(rawHeader, intermediateHeaders);
-        // 2. Store message with the given BTC transaction hash
-        _storeMessage(
-            _isMint, blockHash, _btcTxnHash, _proof, _index, _rawTxn, _taprootAddress, _networkKey, _operators
-        );
-    }
+    // function submitBlockAndStoreMessage(
+    //     bool _isMint,
+    //     bytes calldata rawHeader,
+    //     bytes[] calldata intermediateHeaders,
+    //     bytes32 _btcTxnHash,
+    //     bytes32[] calldata _proof,
+    //     uint256 _index,
+    //     bytes calldata _rawTxn,
+    //     string calldata _taprootAddress,
+    //     string calldata _networkKey,
+    //     address[] calldata _operators
+    // ) external whenNotPaused nonReentrant onlyOwner {
+    //     // 0. Submit block header along with intermediate headers to light client
+    //     bytes32 blockHash = _lightClient.submitRawBlockHeader(rawHeader, intermediateHeaders);
+    //     // 2. Store message with the given BTC transaction hash
+    //     _storeMessage(
+    //         _isMint, blockHash, _btcTxnHash, _proof, _index, _rawTxn, _taprootAddress, _networkKey, _operators
+    //     );
+    // }
 
     /**
      * @notice Stores a cross-chain message for a given BTC transaction hash
