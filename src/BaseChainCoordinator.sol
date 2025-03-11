@@ -27,7 +27,6 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
     // State variables
     mapping(bytes32 => MintData) internal _btcTxnHash_mintData;
-    mapping(bytes32 => bytes) internal _psbtHash_psbtData; // TODO: Come back to update this and check if this can be merged with the above mapping
     eBTCManager internal _eBTCManagerInstance;
     uint32 internal immutable _chainEid;
     uint32 internal immutable _homeEid;
@@ -250,7 +249,6 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
         // Pass the psbt data to the HomeChainCoordinator in the burn transaction
         MessagingFee memory messagingFee = _quote(_homeEid, _psbtData, _options, false);
-        _psbtHash_psbtData[keccak256(_psbtData)] = _psbtData; // TODO: Update this to use the btcTxnHash
         _lzSend(
             _homeEid, // HomeChainCoordinator chainEid
             _psbtData,

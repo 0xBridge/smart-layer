@@ -12,7 +12,7 @@ struct PSBTData {
     string networkKey; // AVS Bitcoin address
     address[] operators; // Array of operators with whom AVS network key is created
     uint256 lockedAmount; // Amount locked or unlocked in the mint or burn transaction
-    uint256 nativeTokenAmount; // Amount of native token minted on the destination chain (TODO: Check if this needs to be saved)
+    uint256 nativeTokenAmount; // Amount of native token minted on the destination chain
 }
 
 interface IHomeChainCoordinator {

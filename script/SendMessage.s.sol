@@ -16,11 +16,11 @@ contract SendMessageScript is Script {
 
     // Constants - to be updated for each deployment
     address internal constant COORDINATOR_ADDRESS = 0xEE35AB43127933562c65A7942cbf1ccAac4BE86F; // HomeChainCoordinator contract address on Amoy
-    bytes32 internal constant BLOCK_HASH = 0x00000000d5e6c2af3f74d53bac835137c3414bcb654521d813a372eac0ce4155; // Block hash
+    bytes32 internal constant BLOCK_HASH = 0x000000000000a20dbeee6d8c5f448e71608e62972c1ff7dd53c567a2df33ff53; // Block hash #72016
     bytes32 internal constant BTC_TXN_HASH = 0x63d2189bacdd8f610bce19e493827880bb839019727728ec8f6031b90e2e9e2e; // BTC transaction hash
 
     // PSBT data represents the Bitcoin transaction
-    bytes internal constant PSBT_DATA =
+    bytes internal constant RAW_TXN =
         hex"0200000000010172a9903e9c75393c69cd155f4842796b3c52454dad15d83e627749de6c78a7780100000000ffffffff041027000000000000160014b7a229b0c1c10c214d1b19d1263b6797dae3e978e80300000000000016001471d044aeb7f41205a9ef0e3d785e7d38a776cfa10000000000000000326a30001471cf07d9c0d8e4bbb5019ccc60437c53fc51e6de00080000000000002710000400009ce100080000000000000000a82a000000000000160014d5a028b62114136a63ebcfacf94e18536b90a1210247304402206d80652d1cc1c6c4b2fe08ae3bdfa2c97121017b07826f7db0a232292c1d74020220579da941457f0d40b93443cf1a223693c59c352a188430f76682d89442918b6d0121036a43583212d54a5977f2cef457520c520ab9bf92299b2d74011ecd410bdb250600000000";
 
     /**
@@ -64,7 +64,7 @@ contract SendMessageScript is Script {
         console.logBytes(options);
 
         // Calculate required messaging fee
-        (uint256 nativeFee,) = _coordinator.quote(BTC_TXN_HASH, PSBT_DATA, false);
+        (uint256 nativeFee,) = _coordinator.quote(BTC_TXN_HASH, RAW_TXN, false);
         console.log("Required native fee:", nativeFee);
 
         // Send the message

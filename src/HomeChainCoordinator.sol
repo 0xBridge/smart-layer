@@ -215,14 +215,14 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         // 1. Get the metadata as well as other fields required for the message
         PSBTData memory psbtData = getPSBTDataForTxnHash(_btcTxnHash);
         // 2. Get the metadata
-        BitcoinTxnParser.TransactionMetadata memory metadata;
+        bytes memory opReturnData = BitcoinTxnParser.decodeBitcoinTxn(psbtData.rawTxn);
+        BitcoinTxnParser.TransactionMetadata memory metadata = BitcoinTxnParser.decodeMetadata(opReturnData);
         // 3. Handle message sending in a separate function
         _handleMessageSending(
             psbtData.txnType,
             chainId,
             _btcTxnHash,
             metadata,
-            psbtData.rawTxn,
             psbtData.taprootAddress,
             psbtData.networkKey,
             psbtData.operators
@@ -235,7 +235,6 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param _dstEid The destination chain ID
      * @param _btcTxnHash The Bitcoin transaction hash
      * @param _metadata The transaction metadata
-     * @param _rawTxn The raw transaction bytes
      * @param _taprootAddress The taproot address where the funds are locked or unlocked from
      * @param _networkKey The network public key for the AVS
      * @param _operators // Array of operators with whom AVS network key is created
@@ -245,7 +244,6 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         uint32 _dstEid,
         bytes32 _btcTxnHash,
         BitcoinTxnParser.TransactionMetadata memory _metadata,
-        bytes memory _rawTxn,
         string memory _taprootAddress,
         string memory _networkKey,
         address[] memory _operators
@@ -257,7 +255,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             _handleSameChainMessage(_dstEid, _btcTxnHash, payload);
         } else {
             _handleCrossChainMessage(
-                _isMint, _dstEid, _btcTxnHash, _metadata, _rawTxn, _taprootAddress, _networkKey, _operators
+                _isMint, _dstEid, _btcTxnHash, _metadata, payload, _taprootAddress, _networkKey, _operators
             );
         }
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
@@ -282,15 +280,15 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         uint32 _dstEid,
         bytes32 _btcTxnHash,
         BitcoinTxnParser.TransactionMetadata memory _metadata,
-        bytes memory _rawTxn,
+        bytes memory _payload,
         string memory _taprootAddress,
         string memory _networkKey,
         address[] memory _operators
     ) internal {
         PSBTData memory psbtData = getPSBTDataForTxnHash(_btcTxnHash);
         psbtData.status = true;
-        _btcTxnHash_psbtData[_btcTxnHash] = psbtData;
-        _lzSend(_dstEid, _rawTxn, _options, MessagingFee(msg.value, 0), msg.sender);
+        _btcTxnHash_psbtData[_btcTxnHash] = psbtData; // Update the status of the transaction
+        _lzSend(_dstEid, _payload, _options, MessagingFee(msg.value, 0), msg.sender);
     }
 
     /**
@@ -322,8 +320,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             revert TxnAlreadyProcessed(_btcTxnHash);
         }
 
-        // 3. Validate txn with SPV data
-        if (!BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index)) revert BitcoinTxnNotFound();
+        // 3. Validate txn with SPV data (TODO: Uncomment this when the backend service to publish SPV blocks is ready by Rahul)
+        // if (!BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index)) revert BitcoinTxnNotFound();
 
         // 4. Validate receiver is set for destination chain
         if (peers[_dstEid] == bytes32(0)) {

@@ -83,7 +83,7 @@ contract AVSTest is Test {
     address private constant EL_STRATEGY_MANAGER = 0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6;
     address private constant ST_ETH_STRATEGY = 0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3;
 
-    // 1. Deploy the AVS contracts - Done via the Othentic cli (TODO: Test with a fresh deployment)
+    // 1. Deploy the AVS contracts - Done via the Othentic cli
     function alreadyDone_setUp() public {
         // 1. Deploy the AVS contracts - this can be done via the Othentic cli
 
@@ -146,7 +146,7 @@ contract AVSTest is Test {
             taskDefinitionId: 0
         });
 
-        // Submit the task (TODO: Figure this part out)
+        // Submit the task
         bytes memory tpSignature =
             hex"e4a74f4cf94b5056483d604eb56a6a31f7791f14f0dcf1aaba7c8b6656b39d763ee2054aa2ef9ddd4a60a2b34900a40e12af2fba6a973a9d994f3686efb44a2a1c";
         uint256[2] memory taSignature = [
