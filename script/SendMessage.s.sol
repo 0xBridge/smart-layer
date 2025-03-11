@@ -45,18 +45,18 @@ contract SendMessageScript is Script {
 
         // Prepare Merkle proof
         bytes32[] memory proof = new bytes32[](11);
-        proof[0] = 0x20753e310cc491f86ca2f87af292aaceddb7e12773c965c5ce56fb2610b3a85b;
-        proof[1] = 0xc91fdeaeec9f532dea4e0d0f175eacad01aa6df5f79fd12eb0cf60a0b45403cc;
-        proof[2] = 0x25f944d1fbc29ada8b2fb1e3b844d70f4faefc6e3b437c6357a79c70ecd2ee2f;
-        proof[3] = 0x7610680b480d5f26076d4e525c1ab470a4e8383dd2f7423f340f4c18aa9f8321;
-        proof[4] = 0xdc5eb091c00510e7df8d46e41947d76fbbd55f814ca4c599238ff5e3ce4d5324;
-        proof[5] = 0xe40462e9e50b441bdfa196d11d7464ed2ebe06f10535aa3b18e23cff7bf3c824;
-        proof[6] = 0x29c246c61959e3acfbef45f8f6cadedc1c02081cfa2ae7a554f8dae97e025dfd;
-        proof[7] = 0x7c53eb3c41a613e70581f8bf478d412904db531281c5a0873af8c2d2d1084d74;
-        proof[8] = 0x2cdc8b9432085da444d4f0ce3a7977987f709ed541b05c75c4f30800e0af5597;
-        proof[9] = 0x8c1f53dd9d4bc6f03f5af029497e87887f35564be5cbda806dfc98b828d633f9;
-        proof[10] = 0x94badf85663bd5b31bf89ea9ffef3a83a4e35665fbc837ee2d03447a53e729ff;
-        uint256 index = 131;
+        proof[0] = 0x58e3e27ef80ea9af7cbf6c68414a1a30c4936442fbb78d954763a385b2cf34b4;
+        proof[1] = 0x9c60aac47f15333f997af21ef95f91fc170b2cf74550d5537bc0f8b7b268859f;
+        proof[2] = 0xfd072d502d65a9621a9cc67bba66d0ebeb8072c38e076cd321201ebc5d0fcf44;
+        proof[3] = 0xc7ed53c752b40989e0b28b9a466b7e4d247a3c8c08aa06ff09faddcc89fc1f5c;
+        proof[4] = 0xbca34a332518e157bf2bc61d07b9f79a5718306ef9770c9e31d9671c64e0e796;
+        proof[5] = 0xb9af329f68773536fea223d8b0733bdce478b19eef448f2c9e777ad0e93c556e;
+        proof[6] = 0x745e6898ccd4b8bed3bfe0972d2054ce711696250c6007a4958559dec729ff3e;
+        proof[7] = 0xbce49ee30b6ac4361edee0fb70d13d73b4d368080d957747b9e3d76a6ba23915;
+        proof[8] = 0x68a804445edf53b793135300e80f45b0160fa4f9dcf1ca6bcf7313ec6b3e4cdd;
+        proof[9] = 0x75a385f7ecc1a6c9571b60428cb2f91c0eaf2f88d6396a071cc50dca096d8cb1;
+        proof[10] = 0xce78d0c5bcc327d656cab0e8bca278b21d6f3f4438cd57d36b31640efb834e15;
+        uint256 index = 132;
 
         // Prepare LayerZero options
         bytes memory optionType = abi.encodePacked(uint16(3));
