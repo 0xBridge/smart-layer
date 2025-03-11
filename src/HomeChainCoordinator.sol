@@ -35,6 +35,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
     address internal _taskManager;
     mapping(bytes32 => PSBTData) internal _btcTxnHash_psbtData;
+    // TODO: Check with Rahul if these two are explicity needed
     mapping(string => string) internal _taprootAddress_networkKey;
     mapping(string => address[]) internal _networkKey_operators;
 
@@ -43,7 +44,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
     // Events
     event MessageSent(uint32 indexed dstEid, bytes32 indexed psbtHash, address indexed operator, uint256 timestamp);
-    event OperatorStatusChanged(address indexed operator, bool status);
+    event MessageCreated();
     event MessageReceived(
         bytes32 indexed guid,
         uint32 srcEid,
@@ -100,22 +101,29 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
     /**
      * @notice Submits a block and sends a message with PSBT data
+     * @param _isMint Whether the transaction is a mint or burn
      * @param rawHeader The raw block header
      * @param intermediateHeaders The intermediate headers for the block
      * @param _btcTxnHash The BTC transaction hash
      * @param _proof The proof for the transaction
      * @param _index The index of the transaction in the block
      * @param _psbtData The PSBT data to be processed
+     * @param _taprootAddress The taproot address where the funds are locked or unlocked from
+     * @param _networkKey The network public key for the AVS
      * @param _options LayerZero message options
      * @dev Only callable by the contract owner, payable to cover cross-chain message fees
      */
     function submitBlockAndSendMessage(
+        bool _isMint,
         bytes calldata rawHeader,
         bytes[] calldata intermediateHeaders,
         bytes32 _btcTxnHash,
         bytes32[] calldata _proof,
         uint256 _index,
         bytes calldata _psbtData,
+        string calldata _taprootAddress,
+        string calldata _networkKey,
+        address[] calldata _operators,
         bytes calldata _options
     ) external payable whenNotPaused nonReentrant onlyOwner {
         // 0. Submit block header along with intermediate headers to light client
@@ -123,73 +131,135 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         // 1. Get merkle root to validate txn
         bytes32 merkleRoot = _lightClient.getMerkleRootForBlock(blockHash);
         // 2. Send message
-        _sendMessage(merkleRoot, _btcTxnHash, _proof, _index, _psbtData, _options);
+        _handleMessageSending(
+            _isMint,
+            merkleRoot,
+            _btcTxnHash,
+            _proof,
+            _index,
+            _psbtData,
+            _taprootAddress,
+            _networkKey,
+            _operators,
+            _options
+        );
     }
 
     /**
-     * @notice Sends a cross-chain message with PSBT data
+     * @notice Stores a cross-chain message for a given BTC transaction hash
+     * @param _isMint Whether the transaction is a mint or burn
      * @param _blockHash The block hash to validate the transaction
      * @param _btcTxnHash The BTC transaction hash
      * @param _proof The proof for the transaction
      * @param _index The index of the transaction in the block
-     * @param _psbtData The PSBT data to be processed
+     * @param _rawTxn The PSBT data to be processed
+     * @param _taprootAddress The taproot address where the funds are locked or unlocked from
+     * @param _networkKey The network public key for the AVS
+     * @param _operators Array of operators with whom AVS network key is created
      * @param _options LayerZero message options
      * @dev Only callable by the contract owner, payable to cover cross-chain message fees
      */
-    function sendMessage(
+    function storeMessage(
+        bool _isMint,
         bytes32 _blockHash,
         bytes32 _btcTxnHash,
         bytes32[] calldata _proof,
         uint256 _index,
-        bytes calldata _psbtData,
+        bytes calldata _rawTxn,
+        string calldata _taprootAddress,
+        string calldata _networkKey,
+        address[] calldata _operators,
         bytes calldata _options
     ) external payable whenNotPaused nonReentrant onlyOwner {
         bytes32 merkleRoot = _lightClient.getMerkleRootForBlock(_blockHash);
-        _sendMessage(merkleRoot, _btcTxnHash, _proof, _index, _psbtData, _options);
+        // 0. Parse and validate PSBT data
+        BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_rawTxn);
+        // 1. Validate input in a separate function call
+        _validateInput(merkleRoot, _btcTxnHash, _proof, _index, _rawTxn, metadata.chainId);
+        // 2. Store PSBT data for mint/burn transaction validation
+        PSBTData memory psbtData = PSBTData({
+            txnType: _isMint,
+            status: false,
+            chainId: metadata.chainId,
+            user: metadata.receiverAddress,
+            rawTxn: _rawTxn,
+            taprootAddress: _taprootAddress,
+            networkKey: _networkKey,
+            operators: _operators,
+            lockedAmount: metadata.lockedAmount,
+            nativeTokenAmount: metadata.nativeTokenAmount
+        });
+        _btcTxnHash_psbtData[_btcTxnHash] = psbtData;
+        // TODO: Emit event for message creation
+        // emit MessageCreated(
+        //     _isMint,
+        //     metadata.chainId,
+        //     metadata.receiverAddress,
+        //     _taprootAddress,
+        //     _networkKey,
+        //     _operators,
+        //     metadata.lockedAmount,
+        //     metadata.nativeTokenAmount
+        // );
     }
 
     // TODO: The message will come from the endpoint but for now we're considering it to be the owner
     // TODO: Check if the message is coming from the task manager
 
     /**
-     * @notice Internal function to send a cross-chain message with PSBT data
-     * @param _merkleRoot The merkle root for the block
+     * @notice Function to send a cross-chain message of the given BTC transaction hash
      * @param _btcTxnHash The BTC transaction hash
-     * @param _proof The proof for the transaction
-     * @param _index The index of the transaction in the block
-     * @param _psbtData The PSBT data to be processed
      * @param _options LayerZero message options
      * @dev Validates the PSBT data and sends the message through LayerZero
      */
-    function _sendMessage(
-        bytes32 _merkleRoot,
-        bytes32 _btcTxnHash,
-        bytes32[] calldata _proof,
-        uint256 _index,
-        bytes calldata _psbtData,
-        bytes calldata _options
-    ) internal {
-        // 0. Parse and validate PSBT data
-        BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_psbtData);
-        // 1. Validate input in a separate function call
-        _validateInput(_merkleRoot, _btcTxnHash, _proof, _index, _psbtData, metadata.chainId);
-        // 2. Handle message sending in a separate function
-        _handleMessageSending(metadata.chainId, _btcTxnHash, metadata, _psbtData, _options);
+    function sendMessage(bytes32 _btcTxnHash, bytes calldata _options)
+        external
+        payable
+        whenNotPaused
+        nonReentrant
+        onlyOwner
+    {
+        // 0. Parse transaction outputs and metadata
+        uint32 chainId = getChainId(_btcTxnHash);
+        // 1. Get the metadata as well as other fields required for the message
+        PSBTData memory psbtData = getPSBTDataForTxnHash(_btcTxnHash);
+        // 2. Get the metadata
+        BitcoinTxnParser.TransactionMetadata memory metadata;
+        // 3. Handle message sending in a separate function
+        _handleMessageSending(
+            psbtData.txnType,
+            chainId,
+            _btcTxnHash,
+            metadata,
+            psbtData.rawTxn,
+            psbtData.taprootAddress,
+            psbtData.networkKey,
+            psbtData.operators,
+            _options
+        );
     }
 
     /**
      * @notice Handles the actual message sending logic
+     * @param _isMint Whether the transaction is a mint or burn
      * @param _dstEid The destination chain ID
      * @param _btcTxnHash The Bitcoin transaction hash
      * @param _metadata The transaction metadata
-     * @param _psbtData The PSBT data
+     * @param _rawTxn The raw transaction bytes
+     * @param _taprootAddress The taproot address where the funds are locked or unlocked from
+     * @param _networkKey The network public key for the AVS
+     * @param _operators // Array of operators with whom AVS network key is created
      * @param _options The LayerZero options
      */
     function _handleMessageSending(
+        bool _isMint,
         uint32 _dstEid,
         bytes32 _btcTxnHash,
         BitcoinTxnParser.TransactionMetadata memory _metadata,
-        bytes calldata _psbtData,
+        bytes memory _rawTxn,
+        string memory _taprootAddress,
+        string memory _networkKey,
+        address[] memory _operators,
         bytes calldata _options
     ) internal {
         bytes memory payload =
@@ -198,9 +268,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         if (_dstEid == _chainEid) {
             _handleSameChainMessage(_dstEid, _btcTxnHash, payload, _options);
         } else {
-            _handleCrossChainMessage(_dstEid, _btcTxnHash, _metadata, _psbtData, payload, _options);
+            _handleCrossChainMessage(
+                _isMint, _dstEid, _btcTxnHash, _metadata, _rawTxn, _taprootAddress, _networkKey, _operators, _options
+            );
         }
-
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
     }
 
@@ -224,25 +295,20 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @notice Handles cross-chain message sending
      */
     function _handleCrossChainMessage(
+        bool _isMint,
         uint32 _dstEid,
         bytes32 _btcTxnHash,
         BitcoinTxnParser.TransactionMetadata memory _metadata,
-        bytes calldata _psbtData,
-        bytes memory _payload,
+        bytes memory _rawTxn,
+        string memory _taprootAddress,
+        string memory _networkKey,
+        address[] memory _operators,
         bytes calldata _options
     ) internal {
-        PSBTData memory psbtData = PSBTData({
-            status: true,
-            chainId: _metadata.chainId,
-            user: _metadata.receiverAddress,
-            lockedAmount: _metadata.lockedAmount,
-            nativeTokenAmount: _metadata.nativeTokenAmount,
-            networkPublicKey: bytes32(0), // TODO: This needs to come from the metadata itself
-            psbtData: _psbtData
-        });
+        PSBTData memory psbtData = getPSBTDataForTxnHash(_btcTxnHash);
+        psbtData.status = true;
         _btcTxnHash_psbtData[_btcTxnHash] = psbtData;
-
-        _lzSend(_dstEid, _payload, _options, MessagingFee(msg.value, 0), address(this));
+        _lzSend(_dstEid, _rawTxn, _options, MessagingFee(msg.value, 0), address(this));
     }
 
     /**
@@ -385,7 +451,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param _btcTxnHash The BTC transaction hash
      * @return The PSBT metadata associated with the transaction hash
      */
-    function getPSBTData(bytes32 _btcTxnHash) external view returns (PSBTData memory) {
+    function getPSBTDataForTxnHash(bytes32 _btcTxnHash) public view returns (PSBTData memory) {
         return _btcTxnHash_psbtData[_btcTxnHash];
     }
 
@@ -424,7 +490,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         //     user: metadata.receiverAddress,
         //     lockedAmount: metadata.lockedAmount,
         //     nativeTokenAmount: metadata.nativeTokenAmount,
-        //     networkPublicKey: metadata.networkPublicKey, // Network key for burn validation
+        //     networkKey: metadata.networkKey, // Network key for burn validation
         //     psbtData: _message
         // });
 
@@ -445,13 +511,12 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     }
 
     // TODO: Add single function to set whatever is required by the createNewTask function
-    // TODO: Add function to get the taproot address from btc txn hash
     // TODO: Add natspec comments for all the new functions
-    function setNetworkKey(string calldata _taprootAddress, string calldata _networkKey) external onlyOwner {
+    function setNetworkKey(string memory _taprootAddress, string calldata _networkKey) external onlyOwner {
         _taprootAddress_networkKey[_taprootAddress] = _networkKey;
     }
 
-    function getNetworkKey(string calldata _taprootAddress) external view returns (string memory) {
+    function getNetworkKey(string memory _taprootAddress) external view returns (string memory) {
         return _taprootAddress_networkKey[_taprootAddress];
     }
 
@@ -462,6 +527,14 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
     function getOperators(string calldata _networkKey) external view returns (address[] memory) {
         return _networkKey_operators[_networkKey];
+    }
+
+    function getTaprootAddress(bytes32 _btcTxnHash) external view returns (string memory) {
+        return _btcTxnHash_psbtData[_btcTxnHash].taprootAddress;
+    }
+
+    function getChainId(bytes32 _btcTxnHash) public view returns (uint32) {
+        return _btcTxnHash_psbtData[_btcTxnHash].chainId;
     }
 
     /**
