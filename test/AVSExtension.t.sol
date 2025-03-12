@@ -163,16 +163,7 @@ contract AVSExtensionTest is Test {
 
         vm.prank(PERFORMER);
         avsExtension.createNewTask(
-            true,
-            destNetworkConfig.chainEid,
-            BLOCK_HASH,
-            BTC_TXN_HASH,
-            proof,
-            INDEX,
-            RAW_TXN,
-            TAPROOT_ADDRESS,
-            NETWORK_KEY,
-            OPERATORS
+            true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
         );
 
         assertEq(avsExtension.getTaskHashesLength(), initialTaskHashLength + 1);
@@ -182,16 +173,7 @@ contract AVSExtensionTest is Test {
         vm.prank(USER);
         vm.expectRevert(AVSExtension.CallerNotTaskGenerator.selector);
         avsExtension.createNewTask(
-            true,
-            destNetworkConfig.chainEid,
-            BLOCK_HASH,
-            BTC_TXN_HASH,
-            proof,
-            INDEX,
-            RAW_TXN,
-            TAPROOT_ADDRESS,
-            NETWORK_KEY,
-            OPERATORS
+            true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
         );
     }
 
@@ -214,16 +196,7 @@ contract AVSExtensionTest is Test {
         // Create task
         vm.prank(PERFORMER);
         avsExtension.createNewTask(
-            true,
-            destNetworkConfig.chainEid,
-            BLOCK_HASH,
-            BTC_TXN_HASH,
-            proof,
-            INDEX,
-            RAW_TXN,
-            TAPROOT_ADDRESS,
-            NETWORK_KEY,
-            OPERATORS
+            true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
         );
 
         // Verify task is valid but not completed

@@ -22,6 +22,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     // Errors
     error TxnAlreadyProcessed(bytes32 btcTxnHash);
     error InvalidPSBTData();
+    error InvalidBlockHash();
     error InvalidAmount(uint256 amount);
     error InvalidDestination();
     error InvalidReceiver(address receiver);
@@ -30,17 +31,17 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     error InvalidPeer();
     error WithdrawalFailed();
 
-    // Added struct to reduce stack depth
-    struct BlockSubmissionParams {
-        bytes rawHeader;
-        bytes[] intermediateHeaders;
-        bytes32 btcTxnHash;
-        bytes32[] proof;
-        uint256 index;
-        bytes rawTxn;
-        string taprootAddress;
-        string networkKey;
-        address[] operators;
+    // TODO: Take the below struct to a common storage contract
+    struct StoreMessageParams {
+        bool isMint; // Whether the transaction is a mint or burn
+        bytes32 blockHash; // The block hash for the transaction
+        bytes32 btcTxnHash; // The BTC transaction hash
+        bytes32[] proof; // The proof for the transaction
+        uint256 index; // The index of the transaction in the block
+        bytes rawTxn; // Raw hex PSBT data for the mint or burn transaction
+        string taprootAddress; // The taproot address for the transaction
+        string networkKey; // The network key for the AVS
+        address[] operators; // The operators for the AVS
     }
 
     // State variables
@@ -109,121 +110,68 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
     /**
      * @notice Submits a block and sends a message with PSBT data
-     * @param _isMint Whether the transaction is a mint or burn
-     * @param params Struct containing all the parameters to avoid stack too deep error
+     * @param _rawHeader The raw block header
+     * @param _intermediateHeaders The intermediate headers
+     * @param _params The parameters for storing the message
      * @dev Only callable by the contract owner
      */
-    function submitBlockAndStoreMessage(bool _isMint, BlockSubmissionParams calldata params)
-        external
-        whenNotPaused
-        nonReentrant
-        onlyOwner
-    {
-        // 0. Submit block header along with intermediate headers to light client
-        bytes32 blockHash = _lightClient.submitRawBlockHeader(params.rawHeader, params.intermediateHeaders);
-        // 1. Get _srcOrDstEid from the PSBT data
-        uint32 _srcOrDstEid = _btcTxnHash_psbtData[params.btcTxnHash].chainId;
-        // 2. Store message with the given BTC transaction hash
-        _storeMessage(
-            _isMint,
-            _srcOrDstEid,
-            blockHash,
-            params.btcTxnHash,
-            params.proof,
-            params.index,
-            params.rawTxn,
-            params.taprootAddress,
-            params.networkKey,
-            params.operators
-        );
+    function submitBlockAndStoreMessage(
+        bytes calldata _rawHeader,
+        bytes[] calldata _intermediateHeaders,
+        StoreMessageParams calldata _params
+    ) external whenNotPaused nonReentrant onlyOwner {
+        // 1. Submit block header along with intermediate headers to light client
+        bytes32 blockHash = _lightClient.submitRawBlockHeader(_rawHeader, _intermediateHeaders);
+        // 2. Validate if the block hash is valid
+        if (blockHash != _params.blockHash) revert InvalidPSBTData();
+        // 3. Store message with the given BTC transaction hash
+        _storeMessage(_params);
     }
 
     /**
-     * @notice Stores a cross-chain message for a given BTC transaction hash
-     * @param _isMint Whether the transaction is a mint or burn
-     * @param _srcOrDstEid The source or destination chainEid from or to which the message is relayed
-     * @param _blockHash The block hash to validate the transaction
-     * @param _btcTxnHash The BTC transaction hash
-     * @param _proof The proof for the transaction
-     * @param _index The index of the transaction in the block
-     * @param _rawTxn The PSBT data to be processed
-     * @param _taprootAddress The taproot address where the funds are locked or unlocked from
-     * @param _networkKey The network public key for the AVS
-     * @param _operators Array of operators with whom AVS network key is created
+     * @notice Stores a message with the given parameters
+     * @param params The parameters for storing the message
      * @dev Only callable by the contract owner
      */
-    function storeMessage(
-        bool _isMint,
-        uint32 _srcOrDstEid,
-        bytes32 _blockHash,
-        bytes32 _btcTxnHash,
-        bytes32[] calldata _proof,
-        uint256 _index,
-        bytes calldata _rawTxn,
-        string calldata _taprootAddress,
-        string calldata _networkKey,
-        address[] calldata _operators
-    ) external whenNotPaused nonReentrant onlyOwner {
-        _storeMessage(
-            _isMint,
-            _srcOrDstEid,
-            _blockHash,
-            _btcTxnHash,
-            _proof,
-            _index,
-            _rawTxn,
-            _taprootAddress,
-            _networkKey,
-            _operators
-        );
+    function storeMessage(StoreMessageParams calldata params) external whenNotPaused nonReentrant onlyOwner {
+        _storeMessage(params);
     }
 
-    function _storeMessage(
-        bool _isMint,
-        uint32 _srcOrDstEid,
-        bytes32 _blockHash,
-        bytes32 _btcTxnHash,
-        bytes32[] calldata _proof,
-        uint256 _index,
-        bytes calldata _rawTxn,
-        string calldata _taprootAddress,
-        string calldata _networkKey,
-        address[] calldata _operators
-    ) internal {
-        bytes32 merkleRoot = _lightClient.getMerkleRootForBlock(_blockHash);
+    function _storeMessage(StoreMessageParams memory params) internal {
+        bytes32 merkleRoot = _lightClient.getMerkleRootForBlock(params.blockHash);
 
         PSBTData memory psbtData;
-        if (_isMint) {
-            // 0. Parse PSBT data
-            BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_rawTxn);
+        if (params.isMint) {
+            // 0. Parse PSBT data to get the metadata for the eBTC mint transaction
+            BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(params.rawTxn);
             // 1. Validate input in a separate function call
-            _validateInput(merkleRoot, _btcTxnHash, _proof, _index, _rawTxn, metadata.chainId);
+            _validateInput(merkleRoot, params.btcTxnHash, params.proof, params.index, params.rawTxn, metadata.chainId);
             // 2. Store PSBT data for mint transaction
             psbtData = PSBTData({
-                txnType: _isMint,
+                txnType: params.isMint,
                 status: false,
                 chainId: metadata.chainId,
                 user: metadata.receiverAddress,
-                rawTxn: _rawTxn,
-                taprootAddress: _taprootAddress,
-                networkKey: _networkKey,
-                operators: _operators,
+                rawTxn: params.rawTxn,
+                taprootAddress: params.taprootAddress,
+                networkKey: params.networkKey,
+                operators: params.operators,
                 lockedAmount: metadata.lockedAmount,
                 nativeTokenAmount: metadata.nativeTokenAmount
             });
-            _taprootAddress_btcTxnHash[_taprootAddress] = _btcTxnHash;
+            _taprootAddress_btcTxnHash[params.taprootAddress] = params.btcTxnHash;
         } else {
-            // 0. Validate input in a separate function call
-            _validateInput(merkleRoot, _btcTxnHash, _proof, _index, _rawTxn, _srcOrDstEid);
-            // 1. Get existing PSBT data for burn transaction
-            psbtData = _btcTxnHash_psbtData[_btcTxnHash];
+            // 0. Get existing PSBT data for burn transaction
+            psbtData = _btcTxnHash_psbtData[params.btcTxnHash];
+            // 1. Validate input in a separate function call
+            _validateInput(merkleRoot, params.btcTxnHash, params.proof, params.index, params.rawTxn, psbtData.chainId);
             // 2. Update the PSBT data with the required burn transaction details
-            psbtData.taprootAddress = _taprootAddress;
-            psbtData.networkKey = _networkKey;
-            psbtData.operators = _operators;
+            psbtData.taprootAddress = params.taprootAddress;
+            psbtData.networkKey = params.networkKey;
+            psbtData.operators = params.operators;
         }
-        _btcTxnHash_psbtData[_btcTxnHash] = psbtData;
-        emit MessageCreated(_isMint, _blockHash, _btcTxnHash);
+        _btcTxnHash_psbtData[params.btcTxnHash] = psbtData;
+        emit MessageCreated(params.isMint, params.blockHash, params.btcTxnHash);
     }
 
     // TODO: The message will come from the endpoint but for now we're considering it to be the owner
@@ -306,9 +254,9 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     function _validateInput(
         bytes32 _merkleRoot,
         bytes32 _btcTxnHash,
-        bytes32[] calldata _proof,
+        bytes32[] memory _proof,
         uint256 _index,
-        bytes calldata _rawTxn,
+        bytes memory _rawTxn,
         uint32 _dstEid
     ) internal view {
         // 1. btcTxnHash generated from the psbt data being shared should be the same as the one passed
@@ -506,12 +454,29 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @return operators The operators for the AVS
      */
     function getAVSDataForTxnHash(bytes32 _btcTxnHash)
-        external
+        public
         view
         returns (bool, string memory, string memory, address[] memory)
     {
         PSBTData memory psbtData = _btcTxnHash_psbtData[_btcTxnHash];
         return (psbtData.txnType, psbtData.taprootAddress, psbtData.networkKey, psbtData.operators);
+    }
+
+    /**
+     * @notice Retrieves the AVS data for a given taproot address
+     * @param _taprootAddress The taproot address
+     * @return txnType The type of transaction (mint or burn)
+     * @return taprootAddress The taproot address for the transaction
+     * @return networkKey The network key for the AVS
+     * @return operators The operators for the AVS
+     */
+    function getAVSDataForTaprootAddress(string memory _taprootAddress)
+        external
+        view
+        returns (bool, string memory, string memory, address[] memory)
+    {
+        bytes32 btcTxnHash = _taprootAddress_btcTxnHash[_taprootAddress];
+        return getAVSDataForTxnHash(btcTxnHash);
     }
 
     /**

@@ -188,9 +188,8 @@ contract HomeChainCoordinatorTest is Test {
 
         vm.recordLogs();
         vm.startPrank(owner);
-        homeChainCoordinator.storeMessage(
-            true, // isMint,
-            destNetworkConfig.chainEid,
+        HomeChainCoordinator.StoreMessageParams memory params = HomeChainCoordinator.StoreMessageParams(
+            true, // isMint
             blockHash,
             btcTxnHash,
             proof,
@@ -200,6 +199,7 @@ contract HomeChainCoordinatorTest is Test {
             NETWORK_KEY,
             OPERATORS
         );
+        homeChainCoordinator.storeMessage(params);
         homeChainCoordinator.sendMessage{value: nativeFee}(btcTxnHash);
         vm.stopPrank();
 
