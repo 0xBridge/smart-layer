@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import {console} from "forge-std/console.sol";
 import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -48,6 +49,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
     address internal _taskManager;
     mapping(bytes32 => PSBTData) internal _btcTxnHash_psbtData;
+    mapping(string => bytes32) internal _taprootAddress_btcTxnHash;
 
     uint256 public maxGasTokenAmount = 1 ether; // Max amount that can be put as the native token amount
     uint256 public minBTCAmount = 1000; // Min BTC amount / satoshis that needs to be locked
@@ -58,13 +60,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     event MessageSent(uint32 indexed dstEid, bytes32 indexed psbtHash, address indexed operator, uint256 timestamp);
     event MessageCreated(bool indexed isMint, bytes32 indexed blockHash, bytes32 indexed btcTxnHash);
     event MessageReceived(
-        bytes32 indexed guid,
-        uint32 srcEid,
-        bytes32 sender,
-        bytes32 indexed btcTxnHash,
-        address indexed receiver,
-        uint256 amount,
-        uint256 timestamp
+        bytes32 indexed guid, uint32 srcEid, bytes32 sender, bytes32 indexed btcTxnHash, bool txnType, uint256 amount
     );
 
     /**
@@ -198,6 +194,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             nativeTokenAmount: metadata.nativeTokenAmount
         });
         _btcTxnHash_psbtData[_btcTxnHash] = psbtData;
+        _taprootAddress_btcTxnHash[_taprootAddress] = _btcTxnHash;
         emit MessageCreated(_isMint, _blockHash, _btcTxnHash);
     }
 
@@ -218,15 +215,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes memory opReturnData = BitcoinTxnParser.decodeBitcoinTxn(psbtData.rawTxn);
         BitcoinTxnParser.TransactionMetadata memory metadata = BitcoinTxnParser.decodeMetadata(opReturnData);
         // 3. Handle message sending in a separate function
-        _handleMessageSending(
-            psbtData.txnType,
-            chainId,
-            _btcTxnHash,
-            metadata,
-            psbtData.taprootAddress,
-            psbtData.networkKey,
-            psbtData.operators
-        );
+        _handleMessageSending(psbtData.txnType, chainId, _btcTxnHash, metadata);
     }
 
     /**
@@ -235,18 +224,12 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param _dstEid The destination chain ID
      * @param _btcTxnHash The Bitcoin transaction hash
      * @param _metadata The transaction metadata
-     * @param _taprootAddress The taproot address where the funds are locked or unlocked from
-     * @param _networkKey The network public key for the AVS
-     * @param _operators // Array of operators with whom AVS network key is created
      */
     function _handleMessageSending(
         bool _isMint,
         uint32 _dstEid,
         bytes32 _btcTxnHash,
-        BitcoinTxnParser.TransactionMetadata memory _metadata,
-        string memory _taprootAddress,
-        string memory _networkKey,
-        address[] memory _operators
+        BitcoinTxnParser.TransactionMetadata memory _metadata
     ) internal {
         bytes memory payload =
             abi.encode(_metadata.receiverAddress, _btcTxnHash, _metadata.lockedAmount, _metadata.nativeTokenAmount);
@@ -254,9 +237,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         if (_dstEid == _chainEid) {
             _handleSameChainMessage(_dstEid, _btcTxnHash, payload);
         } else {
-            _handleCrossChainMessage(
-                _isMint, _dstEid, _btcTxnHash, _metadata, payload, _taprootAddress, _networkKey, _operators
-            );
+            _handleCrossChainMessage(_dstEid, _btcTxnHash, payload);
         }
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
     }
@@ -275,16 +256,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     /**
      * @notice Handles cross-chain message sending
      */
-    function _handleCrossChainMessage(
-        bool _isMint,
-        uint32 _dstEid,
-        bytes32 _btcTxnHash,
-        BitcoinTxnParser.TransactionMetadata memory _metadata,
-        bytes memory _payload,
-        string memory _taprootAddress,
-        string memory _networkKey,
-        address[] memory _operators
-    ) internal {
+    function _handleCrossChainMessage(uint32 _dstEid, bytes32 _btcTxnHash, bytes memory _payload) internal {
         PSBTData memory psbtData = getPSBTDataForTxnHash(_btcTxnHash);
         psbtData.status = true;
         _btcTxnHash_psbtData[_btcTxnHash] = psbtData; // Update the status of the transaction
@@ -320,7 +292,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             revert TxnAlreadyProcessed(_btcTxnHash);
         }
 
-        // 3. Validate txn with SPV data (TODO: Uncomment this when the backend service to publish SPV blocks is ready by Rahul)
+        // 3. Validate txn with SPV data
         if (!BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index)) revert BitcoinTxnNotFound();
 
         // 4. Validate receiver is set for destination chain
@@ -437,7 +409,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @notice Internal function to receive messages from LayerZero
      * @param _origin The origin of the message
      * @param _guid The unique identifier for the message
-     * @param _message The message data
+     * @param _message Raw hex PSBT data for the burn transaction
      * @param _executor The address executing the message
      * @param _extraData Additional data for processing the message
      * @dev Empty implementation as this contract doesn't receive LayerZero messages
@@ -460,32 +432,39 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         }
 
         // 3. Parse psbt and get eBTC burn amount, taproot address, network key, and receiver BTC address
+        BitcoinTxnParser.UnlockTxnData[] memory unlockTxnData = BitcoinTxnParser.extractUnlockOutputs(_message, true); // True is for testnet
+        uint256 unlockTxnDataLength = unlockTxnData.length;
+        if (unlockTxnData.length == 0) {
+            revert InvalidPSBTData();
+        }
 
         // 4. Store PSBT data for burn transaction validation
-        // PSBTData memory psbtData = PSBTData({
-        //     status: false, // This is a burn transaction
-        //     chainId: metadata.chainId,
-        //     user: metadata.receiverAddress,
-        //     lockedAmount: metadata.lockedAmount,
-        //     nativeTokenAmount: metadata.nativeTokenAmount,
-        //     networkKey: metadata.networkKey, // Network key for burn validation
-        //     psbtData: _message
-        // });
+        PSBTData memory psbtData = PSBTData({
+            txnType: false, // This is a burn transaction
+            status: false, // Transaction is not yet processed
+            chainId: _origin.srcEid, // Chain ID of the src chain
+            user: address(0), // TODO: Check if it's possible to get the msg.sender on the baseChainCoordinator
+            rawTxn: _message, // Raw hex PSBT data for the burn transaction
+            taprootAddress: "", // Taproot address for the mint or burn transaction
+            networkKey: "", // AVS Bitcoin address
+            operators: new address[](0), // Array of operators with whom AVS network key is created
+            lockedAmount: unlockTxnData[0].amount, // Amount locked or unlocked in the mint or burn transaction
+            nativeTokenAmount: unlockTxnDataLength > 1 ? unlockTxnData[1].amount : 0 // Amount of native token minted on the destination chain
+        });
 
         // 5. Calculate and store the Bitcoin transaction hash
-        // bytes32 btcTxnHash = TxidCalculator.calculateTxid(_message);
-        // _btcTxnHash_psbtData[btcTxnHash] = psbtData;
+        bytes32 btcTxnHash = TxidCalculator.calculateTxid(_message);
+        _btcTxnHash_psbtData[btcTxnHash] = psbtData;
 
         // 6. Create task for AVS (can be implemented through a TaskManager contract) - This will be done by the task generator
-        // emit MessageReceived(
-        //     _guid,
-        //     _origin.srcEid,
-        //     _origin.sender,
-        //     btcTxnHash,
-        //     metadata.receiverAddress,
-        //     metadata.lockedAmount,
-        //     block.timestamp
-        // );
+        emit MessageReceived(
+            _guid,
+            _origin.srcEid,
+            _origin.sender,
+            btcTxnHash,
+            false, // This is a burn transaction
+            unlockTxnData[0].amount
+        );
     }
 
     /**

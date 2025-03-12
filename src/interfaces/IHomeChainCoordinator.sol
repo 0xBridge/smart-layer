@@ -11,8 +11,8 @@ struct PSBTData {
     string taprootAddress; // Taproot address for the mint or burn transaction
     string networkKey; // AVS Bitcoin address
     address[] operators; // Array of operators with whom AVS network key is created
-    uint256 lockedAmount; // Amount locked or unlocked in the mint or burn transaction
-    uint256 nativeTokenAmount; // Amount of native token minted on the destination chain
+    uint256 lockedAmount; // Amount locked or unlocked in the mint or burn transaction (TODO: Can be converted to uint64)
+    uint256 nativeTokenAmount; // Amount of native token minted on the destination chain (TODO: Can be made generic to check for the burn fees)
 }
 
 interface IHomeChainCoordinator {

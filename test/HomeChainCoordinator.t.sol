@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {Test, Vm} from "forge-std/Test.sol";
+import {Test, Vm, console} from "forge-std/Test.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {LayerZeroV2Helper} from "lib/pigeon/src/layerzero-v2/LayerZeroV2Helper.sol";
@@ -131,7 +131,7 @@ contract HomeChainCoordinatorTest is Test {
 
         // Fund the contract
         // vm.deal(address(this), 100 ether);
-        vm.deal(owner, 100 ether); // This is 100 native tokens on the source chain
+        vm.deal(owner, 10000 ether); // This is 10000 native tokens on the source chain (POL token has pretty less value when compared to ETH)
     }
 
     function testSetReceiver() public {
@@ -183,6 +183,9 @@ contract HomeChainCoordinatorTest is Test {
 
         bytes memory rawTxn =
             hex"0200000000010172a9903e9c75393c69cd155f4842796b3c52454dad15d83e627749de6c78a7780100000000ffffffff041027000000000000160014b7a229b0c1c10c214d1b19d1263b6797dae3e978e80300000000000016001471d044aeb7f41205a9ef0e3d785e7d38a776cfa10000000000000000326a30001471cf07d9c0d8e4bbb5019ccc60437c53fc51e6de00080000000000002710000400009ce100080000000000000000a82a000000000000160014d5a028b62114136a63ebcfacf94e18536b90a1210247304402206d80652d1cc1c6c4b2fe08ae3bdfa2c97121017b07826f7db0a232292c1d74020220579da941457f0d40b93443cf1a223693c59c352a188430f76682d89442918b6d0121036a43583212d54a5977f2cef457520c520ab9bf92299b2d74011ecd410bdb250600000000";
+
+        (uint256 nativeFee,) = homeChainCoordinator.quote(btcTxnHash, rawTxn, false);
+
         vm.recordLogs();
         vm.startPrank(owner);
         homeChainCoordinator.storeMessage(
@@ -196,7 +199,7 @@ contract HomeChainCoordinatorTest is Test {
             NETWORK_KEY,
             OPERATORS
         );
-        homeChainCoordinator.sendMessage{value: 75 ether}(btcTxnHash);
+        homeChainCoordinator.sendMessage{value: nativeFee}(btcTxnHash);
         vm.stopPrank();
 
         // Process the message on destination chain
