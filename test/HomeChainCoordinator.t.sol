@@ -190,6 +190,7 @@ contract HomeChainCoordinatorTest is Test {
         vm.startPrank(owner);
         homeChainCoordinator.storeMessage(
             true, // isMint,
+            destNetworkConfig.chainEid,
             blockHash,
             btcTxnHash,
             proof,

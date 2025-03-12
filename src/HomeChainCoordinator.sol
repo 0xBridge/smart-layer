@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {console} from "forge-std/console.sol";
-import {OApp, Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
+import {OApp, Origin, MessagingFee, MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
@@ -57,7 +57,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     bytes internal constant _options = hex"0003010011010000000000000000000000000000c350"; // TODO: Get rid of this
 
     // Events
-    event MessageSent(uint32 indexed dstEid, bytes32 indexed psbtHash, address indexed operator, uint256 timestamp);
+    event MessageSent(uint32 indexed dstEid, bytes32 indexed btcTxnHash, address indexed operator, uint256 timestamp);
     event MessageCreated(bool indexed isMint, bytes32 indexed blockHash, bytes32 indexed btcTxnHash);
     event MessageReceived(
         bytes32 indexed guid, uint32 srcEid, bytes32 sender, bytes32 indexed btcTxnHash, bool txnType, uint256 amount
@@ -121,9 +121,12 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     {
         // 0. Submit block header along with intermediate headers to light client
         bytes32 blockHash = _lightClient.submitRawBlockHeader(params.rawHeader, params.intermediateHeaders);
+        // 1. Get _srcOrDstEid from the PSBT data
+        uint32 _srcOrDstEid = _btcTxnHash_psbtData[params.btcTxnHash].chainId;
         // 2. Store message with the given BTC transaction hash
         _storeMessage(
             _isMint,
+            _srcOrDstEid,
             blockHash,
             params.btcTxnHash,
             params.proof,
@@ -138,6 +141,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     /**
      * @notice Stores a cross-chain message for a given BTC transaction hash
      * @param _isMint Whether the transaction is a mint or burn
+     * @param _srcOrDstEid The source or destination chainEid from or to which the message is relayed
      * @param _blockHash The block hash to validate the transaction
      * @param _btcTxnHash The BTC transaction hash
      * @param _proof The proof for the transaction
@@ -150,6 +154,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      */
     function storeMessage(
         bool _isMint,
+        uint32 _srcOrDstEid,
         bytes32 _blockHash,
         bytes32 _btcTxnHash,
         bytes32[] calldata _proof,
@@ -160,12 +165,22 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         address[] calldata _operators
     ) external whenNotPaused nonReentrant onlyOwner {
         _storeMessage(
-            _isMint, _blockHash, _btcTxnHash, _proof, _index, _rawTxn, _taprootAddress, _networkKey, _operators
+            _isMint,
+            _srcOrDstEid,
+            _blockHash,
+            _btcTxnHash,
+            _proof,
+            _index,
+            _rawTxn,
+            _taprootAddress,
+            _networkKey,
+            _operators
         );
     }
 
     function _storeMessage(
         bool _isMint,
+        uint32 _srcOrDstEid,
         bytes32 _blockHash,
         bytes32 _btcTxnHash,
         bytes32[] calldata _proof,
@@ -176,25 +191,38 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         address[] calldata _operators
     ) internal {
         bytes32 merkleRoot = _lightClient.getMerkleRootForBlock(_blockHash);
-        // 0. Parse and validate PSBT data
-        BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_rawTxn);
-        // 1. Validate input in a separate function call
-        _validateInput(merkleRoot, _btcTxnHash, _proof, _index, _rawTxn, metadata.chainId);
-        // 2. Store PSBT data for mint/burn transaction validation
-        PSBTData memory psbtData = PSBTData({
-            txnType: _isMint,
-            status: false,
-            chainId: metadata.chainId,
-            user: metadata.receiverAddress,
-            rawTxn: _rawTxn,
-            taprootAddress: _taprootAddress,
-            networkKey: _networkKey,
-            operators: _operators,
-            lockedAmount: metadata.lockedAmount,
-            nativeTokenAmount: metadata.nativeTokenAmount
-        });
+
+        PSBTData memory psbtData;
+        if (_isMint) {
+            // 0. Parse PSBT data
+            BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(_rawTxn);
+            // 1. Validate input in a separate function call
+            _validateInput(merkleRoot, _btcTxnHash, _proof, _index, _rawTxn, metadata.chainId);
+            // 2. Store PSBT data for mint transaction
+            psbtData = PSBTData({
+                txnType: _isMint,
+                status: false,
+                chainId: metadata.chainId,
+                user: metadata.receiverAddress,
+                rawTxn: _rawTxn,
+                taprootAddress: _taprootAddress,
+                networkKey: _networkKey,
+                operators: _operators,
+                lockedAmount: metadata.lockedAmount,
+                nativeTokenAmount: metadata.nativeTokenAmount
+            });
+            _taprootAddress_btcTxnHash[_taprootAddress] = _btcTxnHash;
+        } else {
+            // 0. Validate input in a separate function call
+            _validateInput(merkleRoot, _btcTxnHash, _proof, _index, _rawTxn, _srcOrDstEid);
+            // 1. Get existing PSBT data for burn transaction
+            psbtData = _btcTxnHash_psbtData[_btcTxnHash];
+            // 2. Update the PSBT data with the required burn transaction details
+            psbtData.taprootAddress = _taprootAddress;
+            psbtData.networkKey = _networkKey;
+            psbtData.operators = _operators;
+        }
         _btcTxnHash_psbtData[_btcTxnHash] = psbtData;
-        _taprootAddress_btcTxnHash[_taprootAddress] = _btcTxnHash;
         emit MessageCreated(_isMint, _blockHash, _btcTxnHash);
     }
 
@@ -215,18 +243,16 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes memory opReturnData = BitcoinTxnParser.decodeBitcoinTxn(psbtData.rawTxn);
         BitcoinTxnParser.TransactionMetadata memory metadata = BitcoinTxnParser.decodeMetadata(opReturnData);
         // 3. Handle message sending in a separate function
-        _handleMessageSending(psbtData.txnType, chainId, _btcTxnHash, metadata);
+        _handleMessageSending(chainId, _btcTxnHash, metadata);
     }
 
     /**
      * @notice Handles the actual message sending logic
-     * @param _isMint Whether the transaction is a mint or burn
      * @param _dstEid The destination chain ID
      * @param _btcTxnHash The Bitcoin transaction hash
      * @param _metadata The transaction metadata
      */
     function _handleMessageSending(
-        bool _isMint,
         uint32 _dstEid,
         bytes32 _btcTxnHash,
         BitcoinTxnParser.TransactionMetadata memory _metadata
@@ -234,6 +260,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes memory payload =
             abi.encode(_metadata.receiverAddress, _btcTxnHash, _metadata.lockedAmount, _metadata.nativeTokenAmount);
 
+        // MessagingReceipt memory messageReceipt;
         if (_dstEid == _chainEid) {
             _handleSameChainMessage(_dstEid, _btcTxnHash, payload);
         } else {
@@ -256,11 +283,14 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     /**
      * @notice Handles cross-chain message sending
      */
-    function _handleCrossChainMessage(uint32 _dstEid, bytes32 _btcTxnHash, bytes memory _payload) internal {
+    function _handleCrossChainMessage(uint32 _dstEid, bytes32 _btcTxnHash, bytes memory _payload)
+        internal
+        returns (MessagingReceipt memory)
+    {
         PSBTData memory psbtData = getPSBTDataForTxnHash(_btcTxnHash);
         psbtData.status = true;
         _btcTxnHash_psbtData[_btcTxnHash] = psbtData; // Update the status of the transaction
-        _lzSend(_dstEid, _payload, _options, MessagingFee(msg.value, 0), msg.sender);
+        return _lzSend(_dstEid, _payload, _options, MessagingFee(msg.value, 0), msg.sender);
     }
 
     /**
@@ -443,13 +473,13 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             txnType: false, // This is a burn transaction
             status: false, // Transaction is not yet processed
             chainId: _origin.srcEid, // Chain ID of the src chain
-            user: address(0), // TODO: Check if it's possible to get the msg.sender on the baseChainCoordinator
+            user: address(0), // TODO: Check if it's possible to get the msg.sender on the baseChainCoordinator (_executor)
             rawTxn: _message, // Raw hex PSBT data for the burn transaction
             taprootAddress: "", // Taproot address for the mint or burn transaction
             networkKey: "", // AVS Bitcoin address
             operators: new address[](0), // Array of operators with whom AVS network key is created
-            lockedAmount: unlockTxnData[0].amount, // Amount locked or unlocked in the mint or burn transaction
-            nativeTokenAmount: unlockTxnDataLength > 1 ? unlockTxnData[1].amount : 0 // Amount of native token minted on the destination chain
+            lockedAmount: unlockTxnData[0].amount, // Amount unlocked in the burn transaction
+            nativeTokenAmount: unlockTxnDataLength > 1 ? unlockTxnData[1].amount : 0 // unlockTxnData[1].amount could be saved as the burn fees
         });
 
         // 5. Calculate and store the Bitcoin transaction hash

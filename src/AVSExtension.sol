@@ -93,6 +93,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     /**
      * @notice Creates a new task for verification
      * @param _isMint Whether the task is a mint or burn
+     * @param _srcOrDstEid The source or destination chainEid from or to which the message is relayed
      * @param _blockHash The hash of the Bitcoin block
      * @param _btcTxnHash The hash of the Bitcoin transaction
      * @param _proof The merkle proof for transaction verification
@@ -105,6 +106,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      */
     function createNewTask(
         bool _isMint,
+        uint32 _srcOrDstEid,
         bytes32 _blockHash,
         bytes32 _btcTxnHash,
         bytes32[] calldata _proof,
@@ -115,7 +117,16 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         address[] calldata _operators
     ) external onlyTaskPerformer {
         _homeChainCoordinator.storeMessage(
-            _isMint, _blockHash, _btcTxnHash, _proof, _index, _rawTxn, _taprootAddress, _networkKey, _operators
+            _isMint,
+            _srcOrDstEid,
+            _blockHash,
+            _btcTxnHash,
+            _proof,
+            _index,
+            _rawTxn,
+            _taprootAddress,
+            _networkKey,
+            _operators
         );
         _taskHashes.push(_btcTxnHash);
 
