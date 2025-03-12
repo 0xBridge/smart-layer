@@ -7,7 +7,8 @@ import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
-import {MintData, IBaseChainCoordinator, ILayerZeroReceiver} from "./interfaces/IBaseChainCoordinator.sol";
+import {TxidCalculator} from "./libraries/TxidCalculator.sol";
+import {TxnData, IBaseChainCoordinator, ILayerZeroReceiver} from "./interfaces/IBaseChainCoordinator.sol";
 import {eBTCManager} from "./eBTCManager.sol";
 
 /**
@@ -26,15 +27,17 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     error InvalidAmount(uint256 minAmount);
 
     // State variables
-    mapping(bytes32 => MintData) internal _btcTxnHash_mintData;
+    mapping(bytes32 => TxnData) internal _btcTxnHash_txnData;
     eBTCManager internal _eBTCManagerInstance;
     uint32 internal immutable _chainEid;
     uint32 internal immutable _homeEid;
 
+    bytes internal constant _options = hex"0003010011010000000000000000000000000000c350"; // TODO: Get rid of this
+
     // Events
     event MessageSent(uint32 dstEid, bytes message, bytes32 receiver, uint256 nativeFee);
     event MessageProcessed(
-        bytes32 guid, uint32 srcEid, bytes32 sender, address user, bytes32 btcTxnHash, uint256 lockedAmount
+        bytes32 guid, uint32 srcEid, bytes32 sender, address user, bytes32 btcTxnHash, uint256 amount
     );
 
     /**
@@ -111,16 +114,16 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
             revert InvalidMessageSender();
         }
 
-        (address user, bytes32 btcTxnHash, uint256 lockedAmount, uint256 nativeTokenAmount) =
+        (address user, bytes32 btcTxnHash, uint256 amount, uint256 nativeTokenAmount) =
             abi.decode(_message, (address, bytes32, uint256, uint256));
 
         // 1. Check for replay attacks
         _validateMessageUniqueness(btcTxnHash);
 
         // 2. Process the message
-        _processMessage(btcTxnHash, user, lockedAmount);
+        _processMessage(btcTxnHash, user, amount);
 
-        emit MessageProcessed(_guid, _origin.srcEid, _origin.sender, user, btcTxnHash, lockedAmount);
+        emit MessageProcessed(_guid, _origin.srcEid, _origin.sender, user, btcTxnHash, amount);
     }
 
     /**
@@ -139,28 +142,28 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      * @notice Processes a received message
      * @param _btcTxnHash The Bitcoin transaction hash
      * @param _user The recipient user address
-     * @param _lockedAmount The amount of BTC locked
+     * @param _amount The amount of BTC locked
      * @dev Updates storage and handles minting
      */
-    function _processMessage(bytes32 _btcTxnHash, address _user, uint256 _lockedAmount) internal {
+    function _processMessage(bytes32 _btcTxnHash, address _user, uint256 _amount) internal {
         // Decode the message and process it
-        MintData memory mintData = _btcTxnHash_mintData[_btcTxnHash];
-        mintData.status = true;
-        mintData.user = _user;
-        mintData.lockedAmount = _lockedAmount;
-        _btcTxnHash_mintData[_btcTxnHash] = mintData;
+        TxnData memory txnData = _btcTxnHash_txnData[_btcTxnHash];
+        txnData.status = true;
+        txnData.user = _user;
+        txnData.amount = _amount;
+        _btcTxnHash_txnData[_btcTxnHash] = txnData;
         // Additional processing based on message content
-        _handleMinting(_user, _lockedAmount);
+        _handleMinting(_user, _amount);
     }
 
     /**
      * @notice Handles the minting of eBTC tokens
      * @param _user The recipient user address
-     * @param _lockedAmount The amount to mint
+     * @param _amount The amount to mint
      * @dev Calls the eBTC manager to mint tokens
      */
-    function _handleMinting(address _user, uint256 _lockedAmount) internal {
-        _eBTCManagerInstance.mint(_user, _lockedAmount);
+    function _handleMinting(address _user, uint256 _amount) internal {
+        _eBTCManagerInstance.mint(_user, _amount);
     }
 
     /**
@@ -168,8 +171,8 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      * @param _btcTxnHash The Bitcoin transaction hash
      * @return The mint data associated with the transaction
      */
-    function getTxnData(bytes32 _btcTxnHash) external view returns (MintData memory) {
-        return _btcTxnHash_mintData[_btcTxnHash];
+    function getTxnData(bytes32 _btcTxnHash) external view returns (TxnData memory) {
+        return _btcTxnHash_txnData[_btcTxnHash];
     }
 
     /**
@@ -178,7 +181,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      * @return True if message has been processed
      */
     function isMessageProcessed(bytes32 _btcTxnHash) public view returns (bool) {
-        return _btcTxnHash_mintData[_btcTxnHash].status;
+        return _btcTxnHash_txnData[_btcTxnHash].status;
     }
 
     /**
@@ -224,19 +227,15 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      * @param _v v of the permit signature
      * @param _r r of the permit signature
      * @param _s s of the permit signature
-     * @dev Payable function that accepts native gas for message fee
      */
-    function burnAndUnlock(
+    function burnAndUnlockWithPermit(
         bytes calldata _psbtData,
         uint256 _amount,
         uint256 _deadline,
         uint8 _v,
         bytes32 _r,
-        bytes32 _s,
-        bytes calldata _options
+        bytes32 _s
     ) external {
-        // Validate inputs and process the burn transaction - BaseChainCoordinator doesn't have the brains to validate the burn transaction, it just passes the psbt data to the HomeChainCoordinator
-
         // Tell eBTCManager to burn the eBTC tokens
         address _eBTCToken = _eBTCManagerInstance.getEBTCTokenAddress();
         if (_eBTCToken == address(0)) revert InvalidTokenAddress();
@@ -245,7 +244,36 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
             IERC20Permit(address(eBTCToken)), msg.sender, address(this), _amount, _deadline, _v, _r, _s
         );
         SafeERC20.safeTransferFrom(eBTCToken, msg.sender, address(this), _amount);
+        _burnAndUnlock(_psbtData, _amount);
+    }
+
+    /**
+     * @notice Sends a message to the specified chain
+     * @param _psbtData The PSBT data for the burn transaction
+     * @param _amount The amount of BTC to burn
+     */
+    function burnAndUnlock(bytes calldata _psbtData, uint256 _amount) external {
+        // Tell eBTCManager to burn the eBTC tokens
+        address _eBTCToken = _eBTCManagerInstance.getEBTCTokenAddress();
+        if (_eBTCToken == address(0)) revert InvalidTokenAddress();
+        IERC20 eBTCToken = IERC20(_eBTCToken);
+        SafeERC20.safeTransferFrom(eBTCToken, msg.sender, address(this), _amount);
+        _burnAndUnlock(_psbtData, _amount);
+    }
+
+    // TODO: Need to have a minimum _amount value to burn (to avoid misue of the message relaying fee)
+
+    /**
+     * @notice Burns eBTC tokens and sends a message to the specified chain
+     * @param _psbtData The PSBT data for the burn transaction
+     * @param _amount The amount of BTC to burn
+     */
+    function _burnAndUnlock(bytes calldata _psbtData, uint256 _amount) internal {
         _eBTCManagerInstance.burn(_amount);
+
+        // Store the transaction data on BaseChainCoordinator for future reference
+        bytes32 _btcTxnHash = TxidCalculator.calculateTxid(_psbtData);
+        _btcTxnHash_txnData[_btcTxnHash] = TxnData({status: true, user: msg.sender, amount: _amount});
 
         // Pass the psbt data to the HomeChainCoordinator in the burn transaction
         MessagingFee memory messagingFee = _quote(_homeEid, _psbtData, _options, false);

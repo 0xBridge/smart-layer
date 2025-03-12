@@ -5,10 +5,10 @@ import {
     ILayerZeroReceiver, Origin
 } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroReceiver.sol";
 
-struct MintData {
+struct TxnData {
     bool status;
     address user;
-    uint256 lockedAmount;
+    uint256 amount;
 }
 
 interface IBaseChainCoordinator is ILayerZeroReceiver {}

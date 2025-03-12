@@ -175,17 +175,21 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256[] calldata
     ) external onlyAttestationCenter {
         // Decode task hash (btcTxnHash) from taskInfo data
-        bytes32 btcTxnHash = abi.decode(_taskInfo.data, (bytes32));
+        (bool txnType, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
 
-        // Get task data wrt task Id
-        PSBTData memory task = _homeChainCoordinator.getPSBTDataForTxnHash(btcTxnHash);
+        if (txnType) {
+            // Get task data wrt task Id
+            PSBTData memory task = _homeChainCoordinator.getPSBTDataForTxnHash(btcTxnHash);
 
-        // Mark task as completed
-        _completedTasks[btcTxnHash] = true;
+            // Mark task as completed
+            _completedTasks[btcTxnHash] = true;
 
-        (uint256 nativeFee,) = quote(btcTxnHash, task.rawTxn, false);
-        // Send message after successful verification
-        _homeChainCoordinator.sendMessage{value: nativeFee}(btcTxnHash);
+            (uint256 nativeFee,) = quote(btcTxnHash, task.rawTxn, false);
+            // Send message after successful verification
+            _homeChainCoordinator.sendMessage{value: nativeFee}(btcTxnHash);
+        } else {
+            _homeChainCoordinator.updateBurnStatus(btcTxnHash);
+        }
 
         // emitting event
         emit TaskCompleted(btcTxnHash);

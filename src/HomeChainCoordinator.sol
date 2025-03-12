@@ -30,8 +30,9 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     error BitcoinTxnAndPSBTMismatch();
     error InvalidPeer();
     error WithdrawalFailed();
+    error InvalidStatusUpdate();
 
-    // TODO: Take the below struct to a common storage contract
+    // TODO: Take the below struct to a common storage contract along with PSBTData
     struct StoreMessageParams {
         bool isMint; // Whether the transaction is a mint or burn
         bytes32 blockHash; // The block hash for the transaction
@@ -58,11 +59,12 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     bytes internal constant _options = hex"0003010011010000000000000000000000000000c350"; // TODO: Get rid of this
 
     // Events
-    event MessageSent(uint32 indexed dstEid, bytes32 indexed btcTxnHash, address indexed operator, uint256 timestamp);
     event MessageCreated(bool indexed isMint, bytes32 indexed blockHash, bytes32 indexed btcTxnHash);
+    event MessageSent(uint32 indexed dstEid, bytes32 indexed btcTxnHash, address indexed operator, uint256 timestamp);
     event MessageReceived(
         bytes32 indexed guid, uint32 srcEid, bytes32 sender, bytes32 indexed btcTxnHash, bool txnType, uint256 amount
     );
+    event UpdateTxnStatus(bytes32 indexed btcTxnHash, bool status);
 
     /**
      * @notice Initializes the HomeChainCoordinator contract
@@ -146,6 +148,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(params.rawTxn);
             // 1. Validate input in a separate function call
             _validateInput(merkleRoot, params.btcTxnHash, params.proof, params.index, params.rawTxn, metadata.chainId);
+            // TODO: Validate the psbt metadata amount matches with the p2tr locked amount
             // 2. Store PSBT data for mint transaction
             psbtData = PSBTData({
                 txnType: params.isMint,
@@ -165,6 +168,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             psbtData = _btcTxnHash_psbtData[params.btcTxnHash];
             // 1. Validate input in a separate function call
             _validateInput(merkleRoot, params.btcTxnHash, params.proof, params.index, params.rawTxn, psbtData.chainId);
+            // TODO: Validate the burn amount on the baseChainCoordinator is greater than the unlocked amount on the HomeChainCoordinator (unlockTxnData[0].amount) and lesser than the respective mint amount (if possible)
             // 2. Update the PSBT data with the required burn transaction details
             psbtData.taprootAddress = params.taprootAddress;
             psbtData.networkKey = params.networkKey;
@@ -383,6 +387,26 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         return _btcTxnHash_psbtData[_btcTxnHash];
     }
 
+    function updateBurnStatus(bytes32 _btcTxnHash) external whenNotPaused onlyOwner {
+        // 1. Check if the transaction exists
+        PSBTData memory psbtData = _btcTxnHash_psbtData[_btcTxnHash];
+        if (psbtData.chainId == 0) {
+            revert BitcoinTxnNotFound();
+        }
+
+        // 2. Update the status of the transaction
+        if (psbtData.status) {
+            revert InvalidStatusUpdate();
+        }
+        psbtData.status = true;
+
+        // 3. Update the PSBT data
+        _btcTxnHash_psbtData[_btcTxnHash] = psbtData;
+
+        // 4. Emit event for the updated status
+        emit UpdateTxnStatus(_btcTxnHash, true);
+    }
+
     /**
      * @notice Internal function to receive messages from LayerZero
      * @param _origin The origin of the message
@@ -465,18 +489,25 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     /**
      * @notice Retrieves the AVS data for a given taproot address
      * @param _taprootAddress The taproot address
+     * @return btcTxnHash The BTC transaction hash
      * @return txnType The type of transaction (mint or burn)
      * @return taprootAddress The taproot address for the transaction
      * @return networkKey The network key for the AVS
      * @return operators The operators for the AVS
      */
     function getAVSDataForTaprootAddress(string memory _taprootAddress)
-        external
+        public
         view
-        returns (bool, string memory, string memory, address[] memory)
+        returns (
+            bytes32 btcTxnHash,
+            bool txnType,
+            string memory taprootAddress,
+            string memory networkKey,
+            address[] memory operators
+        )
     {
-        bytes32 btcTxnHash = _taprootAddress_btcTxnHash[_taprootAddress];
-        return getAVSDataForTxnHash(btcTxnHash);
+        btcTxnHash = _taprootAddress_btcTxnHash[_taprootAddress];
+        (txnType, taprootAddress, networkKey, operators) = getAVSDataForTxnHash(btcTxnHash);
     }
 
     /**
