@@ -80,19 +80,11 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
      */
     function burn(uint256 amount) external nonReentrant whenNotPaused {
         if (amount < minBTCAmount) revert InvalidAmount(amount);
+        // Safe transfer BTC to the this address for the burn
+        address(_eBTCToken).safeTransferFrom(msg.sender, address(this), amount);
         _eBTCToken.burn(amount);
         emit Burn(msg.sender, amount);
     }
-
-    /**
-     * @notice Burns eBTC tokens
-     * @param amount Amount of tokens to burn
-     */
-    // function _burn(uint256 amount) internal {
-    //     if (amount < minBTCAmount) revert InvalidAmount(amount);
-    //     _eBTCToken.burn(amount);
-    //     emit Burn(msg.sender, amount);
-    // }
 
     // TODO: Add function to support mint with proofs via other bridge contracts
 

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {console} from "forge-std/console.sol";
 import {OApp, Origin, MessagingFee, MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -24,7 +23,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     error InvalidPSBTData();
     error InvalidBlockHash();
     error InvalidAmount(uint256 amount);
-    error InvalidDestination();
+    error InvalidSourceOrDestination();
     error InvalidReceiver(address receiver);
     error BitcoinTxnNotFound();
     error BitcoinTxnAndPSBTMismatch();
@@ -279,7 +278,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
         // 4. Validate receiver is set for destination chain
         if (peers[_dstEid] == bytes32(0)) {
-            revert InvalidDestination();
+            revert InvalidSourceOrDestination();
         }
     }
 
@@ -334,7 +333,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
         // 2. Validate receiver is set for destination chain
         if (peers[metadata.chainId] == bytes32(0)) {
-            revert InvalidDestination();
+            revert InvalidSourceOrDestination();
         }
 
         // 3. Check if all the fields needed to be sent in the payload are present in the metadata (should never enter revert ideally)
@@ -391,7 +390,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         // 1. Check if the transaction exists
         PSBTData memory psbtData = _btcTxnHash_psbtData[_btcTxnHash];
         if (psbtData.chainId == 0) {
-            revert BitcoinTxnNotFound();
+            revert InvalidSourceOrDestination();
         }
 
         // 2. Update the status of the transaction

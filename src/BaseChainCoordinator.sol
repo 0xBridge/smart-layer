@@ -235,7 +235,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         uint8 _v,
         bytes32 _r,
         bytes32 _s
-    ) external {
+    ) external payable {
         // Tell eBTCManager to burn the eBTC tokens
         address _eBTCToken = _eBTCManagerInstance.getEBTCTokenAddress();
         if (_eBTCToken == address(0)) revert InvalidTokenAddress();
@@ -243,7 +243,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         SafeERC20.safePermit(
             IERC20Permit(address(eBTCToken)), msg.sender, address(this), _amount, _deadline, _v, _r, _s
         );
-        SafeERC20.safeTransferFrom(eBTCToken, msg.sender, address(this), _amount);
+        SafeERC20.safeTransferFrom(eBTCToken, msg.sender, address(_eBTCManagerInstance), _amount);
         _burnAndUnlock(_psbtData, _amount);
     }
 
@@ -252,16 +252,17 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      * @param _psbtData The PSBT data for the burn transaction
      * @param _amount The amount of BTC to burn
      */
-    function burnAndUnlock(bytes calldata _psbtData, uint256 _amount) external {
-        // Tell eBTCManager to burn the eBTC tokens
+    function burnAndUnlock(bytes calldata _psbtData, uint256 _amount) external payable {
         address _eBTCToken = _eBTCManagerInstance.getEBTCTokenAddress();
         if (_eBTCToken == address(0)) revert InvalidTokenAddress();
         IERC20 eBTCToken = IERC20(_eBTCToken);
         SafeERC20.safeTransferFrom(eBTCToken, msg.sender, address(this), _amount);
+        SafeERC20.safeApprove(eBTCToken, address(_eBTCManagerInstance), _amount);
         _burnAndUnlock(_psbtData, _amount);
     }
 
     // TODO: Need to have a minimum _amount value to burn (to avoid misue of the message relaying fee)
+    // TODO: Replace safeTransferFrom with safeApprove to _eBTCManagerInstance for _amount value
 
     /**
      * @notice Burns eBTC tokens and sends a message to the specified chain
@@ -276,16 +277,15 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         _btcTxnHash_txnData[_btcTxnHash] = TxnData({status: true, user: msg.sender, amount: _amount});
 
         // Pass the psbt data to the HomeChainCoordinator in the burn transaction
-        MessagingFee memory messagingFee = _quote(_homeEid, _psbtData, _options, false);
         _lzSend(
             _homeEid, // HomeChainCoordinator chainEid
             _psbtData,
             _options,
-            messagingFee, // Fee in native gas and ZRO token.
+            MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
             address(this) // Refund address in case of failed source message.
         );
 
-        emit MessageSent(_homeEid, _psbtData, peers[_homeEid], messagingFee.nativeFee);
+        emit MessageSent(_homeEid, _psbtData, peers[_homeEid], msg.value);
     }
 
     /**
