@@ -231,7 +231,7 @@ contract HomeChainCoordinatorTest is Test {
         vm.recordLogs();
         vm.startPrank(BTC_RECEIVER);
         eBTCToken.approve(address(baseChainCoordinator), BTC_AMOUNT);
-        baseChainCoordinator.burnAndUnlock{value: 1 ether}(BURN_RAW_TXN, BTC_AMOUNT); // TODO: Fix this
+        baseChainCoordinator.burnAndUnlock{value: 1 ether}(BURN_RAW_TXN, BTC_AMOUNT);
         vm.stopPrank();
 
         bytes32[] memory burnProof = new bytes32[](10);

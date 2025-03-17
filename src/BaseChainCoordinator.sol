@@ -32,7 +32,8 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     uint32 internal immutable _chainEid;
     uint32 internal immutable _homeEid;
 
-    bytes internal constant _options = hex"0003010011010000000000000000000000000000c350"; // TODO: Get rid of this
+    uint256 internal constant MIN_BURN_AMOUNT = 1000; // Min amount to burn in satoshis
+    bytes internal constant OPTIONS = hex"0003010011010000000000000000000000000000c350"; // TODO: Get rid of this
 
     // Events
     event MessageSent(uint32 dstEid, bytes message, bytes32 receiver, uint256 nativeFee);
@@ -280,7 +281,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         _lzSend(
             _homeEid, // HomeChainCoordinator chainEid
             _psbtData,
-            _options,
+            OPTIONS,
             MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
             address(this) // Refund address in case of failed source message.
         );
