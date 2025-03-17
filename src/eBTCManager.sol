@@ -86,8 +86,6 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
         emit Burn(msg.sender, amount);
     }
 
-    // TODO: Add function to support mint with proofs via other bridge contracts
-
     /**
      * @notice Pauses all contract operations
      * @dev Only callable by accounts with the DEFAULT_ADMIN_ROLE

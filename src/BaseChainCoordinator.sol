@@ -32,8 +32,9 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     uint32 internal immutable _chainEid;
     uint32 internal immutable _homeEid;
 
+    // TODO: Need to have a minimum _amount value to burn
     uint256 internal constant MIN_BURN_AMOUNT = 1000; // Min amount to burn in satoshis
-    bytes internal constant OPTIONS = hex"0003010011010000000000000000000000000000c350"; // TODO: Get rid of this
+    bytes internal constant OPTIONS = hex"0003010011010000000000000000000000000000c350"; // Options for message sending
 
     // Events
     event MessageSent(uint32 dstEid, bytes message, bytes32 receiver, uint256 nativeFee);
@@ -118,11 +119,21 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         (address user, bytes32 btcTxnHash, uint256 amount, uint256 nativeTokenAmount) =
             abi.decode(_message, (address, bytes32, uint256, uint256));
 
-        // 1. Check for replay attacks
-        _validateMessageUniqueness(btcTxnHash);
-
-        // 2. Process the message
-        _processMessage(btcTxnHash, user, amount);
+        if (user != address(0) && amount != 0) {
+            // 1. Check for replay attacks
+            _validateMessageUniqueness(btcTxnHash);
+            // 2. Process the message
+            _processMessage(btcTxnHash, user, amount);
+        } else {
+            // 1. Case of burn failure handle - Get the user and amount from the mapping
+            TxnData memory txnData = _btcTxnHash_txnData[btcTxnHash];
+            user = txnData.user;
+            amount = txnData.amount;
+            // 2. Mint the eBTC tokens back to the user
+            _handleMinting(user, amount);
+            // 3. Delete the request from the mapping
+            delete _btcTxnHash_txnData[btcTxnHash];
+        }
 
         emit MessageProcessed(_guid, _origin.srcEid, _origin.sender, user, btcTxnHash, amount);
     }
@@ -241,10 +252,10 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         address _eBTCToken = _eBTCManagerInstance.getEBTCTokenAddress();
         if (_eBTCToken == address(0)) revert InvalidTokenAddress();
         IERC20 eBTCToken = IERC20(_eBTCToken);
+        SafeERC20.safeTransferFrom(eBTCToken, msg.sender, address(this), _amount);
         SafeERC20.safePermit(
-            IERC20Permit(address(eBTCToken)), msg.sender, address(this), _amount, _deadline, _v, _r, _s
+            IERC20Permit(address(eBTCToken)), msg.sender, address(_eBTCManagerInstance), _amount, _deadline, _v, _r, _s
         );
-        SafeERC20.safeTransferFrom(eBTCToken, msg.sender, address(_eBTCManagerInstance), _amount);
         _burnAndUnlock(_psbtData, _amount);
     }
 
@@ -261,9 +272,6 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         SafeERC20.safeApprove(eBTCToken, address(_eBTCManagerInstance), _amount);
         _burnAndUnlock(_psbtData, _amount);
     }
-
-    // TODO: Need to have a minimum _amount value to burn (to avoid misue of the message relaying fee)
-    // TODO: Replace safeTransferFrom with safeApprove to _eBTCManagerInstance for _amount value
 
     /**
      * @notice Burns eBTC tokens and sends a message to the specified chain

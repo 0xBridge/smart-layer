@@ -42,7 +42,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     // Events
     event PerformerUpdated(address oldPerformer, address newPerformer);
     event NewTaskCreated(bytes32 indexed btcTxnHash);
-    event TaskCompleted(bytes32 indexed btcTxnHash);
+    event TaskCompleted(bool indexed txnType, bytes32 indexed btcTxnHash);
 
     /**
      * @notice Ensures the caller is the attestation center
@@ -92,7 +92,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
 
     /**
      * @notice Creates a new task for verification
-     * @param _isMint Whether the task is a mint or burn
+     * @param _txnType Whether the task is a mint (1) or burn (0)
      * @param _blockHash The hash of the Bitcoin block
      * @param _btcTxnHash The hash of the Bitcoin transaction
      * @param _proof The merkle proof for transaction verification
@@ -104,7 +104,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      * @dev Only the authorized performer can create new tasks
      */
     function createNewTask(
-        bool _isMint,
+        bool _txnType,
         bytes32 _blockHash,
         bytes32 _btcTxnHash,
         bytes32[] calldata _proof,
@@ -116,7 +116,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     ) external onlyTaskPerformer {
         // Create the struct parameter for storeMessage
         HomeChainCoordinator.StoreMessageParams memory params = HomeChainCoordinator.StoreMessageParams({
-            isMint: _isMint,
+            txnType: _txnType,
             blockHash: _blockHash,
             btcTxnHash: _btcTxnHash,
             proof: _proof,
@@ -150,7 +150,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256[] calldata
     ) external view onlyAttestationCenter {
         // Decode task hash from taskInfo data
-        bytes32 btcTxnHash = abi.decode(_taskInfo.data, (bytes32));
+        (bool txnType, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
 
         // Check that the task is valid, hasn't been responsed yet
         if (!_isApproved) revert TaskNotApproved();
@@ -177,14 +177,14 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         // Decode task hash (btcTxnHash) from taskInfo data
         (bool txnType, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
 
+        // Mark task as completed
+        _completedTasks[btcTxnHash] = true;
+
         if (txnType) {
             // Get task data wrt task Id
-            PSBTData memory task = _homeChainCoordinator.getPSBTDataForTxnHash(btcTxnHash);
+            PSBTData memory psbtData = _homeChainCoordinator.getPSBTDataForTxnHash(btcTxnHash);
 
-            // Mark task as completed
-            _completedTasks[btcTxnHash] = true;
-
-            (uint256 nativeFee,) = quote(btcTxnHash, task.rawTxn, false);
+            (uint256 nativeFee,) = quote(btcTxnHash, psbtData.rawTxn, false);
             // Send message after successful verification
             _homeChainCoordinator.sendMessage{value: nativeFee}(btcTxnHash);
         } else {
@@ -192,7 +192,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         }
 
         // emitting event
-        emit TaskCompleted(btcTxnHash);
+        emit TaskCompleted(txnType, btcTxnHash);
     }
 
     /**

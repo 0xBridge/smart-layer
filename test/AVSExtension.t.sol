@@ -22,7 +22,7 @@ contract AVSExtensionTest is Test {
 
     // Test accounts
     address private owner;
-    address private constant PERFORMER = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE; // TODO: Take this from private key
+    address private constant PERFORMER = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
     address private constant USER = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
     address private constant ATTESTATION_CENTER = 0x276ef26eEDC3CFE0Cdf22fB033Abc9bF6b6a95B3;
 
