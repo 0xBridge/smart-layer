@@ -41,7 +41,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         uint256 index; // The index of the transaction in the block
         bytes rawTxn; // Raw hex PSBT data for the mint or burn transaction
         bytes32 taprootAddress; // The taproot address for the transaction
-        string networkKey; // The network key for the AVS
+        bytes32 networkKey; // The network key for the AVS
         address[] operators; // The operators for the AVS
     }
 
@@ -490,11 +490,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @return networkKey The network key for the AVS
      * @return operators The operators for the AVS
      */
-    function getAVSDataForTxnHash(bytes32 _btcTxnHash)
-        public
-        view
-        returns (bool, bytes32, string memory, address[] memory)
-    {
+    function getAVSDataForTxnHash(bytes32 _btcTxnHash) public view returns (bool, bytes32, bytes32, address[] memory) {
         PSBTData memory psbtData = _btcTxnHash_psbtData[_btcTxnHash];
         return (psbtData.txnType, psbtData.taprootAddress, psbtData.networkKey, psbtData.operators);
     }
@@ -515,7 +511,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             bytes32 btcTxnHash,
             bool txnType,
             bytes32 taprootAddress,
-            string memory networkKey,
+            bytes32 networkKey,
             address[] memory operators
         )
     {

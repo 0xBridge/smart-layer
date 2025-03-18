@@ -9,7 +9,7 @@ struct PSBTData {
     address user; // User address (could be the receiver of the eBTC token or the burner of the eBTC token)
     bytes rawTxn; // Raw hex PSBT data for the mint or burn transaction
     bytes32 taprootAddress; // Taproot address for the mint or burn transaction
-    string networkKey; // AVS Bitcoin address
+    bytes32 networkKey; // AVS Bitcoin address
     address[] operators; // Array of operators with whom AVS network key is created
     uint256 lockedAmount; // Amount locked or unlocked in the mint or burn transaction (NOTE: Can be converted to uint64 as that's the max with 21m BTCs)
     uint256 nativeTokenAmount; // Amount of native token minted on the destination chain (NOTE: Can be made generic to check for the fees at the time of burn)

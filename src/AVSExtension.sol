@@ -111,7 +111,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256 _index,
         bytes calldata _rawTxn,
         bytes32 _taprootAddress,
-        string calldata _networkKey,
+        bytes32 _networkKey,
         address[] calldata _operators
     ) external onlyTaskPerformer {
         // Create the struct parameter for storeMessage

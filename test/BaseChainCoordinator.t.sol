@@ -219,7 +219,7 @@ contract BaseChainCoordinatorTest is Test {
             index: burnTxnIndex,
             rawTxn: BURN_RAW_TXN,
             taprootAddress: 0xb2925665f511a4ec1507d9710600be27f791f80131074c6eda5739053714f33b,
-            networkKey: "tb1qk73znvxpcyxzzngmr8gjvwm8jldw86tcv3yrnt",
+            networkKey: 0xb7a229b0c1c10c214d1b19d1263b6797dae3e978000000000000000000000000,
             operators: new address[](0)
         });
 
