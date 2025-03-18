@@ -386,8 +386,6 @@ library BitcoinTxnParser {
         // Extract inputs
         inputs = new Input[](txn.inputs.length);
         inputs = txn.inputs;
-        console.logBytes32(inputs[0].txid);
-        console.logBytes(inputs[0].script);
 
         // Extract outputs
         outputs = new UnlockTxnData[](txn.outputs.length);

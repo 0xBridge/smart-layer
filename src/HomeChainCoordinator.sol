@@ -131,7 +131,6 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes32 blockHash = _lightClient.submitRawBlockHeader(_rawHeader, _intermediateHeaders);
         // 2. Validate if the block hash is valid
         if (blockHash != _params.blockHash) revert InvalidPSBTData();
-        console.log("Entering _storeMessage");
         // 3. Store message with the given BTC transaction hash
         _storeMessage(_params);
     }
@@ -153,7 +152,6 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             // 1 for mint, 0 for burn
             // 0. Parse PSBT data to get the metadata for the eBTC mint transaction
             BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(params.rawTxn);
-            console.log("Case of mint side");
             // 1. Validate input in a separate function call
             _validateInput(merkleRoot, params.btcTxnHash, params.proof, params.index, params.rawTxn, metadata.chainId);
             // 2. Store PSBT data for mint transaction
@@ -443,7 +441,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         (BitcoinTxnParser.Input[] memory unlockTxnInputs, BitcoinTxnParser.UnlockTxnData[] memory unlockTxnData) =
             BitcoinTxnParser.extractUnlockOutputs(rawTxn);
         bytes32 mintTxid = unlockTxnInputs[0].txid;
-        // Check if the amount being unlocked is less than or equal the eBTC amount burnt | Currently disabled as the OP_RETURN mint amount is lower than the burn amount
+        // Check if the amount being unlocked is less than or equal the eBTC amount burnt
         if (
             unlockTxnData.length == 0 || unlockTxnData[0].amount > amount
                 || _btcTxnHash_psbtData[mintTxid].taprootAddress != unlockTxnData[0].btcAddress
@@ -451,7 +449,6 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             revert InvalidRequest();
         }
 
-        console.log("Receive message from BaseChainCoordinator and value _origin.srcEid: ", _origin.srcEid);
         // 4. Store PSBT data for burn transaction validation
         PSBTData memory psbtData = PSBTData({
             txnType: false, // This is a burn transaction
