@@ -218,7 +218,7 @@ contract BaseChainCoordinatorTest is Test {
             proof: burnProof,
             index: burnTxnIndex,
             rawTxn: BURN_RAW_TXN,
-            taprootAddress: "tb1pk2f9ve04zxjwc9g8m9csvq97ylmer7qpxyr5cmk62uus2dc57vasy6lw4p",
+            taprootAddress: 0xb2925665f511a4ec1507d9710600be27f791f80131074c6eda5739053714f33b,
             networkKey: "tb1qk73znvxpcyxzzngmr8gjvwm8jldw86tcv3yrnt",
             operators: new address[](0)
         });

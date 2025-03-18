@@ -110,7 +110,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         bytes32[] calldata _proof,
         uint256 _index,
         bytes calldata _rawTxn,
-        string calldata _taprootAddress,
+        bytes32 _taprootAddress,
         string calldata _networkKey,
         address[] calldata _operators
     ) external onlyTaskPerformer {

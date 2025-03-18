@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import {console} from "forge-std/console.sol";
+
 /// @title BitcoinTxnParser
 /// @notice Library for parsing Bitcoin transactions and extracting OP_RETURN metadata
 /// @dev Handles both legacy and segwit transaction formats
@@ -54,7 +56,7 @@ library BitcoinTxnParser {
 
     // Simple struct for output information
     struct UnlockTxnData {
-        string btcAddress;
+        bytes32 btcAddress;
         uint64 amount;
     }
 
@@ -370,68 +372,37 @@ library BitcoinTxnParser {
         }
     }
 
-    /// @notice Creates a simplified Bitcoin address string representation
-    /// @param scriptType The type of script
-    /// @param scriptData The extracted script data (hash or key)
-    /// @param isTestnet Whether to use testnet prefixes
-    /// @return A string representation of the Bitcoin address
-    function createAddressString(uint8 scriptType, bytes memory scriptData, bool isTestnet)
-        internal
-        pure
-        returns (string memory)
-    {
-        string memory prefix;
-
-        if (scriptType == TYPE_P2PKH) {
-            prefix = isTestnet ? "mtest_" : "1_";
-        } else if (scriptType == TYPE_P2SH) {
-            prefix = isTestnet ? "2test_" : "3_";
-        } else if (scriptType == TYPE_P2WPKH) {
-            prefix = isTestnet ? "tb1q_" : "bc1q_";
-        } else if (scriptType == TYPE_P2WSH) {
-            prefix = isTestnet ? "tb1q_" : "bc1q_";
-        } else if (scriptType == TYPE_P2TR) {
-            prefix = isTestnet ? "tb1p_" : "bc1p_";
-        } else {
-            return "unknown_script_type";
-        }
-
-        return string(abi.encodePacked(prefix, toHexString(scriptData)));
-    }
-
-    /// @notice Helper to convert bytes to hex string
-    /// @param data The bytes to convert
-    /// @return The hex string representation
-    function toHexString(bytes memory data) internal pure returns (string memory) {
-        bytes memory hexChars = "0123456789abcdef";
-        bytes memory result = new bytes(data.length * 2);
-
-        for (uint256 i = 0; i < data.length; i++) {
-            result[i * 2] = hexChars[uint8(data[i]) >> 4];
-            result[i * 2 + 1] = hexChars[uint8(data[i]) & 0x0f];
-        }
-
-        return string(result);
-    }
-
     /// @notice Extracts the output addresses and amounts from a Bitcoin transaction
     /// @param rawTxn The raw Bitcoin transaction bytes
-    /// @param isTestnet Whether to use testnet address formats
+    /// @return inputs Array of inputs info (addresses and amounts)
     /// @return outputs Array of output info (addresses and amounts)
-    function extractUnlockOutputs(bytes calldata rawTxn, bool isTestnet)
+    function extractUnlockOutputs(bytes memory rawTxn)
         internal
         pure
-        returns (UnlockTxnData[] memory outputs)
+        returns (Input[] memory inputs, UnlockTxnData[] memory outputs)
     {
         Transaction memory txn = parseTransaction(rawTxn);
+
+        // Extract inputs
+        inputs = new Input[](txn.inputs.length);
+        inputs = txn.inputs;
+        console.logBytes32(inputs[0].txid);
+        console.logBytes(inputs[0].script);
 
         // Extract outputs
         outputs = new UnlockTxnData[](txn.outputs.length);
         for (uint256 i = 0; i < txn.outputs.length; i++) {
-            uint8 scriptType = getScriptType(txn.outputs[i].script);
-            bytes memory scriptData = extractScriptData(txn.outputs[i].script);
-
-            outputs[i].btcAddress = createAddressString(scriptType, scriptData, isTestnet);
+            bytes memory script = txn.outputs[i].script;
+            uint256 scriptLength = script.length;
+            // Get the last 32 bytes or return 0 if script is too short
+            bytes32 lastBytes32;
+            if (scriptLength > 32) {
+                assembly {
+                    // Load the last 32 bytes into lastBytes32
+                    lastBytes32 := mload(add(add(script, 32), sub(scriptLength, 32)))
+                }
+            }
+            outputs[i].btcAddress = scriptLength > 32 ? lastBytes32 : bytes32(script);
             outputs[i].amount = txn.outputs[i].value;
         }
     }

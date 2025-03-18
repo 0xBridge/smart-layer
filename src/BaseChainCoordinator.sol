@@ -286,10 +286,13 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         bytes32 _btcTxnHash = TxidCalculator.calculateTxid(_psbtData);
         _btcTxnHash_txnData[_btcTxnHash] = TxnData({status: true, user: msg.sender, amount: _amount});
 
+        // Pack the amount into _extraData
+        bytes memory amountAndPsbtData = abi.encode(_amount, _psbtData);
+
         // Pass the psbt data to the HomeChainCoordinator in the burn transaction
         _lzSend(
             _homeEid, // HomeChainCoordinator chainEid
-            _psbtData,
+            amountAndPsbtData,
             OPTIONS,
             MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
             address(this) // Refund address in case of failed source message.

@@ -66,7 +66,7 @@ contract HomeChainCoordinatorTest is Test {
         hex"02000000000102137d512d277b25677a4a7f522581d4d6e47ee85fd3b9353fdc7d17a05ae2e7bd0000000000ffffffff9e504ef8a97d1c29c8df3db5e79fdc2dc362d2d770c66e234a849b915a449e1d0000000000ffffffff028813000000000000160014cf54150aff704eb4ecae400d9e665eb285dcbfaff40100000000000016001471d044aeb7f41205a9ef0e3d785e7d38a776cfa10440e0c768d0f30cb9617d4e89a4887be7515a8be186478b2c6554fc8701e04f0f72bd5882710156aed605365c4f74b4b7f767d7ffc2d9730a3c220208bc892f62c44022d47f4bc506a5d4df5263471db65697ad5b74573cd98f534f7ad2dcd2227deaaf1ace3e6186a3d634ffa9ea657a71d39b4b441e9c8b477c2ab9ddde7542e92c44206a43583212d54a5977f2cef457520c520ab9bf92299b2d74011ecd410bdb2506ad201a4b83276e5b4ddcf3f7f52615b35c39b013c94f58b941019ddf2be7b511568fac41c16a43583212d54a5977f2cef457520c520ab9bf92299b2d74011ecd410bdb25061c38128ccf96002c3f5ce0e3b9d4d587a7744ba51e4814c2b2569b89cf09640704408efafc4f08a1c4780daac0990190485025ce8f8443f5297fbdcd3f45e5f0d1fb4817b104e961b42a56ed71a2b43616aa0a62298e5a2a248e713b079f31b88a1d40018bb141f298e78962c25930c554c778978782e5e2627d602131ba99a3c27458b7f51d8c67b22fdc02fac7f3467c7fa5fcd1741041a1b5645a497c92a905b06e44206a43583212d54a5977f2cef457520c520ab9bf92299b2d74011ecd410bdb2506ad201a4b83276e5b4ddcf3f7f52615b35c39b013c94f58b941019ddf2be7b511568fac41c16a43583212d54a5977f2cef457520c520ab9bf92299b2d74011ecd410bdb25061c38128ccf96002c3f5ce0e3b9d4d587a7744ba51e4814c2b2569b89cf09640700000000";
 
     // AVS Data (Dummy values)
-    string private constant TAPROOT_ADDRESS = "tb1pk2f9ve04zxjwc9g8m9csvq97ylmer7qpxyr5cmk62uus2dc57vasy6lw4p";
+    bytes32 private constant TAPROOT_ADDRESS = 0xb2925665f511a4ec1507d9710600be27f791f80131074c6eda5739053714f33b;
     string private constant NETWORK_KEY = "tb1qk73znvxpcyxzzngmr8gjvwm8jldw86tcv3yrnt";
     address[] private OPERATORS = [
         0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE,
@@ -307,6 +307,8 @@ contract HomeChainCoordinatorTest is Test {
 
         // 2. Initiate a txn with the invalid psbt on the HomeChainCoordinator to mint back the eBTC
         Vm.Log[] memory burnLogs = vm.getRecordedLogs();
+        // Expect this to revert as this is a case of sending invalidBurnPsbt from baseChainCoordinator
+        vm.expectRevert(HomeChainCoordinator.InvalidRequest.selector);
         burnLzHelper.help(srcNetworkConfig.endpoint, srcForkId, burnLogs);
 
         vm.selectFork(srcForkId);
@@ -318,7 +320,8 @@ contract HomeChainCoordinatorTest is Test {
         vm.stopPrank();
 
         // Check since it wasn't a valid burn txn, the HomeChainCoordinator should not have regsitered the psbtData at the first place
-        // Get primary status of the burn and the eBTC balance of the user on the destination chain
+        PSBTData memory psbtData = homeChainCoordinator.getPSBTDataForTxnHash(invalidBurnTxnHash);
+        assertEq(psbtData.rawTxn.length, 0);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         lzHelper.help(destNetworkConfig.endpoint, destForkId, logs);
