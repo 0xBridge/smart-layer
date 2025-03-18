@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {Test, Vm, console} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {LayerZeroV2Helper} from "lib/pigeon/src/layerzero-v2/LayerZeroV2Helper.sol";
 import {HelperConfig} from "../script/HelperConfig.s.sol";
@@ -212,7 +212,7 @@ contract BaseChainCoordinatorTest is Test {
 
         // Create parameters for storing the message
         HomeChainCoordinator.StoreMessageParams memory params = HomeChainCoordinator.StoreMessageParams({
-            isMint: false, // This is a burn transaction
+            txnType: false, // This is a burn transaction
             blockHash: BURN_BLOCK_HASH,
             btcTxnHash: BURN_BTC_TXN_HASH,
             proof: burnProof,

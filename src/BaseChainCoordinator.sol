@@ -25,6 +25,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     error WithdrawalFailed();
     error InvalidTokenAddress();
     error InvalidAmount(uint256 minAmount);
+    error InvalidPSBTData();
 
     // State variables
     mapping(bytes32 => TxnData) internal _btcTxnHash_txnData;
@@ -32,7 +33,6 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     uint32 internal immutable _chainEid;
     uint32 internal immutable _homeEid;
 
-    // TODO: Need to have a minimum _amount value to burn
     uint256 internal constant MIN_BURN_AMOUNT = 1000; // Min amount to burn in satoshis
     bytes internal constant OPTIONS = hex"0003010011010000000000000000000000000000c350"; // Options for message sending
 
@@ -129,10 +129,10 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
             TxnData memory txnData = _btcTxnHash_txnData[btcTxnHash];
             user = txnData.user;
             amount = txnData.amount;
-            // 2. Mint the eBTC tokens back to the user
-            _handleMinting(user, amount);
-            // 3. Delete the request from the mapping
+            // 2. Delete the request from the mapping
             delete _btcTxnHash_txnData[btcTxnHash];
+            // 3. Mint the eBTC tokens back to the user
+            _handleMinting(user, amount);
         }
 
         emit MessageProcessed(_guid, _origin.srcEid, _origin.sender, user, btcTxnHash, amount);
@@ -279,6 +279,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      * @param _amount The amount of BTC to burn
      */
     function _burnAndUnlock(bytes calldata _psbtData, uint256 _amount) internal {
+        if (_psbtData.length == 0) revert InvalidPSBTData();
         _eBTCManagerInstance.burn(_amount);
 
         // Store the transaction data on BaseChainCoordinator for future reference

@@ -10,6 +10,7 @@ import {BaseChainCoordinator} from "../src/BaseChainCoordinator.sol";
 import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 import {eBTCManager} from "../src/eBTCManager.sol";
 import {eBTC} from "../src/eBTC.sol";
+import {TxidCalculator} from "../src/libraries/TxidCalculator.sol";
 
 contract HomeChainCoordinatorTest is Test {
     LayerZeroV2Helper private lzHelper;
@@ -278,5 +279,49 @@ contract HomeChainCoordinatorTest is Test {
         vm.selectFork(destForkId);
         uint256 balance = eBTCToken.balanceOf(BTC_RECEIVER);
         assertEq(balance, 0);
+    }
+
+    function testBurnInvalidPSBT() public {
+        // 0. Assume the BTC_RECEIVER has some eBTC
+        vm.deal(address(BTC_RECEIVER), 10000 ether); // This is 10000 native tokens on the destination chain (BSC Testnet)
+        deal(address(eBTCToken), BTC_RECEIVER, BTC_AMOUNT, true);
+
+        // 1. Send message with invalid psbt via the BaseChainCoordinator for the burn txn
+        vm.selectFork(destForkId);
+        burnLzHelper = new LayerZeroV2Helper();
+
+        bytes memory psbtData = BURN_RAW_TXN; // Invalid psbt
+        bytes32 txnHash = TxidCalculator.calculateTxid(psbtData);
+
+        vm.recordLogs();
+        vm.startPrank(BTC_RECEIVER);
+        eBTCToken.approve(address(baseChainCoordinator), BTC_AMOUNT);
+        baseChainCoordinator.burnAndUnlock{value: 1 ether}(psbtData, BTC_AMOUNT);
+        vm.stopPrank();
+
+        uint256 initialBalancePostBurn = eBTCToken.balanceOf(BTC_RECEIVER);
+        assertEq(initialBalancePostBurn, 0);
+        console.log("Initial Balance Post Burn: ", initialBalancePostBurn);
+
+        // 2. Initiate a txn with the invalid psbt on the HomeChainCoordinator to mint back the eBTC
+        Vm.Log[] memory burnLogs = vm.getRecordedLogs();
+        burnLzHelper.help(srcNetworkConfig.endpoint, srcForkId, burnLogs);
+
+        vm.selectFork(srcForkId);
+        vm.prank(BTC_RECEIVER);
+        homeChainCoordinator.unlockBurntEBTC{value: 1 ether}(destNetworkConfig.chainEid, txnHash);
+        console.logBytes32(txnHash);
+
+        // Check since it wasn't a valid burn txn, the HomeChainCoordinator should not have regsitered the psbtData at the first place
+        // Get primary status of the burn and the eBTC balance of the user on the destination chain
+        PSBTData memory burnPsbtData = homeChainCoordinator.getPSBTDataForTxnHash(txnHash);
+        assertEq(burnPsbtData.rawTxn.length, 0);
+        console.log("Burn PSBT Data: ", burnPsbtData.rawTxn.length);
+
+        vm.selectFork(destForkId);
+        uint256 finalBalancePostRetry = eBTCToken.balanceOf(BTC_RECEIVER);
+        assertEq(finalBalancePostRetry, BTC_AMOUNT);
+
+        // 3. Try initiating the mint again, it should fail
     }
 }
