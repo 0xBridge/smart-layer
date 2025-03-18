@@ -386,8 +386,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     function updateBurnStatus(bytes32 _btcTxnHash) external whenNotPaused onlyOwner {
         // 1. Check if the transaction exists
         PSBTData memory psbtData = _btcTxnHash_psbtData[_btcTxnHash];
-        if (psbtData.chainId == 0) {
-            revert InvalidSourceOrDestination();
+        if (psbtData.rawTxn.length == 0) {
+            revert InvalidRequest();
         }
 
         // 2. Update the status of the transaction
@@ -441,7 +441,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             txnType: false, // This is a burn transaction
             status: false, // Transaction is not yet processed
             chainId: _origin.srcEid, // Chain ID of the src chain
-            user: address(0), // TODO: Check if it's possible to get the msg.sender on the baseChainCoordinator (_executor)
+            user: address(0), // TODO: Check if makes sense to store the msg.sender on the baseChainCoordinator here
             rawTxn: _message, // Raw hex PSBT data for the burn transaction
             taprootAddress: "", // Taproot address for the mint or burn transaction
             networkKey: "", // AVS Bitcoin address
@@ -452,6 +452,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
         // 5. Calculate and store the Bitcoin transaction hash
         bytes32 btcTxnHash = TxidCalculator.calculateTxid(_message);
+        // Note: User should not be able to manipulate any existing _btcTxnHash_psbtData data (either mint or burn)
+        if (_btcTxnHash_psbtData[btcTxnHash].rawTxn.length != 0) {
+            revert InvalidRequest();
+        }
         _btcTxnHash_psbtData[btcTxnHash] = psbtData;
 
         // 6. Create task for AVS (can be implemented through a TaskManager contract) - This will be done by the task generator
