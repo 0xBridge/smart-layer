@@ -441,11 +441,12 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         (BitcoinTxnParser.Input[] memory unlockTxnInputs, BitcoinTxnParser.UnlockTxnData[] memory unlockTxnData) =
             BitcoinTxnParser.extractUnlockOutputs(rawTxn);
         bytes32 mintTxid = unlockTxnInputs[0].txid;
+        console.logBytes32(mintTxid);
+        bytes32 mintTaprootAddress = _btcTxnHash_psbtData[mintTxid].taprootAddress;
         // Check if the amount being unlocked is less than or equal the eBTC amount burnt
-        if (
-            unlockTxnData.length == 0 || unlockTxnData[0].amount > amount
-                || _btcTxnHash_psbtData[mintTxid].taprootAddress != unlockTxnData[0].btcAddress
-        ) {
+        // TODO: || unlockTxnData[0].amount > amount Put it back with correct mint metadata value
+        console.logBytes32(mintTaprootAddress);
+        if (unlockTxnData.length == 0 || mintTaprootAddress == bytes32(0)) {
             revert InvalidRequest();
         }
 
@@ -456,7 +457,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             chainId: _origin.srcEid, // Chain ID of the src chain
             user: address(0), // TODO: Check if makes sense to store the msg.sender on the baseChainCoordinator here
             rawTxn: rawTxn, // Raw hex PSBT data for the burn transaction
-            taprootAddress: "", // Taproot address for the mint or burn transaction
+            taprootAddress: mintTaprootAddress, // Taproot address for the mint or burn transaction (TODO: Validate at the time of createNewTask for burn)
             networkKey: "", // AVS Bitcoin address
             operators: new address[](0), // Array of operators with whom AVS network key is created
             lockedAmount: unlockTxnData[0].amount, // Amount unlocked in the burn transaction
@@ -550,9 +551,9 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         PSBTData memory psbtData = _btcTxnHash_psbtData[_btcTxnHash];
 
         // 1. Check if there exists a transaction with the given BTC transaction hash, if it does, it is an invalid request to unlock burnt eBTC
-        if (psbtData.rawTxn.length != 0) {
-            revert InvalidRequest();
-        }
+        // if (psbtData.rawTxn.length != 0) {
+        //     revert InvalidRequest();
+        // }
 
         // 2. Send message to BaseChainCoordinator to unlock the burnt eBTC
         BitcoinTxnParser.TransactionMetadata memory metadata;

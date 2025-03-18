@@ -26,6 +26,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     error InvalidTokenAddress();
     error InvalidAmount(uint256 minAmount);
     error InvalidPSBTData();
+    error InvalidBurnRequest();
 
     // State variables
     mapping(bytes32 => TxnData) internal _btcTxnHash_txnData;
@@ -284,6 +285,10 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
         // Store the transaction data on BaseChainCoordinator for future reference
         bytes32 _btcTxnHash = TxidCalculator.calculateTxid(_psbtData);
+        // Shouldn't allow an already existing PSBT to be sent via BaseChainCoordinator
+        if (_btcTxnHash_txnData[_btcTxnHash].user != address(0)) {
+            revert InvalidBurnRequest();
+        }
         _btcTxnHash_txnData[_btcTxnHash] = TxnData({status: true, user: msg.sender, amount: _amount});
 
         // Pack the amount into _extraData
