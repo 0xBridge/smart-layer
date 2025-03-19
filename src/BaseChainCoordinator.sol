@@ -21,12 +21,12 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     error MessageAlreadyProcessed(bytes32 btcTxnHash);
     error InvalidMessageSender();
     error InvalidPeer();
-    error ReceiverNotSet();
     error WithdrawalFailed();
     error InvalidTokenAddress();
-    error InvalidAmount(uint256 minAmount);
     error InvalidPSBTData();
-    error InvalidBurnRequest();
+    error InvalidUserOrAmount();
+    error InvalidBurnRequest(bytes32 btcTxnHash);
+    error InvalidAmount(uint256 minBTCAmount);
 
     // State variables
     mapping(bytes32 => TxnData) internal _btcTxnHash_txnData;
@@ -34,7 +34,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     uint32 internal immutable _chainEid;
     uint32 internal immutable _homeEid;
 
-    uint256 internal constant MIN_BURN_AMOUNT = 1000; // Min amount to burn in satoshis
+    uint256 public minBTCAmount = 1000; // Min BTC amount / satoshis that needs to be burned
     bytes internal constant OPTIONS = hex"0003010011010000000000000000000000000000c350"; // Options for message sending
 
     // Events
@@ -57,6 +57,16 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         _eBTCManagerInstance = eBTCManager(eBTCManager_);
         _chainEid = chainEid_;
         _homeEid = homeEid_;
+    }
+
+    /**
+     * @notice Sets the minimum amount of BTC that needs to be locked
+     * @param _minBtcAmount The minimum BTC amount to set
+     * @dev Only callable by the contract owner
+     */
+    function setMinBtcAmount(uint256 _minBtcAmount) external onlyOwner {
+        if (_minBtcAmount == 0) revert InvalidAmount(_minBtcAmount);
+        minBTCAmount = _minBtcAmount;
     }
 
     /**
@@ -121,7 +131,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
             abi.decode(_message, (address, bytes32, uint256, uint256));
 
         if (user != address(0) && amount != 0) {
-            // 1. Check for replay attacks
+            // 1. Case of burn mint - Check for replay attacks
             _validateMessageUniqueness(btcTxnHash);
             // 2. Validate message inputs
             _validateInputs(user, amount);
@@ -163,7 +173,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     function _validateInputs(address _user, uint256 _amount) internal pure {
         // Decode the message and process it
         if (_user == address(0) || _amount == 0) {
-            revert InvalidBurnRequest();
+            revert InvalidUserOrAmount();
         }
     }
 
@@ -175,7 +185,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      * @dev Updates storage and handles minting
      */
     function _processMessage(bytes32 _btcTxnHash, address _user, uint256 _amount) internal {
-        // Decode the message and process it
+        // Create the txnData and process it
         TxnData memory txnData = _btcTxnHash_txnData[_btcTxnHash];
         txnData.status = true;
         txnData.user = _user;
@@ -250,7 +260,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
     /**
      * @notice Sends a message to the specified chain
-     * @param _psbtData The PSBT data for the burn transaction
+     * @param _rawTxn The raw PSBT data for the burn transaction
      * @param _amount The amount of BTC to burn
      * @param _deadline Expiration time for the permit signature
      * @param _v v of the permit signature
@@ -258,7 +268,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      * @param _s s of the permit signature
      */
     function burnAndUnlockWithPermit(
-        bytes calldata _psbtData,
+        bytes calldata _rawTxn,
         uint256 _amount,
         uint256 _deadline,
         uint8 _v,
@@ -273,53 +283,54 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         SafeERC20.safePermit(
             IERC20Permit(address(eBTCToken)), msg.sender, address(_eBTCManagerInstance), _amount, _deadline, _v, _r, _s
         );
-        _burnAndUnlock(_psbtData, _amount);
+        _burnAndUnlock(_rawTxn, _amount);
     }
 
     /**
      * @notice Sends a message to the specified chain
-     * @param _psbtData The PSBT data for the burn transaction
+     * @param _rawTxn The raw PSBT data for the burn transaction
      * @param _amount The amount of BTC to burn
      */
-    function burnAndUnlock(bytes calldata _psbtData, uint256 _amount) external payable {
+    function burnAndUnlock(bytes calldata _rawTxn, uint256 _amount) external payable {
         address _eBTCToken = _eBTCManagerInstance.getEBTCTokenAddress();
         if (_eBTCToken == address(0)) revert InvalidTokenAddress();
         IERC20 eBTCToken = IERC20(_eBTCToken);
         SafeERC20.safeTransferFrom(eBTCToken, msg.sender, address(this), _amount);
         SafeERC20.safeApprove(eBTCToken, address(_eBTCManagerInstance), _amount);
-        _burnAndUnlock(_psbtData, _amount);
+        _burnAndUnlock(_rawTxn, _amount);
     }
 
     /**
      * @notice Burns eBTC tokens and sends a message to the specified chain
-     * @param _psbtData The PSBT data for the burn transaction
+     * @param _rawTxn The raw PSBT data for the burn transaction
      * @param _amount The amount of BTC to burn
      */
-    function _burnAndUnlock(bytes calldata _psbtData, uint256 _amount) internal {
-        if (_psbtData.length == 0) revert InvalidPSBTData();
+    function _burnAndUnlock(bytes calldata _rawTxn, uint256 _amount) internal {
+        if (_rawTxn.length == 0) revert InvalidPSBTData();
+        // Shouldn't allow an already existing PSBT to be sent to HomeChainCoordinator via BaseChainCoordinator
+        bytes32 _btcTxnHash = TxidCalculator.calculateTxid(_rawTxn);
+        if (_btcTxnHash_txnData[_btcTxnHash].user != address(0)) {
+            revert InvalidBurnRequest(_btcTxnHash);
+        }
+        // Burn the requested amount
         _eBTCManagerInstance.burn(_amount);
 
-        // Store the transaction data on BaseChainCoordinator for future reference
-        bytes32 _btcTxnHash = TxidCalculator.calculateTxid(_psbtData);
-        // Shouldn't allow an already existing PSBT to be sent via BaseChainCoordinator
-        if (_btcTxnHash_txnData[_btcTxnHash].user != address(0)) {
-            revert InvalidBurnRequest();
-        }
+        // Store the transaction data on BaseChainCoordinator for future reference (No need to save the entire rawTxn)
         _btcTxnHash_txnData[_btcTxnHash] = TxnData({status: true, user: msg.sender, amount: _amount});
 
         // Pack the amount into _extraData
-        bytes memory amountAndPsbtData = abi.encode(_amount, _psbtData);
+        bytes memory amountAndRawTxn = abi.encode(_amount, _rawTxn);
 
         // Pass the psbt data to the HomeChainCoordinator in the burn transaction
         _lzSend(
             _homeEid, // HomeChainCoordinator chainEid
-            amountAndPsbtData,
+            amountAndRawTxn,
             OPTIONS,
             MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
             address(this) // Refund address in case of failed source message.
         );
 
-        emit MessageSent(_homeEid, _psbtData, peers[_homeEid], msg.value);
+        emit MessageSent(_homeEid, _rawTxn, peers[_homeEid], msg.value);
     }
 
     /**
