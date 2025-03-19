@@ -124,7 +124,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
             // 1. Check for replay attacks
             _validateMessageUniqueness(btcTxnHash);
             // 2. Validate message inputs
-            _validateMessage(user, amount);
+            _validateInputs(user, amount);
             // 3. Process the message
             _processMessage(btcTxnHash, user, amount);
         } else {
@@ -134,7 +134,9 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
             amount = txnData.amount;
             // 2. Delete the request from the mapping
             delete _btcTxnHash_txnData[btcTxnHash];
-            // 3. Mint the eBTC tokens back to the user
+            // 3. Validate message inputs
+            _validateInputs(user, amount);
+            // 4. Mint the eBTC tokens back to the user
             _handleMinting(user, amount);
         }
 
@@ -157,9 +159,8 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
      * @notice Validate message inputs
      * @param _user The recipient user address
      * @param _amount The amount of BTC locked
-     * @dev Updates storage and handles minting
      */
-    function _validateMessage(address _user, uint256 _amount) internal pure {
+    function _validateInputs(address _user, uint256 _amount) internal pure {
         // Decode the message and process it
         if (_user == address(0) || _amount == 0) {
             revert InvalidBurnRequest();
