@@ -123,7 +123,9 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         if (user != address(0) && amount != 0) {
             // 1. Check for replay attacks
             _validateMessageUniqueness(btcTxnHash);
-            // 2. Process the message
+            // 2. Validate message inputs
+            _validateMessage(user, amount);
+            // 3. Process the message
             _processMessage(btcTxnHash, user, amount);
         } else {
             // 1. Case of burn failure handle - Get the user and amount from the mapping
@@ -148,6 +150,19 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         // Check if this message has already been processed
         if (isMessageProcessed(_btcTxnHash)) {
             revert MessageAlreadyProcessed(_btcTxnHash);
+        }
+    }
+
+    /**
+     * @notice Validate message inputs
+     * @param _user The recipient user address
+     * @param _amount The amount of BTC locked
+     * @dev Updates storage and handles minting
+     */
+    function _validateMessage(address _user, uint256 _amount) internal pure {
+        // Decode the message and process it
+        if (_user == address(0) || _amount == 0) {
+            revert InvalidBurnRequest();
         }
     }
 
