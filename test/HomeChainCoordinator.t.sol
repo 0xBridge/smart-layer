@@ -316,7 +316,7 @@ contract HomeChainCoordinatorTest is Test {
 
         vm.recordLogs();
         vm.startPrank(BTC_RECEIVER);
-        homeChainCoordinator.unlockBurntEBTC{value: 50 ether}(destNetworkConfig.chainEid, BURN_BTC_TXN_HASH);
+        homeChainCoordinator.unlockBurntEBTC{value: 50 ether}(destNetworkConfig.chainEid, invalidBurnTxnHash);
         vm.stopPrank();
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
