@@ -523,12 +523,12 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     // Create a function to retry for the failure case
     function unlockBurntEBTC(uint32 chainId, bytes32 _btcTxnHash) external payable whenNotPaused nonReentrant {
         // 0. Get the BTC transaction hash from the AVS data
-        // PSBTData memory psbtData = _btcTxnHash_psbtData[_btcTxnHash];
+        PSBTData memory psbtData = _btcTxnHash_psbtData[_btcTxnHash];
 
         // 1. Check if there exists a transaction with the given BTC transaction hash, if it does, it is an invalid request to unlock burnt eBTC
-        // if (psbtData.rawTxn.length != 0) {
-        //     revert InvalidRequest();
-        // }
+        if (psbtData.rawTxn.length != 0) {
+            revert InvalidRequest();
+        }
 
         // 2. Send message to BaseChainCoordinator to unlock the burnt eBTC
         BitcoinTxnParser.TransactionMetadata memory metadata;

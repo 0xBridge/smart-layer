@@ -131,7 +131,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
             abi.decode(_message, (address, bytes32, uint256, uint256));
 
         if (user != address(0) && amount != 0) {
-            // 1. Case of burn mint - Check for replay attacks
+            // 1. Case of mint - Check for replay attacks
             _validateMessageUniqueness(btcTxnHash);
             // 2. Validate message inputs
             _validateInputs(user, amount);
