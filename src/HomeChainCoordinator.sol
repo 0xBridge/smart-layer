@@ -31,6 +31,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     error WithdrawalFailed();
     error InvalidStatusUpdate();
     error InvalidRequest();
+    error InvalidTaprootAddress();
 
     struct StoreMessageParams {
         bool txnType; // Whether the transaction is a mint or burn
@@ -170,13 +171,20 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
             // 1. Validate input in a separate function call
             _validateInput(merkleRoot, params.btcTxnHash, params.proof, params.index, params.rawTxn, psbtData.chainId);
-            // 2. Update the PSBT data with the required burn transaction details
-            psbtData.taprootAddress = params.taprootAddress;
+            // 2. Validate taproot address at the time of task creation
+            _validateTaprootAddress(params.taprootAddress, psbtData);
+            // 3. Update the PSBT data with the required burn transaction details
             psbtData.networkKey = params.networkKey;
             psbtData.operators = params.operators;
         }
         _btcTxnHash_psbtData[params.btcTxnHash] = psbtData;
         emit MessageCreated(params.txnType, params.blockHash, params.btcTxnHash);
+    }
+
+    function _validateTaprootAddress(bytes32 taprootAddress, PSBTData memory psbtData) internal pure {
+        if (taprootAddress != psbtData.taprootAddress) {
+            revert InvalidTaprootAddress();
+        }
     }
 
     // NOTE: The message will come from the endpoint but for now we're considering it to be the owner
