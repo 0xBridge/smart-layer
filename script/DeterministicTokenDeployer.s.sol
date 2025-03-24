@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import {Script, console} from "forge-std/Script.sol";
 import {eBTC} from "../src/eBTC.sol";
 import {eBTCManager} from "../src/eBTCManager.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {Script, console} from "forge-std/Script.sol";
 
 /**
  * @title DeterministicTokenDeployer
@@ -13,7 +13,9 @@ import {Script, console} from "forge-std/Script.sol";
  */
 contract DeterministicTokenDeployer is Script {
     // Constants
-    address public constant OWNER_ADDRESS = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
+    uint256 ownerPrivateKey = vm.envUint("OWNER_PRIVATE_KEY");
+    // Get address from private key
+    address public OWNER_ADDRESS = vm.addr(ownerPrivateKey);
 
     // Events
     event TokenDeployed(address indexed tokenAddress);
@@ -71,7 +73,7 @@ contract DeterministicTokenDeployer is Script {
             tokenImplementation := create2(0, add(tokenBytecode, 32), mload(tokenBytecode), salt_)
         }
         // Generate initialization data
-        bytes memory initData = abi.encodeWithSelector(eBTC.initialize.selector, owner_);
+        bytes memory initData = abi.encodeCall(eBTC.initialize, owner_);
         // Generate proxy constructor data
         return (abi.encodePacked(type(ERC1967Proxy).creationCode, abi.encode(tokenImplementation, initData)));
     }

@@ -11,11 +11,11 @@ import {HomeChainCoordinator, PSBTData} from "./HomeChainCoordinator.sol";
 import {IAttestationCenter, IAvsLogic} from "./interfaces/IAvsLogic.sol";
 
 /**
- * @title AVSExtension
+ * @title TasksManager
  * @notice Implementation of a secure 0xBridge AVS logic with ownership and pause functionality
  * @dev Manages tasks and processes attestations for bridge operations
  */
-contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
+contract TasksManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     // using BN254 for BN254.G1Point;
 
     // Errors
@@ -66,7 +66,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     }
 
     /**
-     * @notice Initializes the AVSExtension contract
+     * @notice Initializes the TasksManager contract
      * @param initialOwner_ Address of the initial owner of the contract
      * @param performer_ Address authorized to create new tasks
      * @param attestationCenter_ Address of the attestation center contract

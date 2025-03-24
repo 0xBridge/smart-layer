@@ -45,16 +45,18 @@ contract BitcoinLightClientTest is Test {
         bitcoinLightClient = new BitcoinLightClient();
 
         // Deploy proxy
-        bytes memory initData = abi.encodeWithSelector(
-            BitcoinLightClient.initialize.selector,
-            ADMIN,
-            initialHeader.version,
-            initialHeader.timestamp,
-            initialHeader.difficultyBits,
-            initialHeader.nonce,
-            initialHeader.height,
-            initialHeader.prevBlock,
-            initialHeader.merkleRoot
+        bytes memory initData = abi.encodeCall(
+            BitcoinLightClient.initialize,
+            (
+                ADMIN,
+                initialHeader.version,
+                initialHeader.timestamp,
+                initialHeader.difficultyBits,
+                initialHeader.nonce,
+                initialHeader.height,
+                initialHeader.prevBlock,
+                initialHeader.merkleRoot
+            )
         );
 
         ERC1967Proxy proxyContract = new ERC1967Proxy(address(bitcoinLightClient), initData);

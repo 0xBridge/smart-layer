@@ -36,16 +36,9 @@ contract DeployBitcoinLightClient is Script {
         BitcoinLightClient implementation = new BitcoinLightClient();
 
         // Encode initialization data
-        bytes memory initData = abi.encodeWithSelector(
-            BitcoinLightClient.initialize.selector,
-            admin,
-            version,
-            timestamp,
-            difficultyBits,
-            nonce,
-            height,
-            prevBlock,
-            merkleRoot
+        bytes memory initData = abi.encodeCall(
+            BitcoinLightClient.initialize,
+            (admin, version, timestamp, difficultyBits, nonce, height, prevBlock, merkleRoot)
         );
 
         // Deploy proxy

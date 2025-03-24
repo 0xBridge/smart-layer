@@ -5,16 +5,16 @@ import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {LayerZeroV2Helper} from "lib/pigeon/src/layerzero-v2/LayerZeroV2Helper.sol";
 import {HelperConfig} from "../script/HelperConfig.s.sol";
-import {AVSExtension} from "../src/AVSExtension.sol";
+import {TasksManager} from "../src/TasksManager.sol";
 import {HomeChainCoordinator} from "../src/HomeChainCoordinator.sol";
 import {BaseChainCoordinator} from "../src/BaseChainCoordinator.sol";
 import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 import {IAttestationCenter} from "../src/interfaces/IAttestationCenter.sol";
 import {eBTCManager} from "../src/eBTCManager.sol";
 
-contract AVSExtensionTest is Test {
+contract TasksManagerTest is Test {
     // Main contracts
-    AVSExtension private avsExtension;
+    TasksManager private tasksManager;
     HomeChainCoordinator private homeChainCoordinator;
     BaseChainCoordinator private baseChainCoordinator;
     BitcoinLightClient private btcLightClient;
@@ -106,16 +106,9 @@ contract AVSExtensionTest is Test {
 
         // Deploy Bitcoin Light Client
         BitcoinLightClient bitcoinLightClientImplementation = new BitcoinLightClient();
-        bytes memory lightClientInitData = abi.encodeWithSelector(
-            BitcoinLightClient.initialize.selector,
-            owner,
-            BLOCK_VERSION,
-            BLOCK_TIMESTAMP,
-            DIFFICULTY_BITS,
-            NONCE,
-            HEIGHT,
-            PREV_BLOCK,
-            MERKLE_ROOT
+        bytes memory lightClientInitData = abi.encodeCall(
+            BitcoinLightClient.initialize,
+            (owner, BLOCK_VERSION, BLOCK_TIMESTAMP, DIFFICULTY_BITS, NONCE, HEIGHT, PREV_BLOCK, MERKLE_ROOT)
         );
         ERC1967Proxy lightClientProxy = new ERC1967Proxy(address(bitcoinLightClientImplementation), lightClientInitData);
         btcLightClient = BitcoinLightClient(address(lightClientProxy));
@@ -130,22 +123,22 @@ contract AVSExtensionTest is Test {
         homeChainCoordinator.setPeer(destNetworkConfig.chainEid, receiver);
         vm.stopPrank();
 
-        // Deploy AVSExtension
-        avsExtension = new AVSExtension(owner, PERFORMER, ATTESTATION_CENTER, address(homeChainCoordinator));
-        // Transfer ownership of HomeChainCoordinator to the avsExtension
+        // Deploy TasksManager
+        tasksManager = new TasksManager(owner, PERFORMER, ATTESTATION_CENTER, address(homeChainCoordinator));
+        // Transfer ownership of HomeChainCoordinator to the tasksManager
         vm.prank(owner);
-        homeChainCoordinator.transferOwnership(address(avsExtension));
+        homeChainCoordinator.transferOwnership(address(tasksManager));
 
         // Fund contracts
         vm.deal(owner, 100 ether);
-        vm.deal(address(avsExtension), 10 ether);
+        vm.deal(address(tasksManager), 10 ether);
         vm.deal(address(homeChainCoordinator), 10 ether);
 
         // lzHelper = new LayerZeroV2Helper();
     }
 
     function testInitialState() public {
-        assertTrue(avsExtension.owner() == owner);
+        assertTrue(tasksManager.owner() == owner);
     }
 
     function testSetPerformer() public {
@@ -155,24 +148,24 @@ contract AVSExtensionTest is Test {
         emit PerformerUpdated(PERFORMER, newPerformer);
 
         vm.prank(owner);
-        avsExtension.setPerformer(newPerformer);
+        tasksManager.setPerformer(newPerformer);
     }
 
     function testCreateNewTask() public {
-        uint256 initialTaskHashLength = avsExtension.getTaskHashesLength();
+        uint256 initialTaskHashLength = tasksManager.getTaskHashesLength();
 
         vm.prank(PERFORMER);
-        avsExtension.createNewTask(
+        tasksManager.createNewTask(
             true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
         );
 
-        assertEq(avsExtension.getTaskHashesLength(), initialTaskHashLength + 1);
+        assertEq(tasksManager.getTaskHashesLength(), initialTaskHashLength + 1);
     }
 
     function testCreateNewTaskNotPerformer() public {
         vm.prank(USER);
-        vm.expectRevert(AVSExtension.CallerNotTaskGenerator.selector);
-        avsExtension.createNewTask(
+        vm.expectRevert(TasksManager.CallerNotTaskGenerator.selector);
+        tasksManager.createNewTask(
             true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
         );
     }
@@ -187,21 +180,21 @@ contract AVSExtensionTest is Test {
         });
 
         vm.prank(ATTESTATION_CENTER);
-        vm.expectRevert(AVSExtension.InvalidTask.selector);
+        vm.expectRevert(TasksManager.InvalidTask.selector);
 
-        avsExtension.beforeTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
+        tasksManager.beforeTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
     }
 
     function testTaskLifecycle() public {
         // Create task
         vm.prank(PERFORMER);
-        avsExtension.createNewTask(
+        tasksManager.createNewTask(
             true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
         );
 
         // Verify task is valid but not completed
-        assertTrue(avsExtension.isTaskValid(BTC_TXN_HASH));
-        assertFalse(avsExtension.isTaskCompleted(BTC_TXN_HASH));
+        assertTrue(tasksManager.isTaskValid(BTC_TXN_HASH));
+        assertFalse(tasksManager.isTaskCompleted(BTC_TXN_HASH));
 
         // Simulate task completion through attestation center
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
@@ -212,14 +205,14 @@ contract AVSExtensionTest is Test {
         });
 
         vm.prank(ATTESTATION_CENTER);
-        avsExtension.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
+        tasksManager.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
 
         // Verify task is now completed
-        assertTrue(avsExtension.isTaskCompleted(BTC_TXN_HASH));
+        assertTrue(tasksManager.isTaskCompleted(BTC_TXN_HASH));
     }
 
     function testQuoteGasFees() public {
-        (uint256 nativeFee, uint256 lzTokenFee) = avsExtension.quote(BTC_TXN_HASH, RAW_TXN, false);
+        (uint256 nativeFee, uint256 lzTokenFee) = tasksManager.quote(BTC_TXN_HASH, RAW_TXN, false);
 
         assertTrue(nativeFee > 0);
         assertEq(lzTokenFee, 0); // When payInLzToken is false
@@ -227,30 +220,30 @@ contract AVSExtensionTest is Test {
 
     function testPause() public {
         vm.prank(owner);
-        avsExtension.pause();
-        assertTrue(avsExtension.paused());
+        tasksManager.pause();
+        assertTrue(tasksManager.paused());
 
         vm.prank(owner);
-        avsExtension.unpause();
-        assertFalse(avsExtension.paused());
+        tasksManager.unpause();
+        assertFalse(tasksManager.paused());
     }
 
     function testPauseNotOwner() public {
         vm.startPrank(makeAddr("randomUser"));
         vm.expectRevert("Ownable: caller is not the owner");
-        avsExtension.pause();
+        tasksManager.pause();
         vm.stopPrank();
     }
 
     function testWithdraw() public {
         uint256 initialBalance = address(owner).balance;
-        uint256 contractBalance = address(avsExtension).balance;
+        uint256 contractBalance = address(tasksManager).balance;
 
         vm.prank(owner);
-        avsExtension.withdraw();
+        tasksManager.withdraw();
 
         assertEq(address(owner).balance, initialBalance + contractBalance);
-        assertEq(address(avsExtension).balance, 0);
+        assertEq(address(tasksManager).balance, 0);
     }
 
     // receive() external payable {}

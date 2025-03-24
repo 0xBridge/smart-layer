@@ -27,7 +27,7 @@ contract DeployEBTC is Script {
         eBTC implementation = new eBTC();
 
         // Encode initialization data
-        bytes memory initData = abi.encodeWithSelector(eBTC.initialize.selector, minter);
+        bytes memory initData = abi.encodeCall(eBTC.initialize, minter);
 
         // Deploy proxy
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);

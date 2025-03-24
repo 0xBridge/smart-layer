@@ -20,8 +20,8 @@ contract SendMessageScript is Script {
     address internal constant BASE_CHAIN_COORDINATOR_ADDRESS = 0x2908ba527aE590F9C7c5fCcDaC47598E28179Cf4; // on Sepolia
 
     // Chain identification
-    uint32 internal constant SRC_EID = 40267; // Amoy
-    uint32 internal constant DEST_EID = 40161; // Sepolia
+    uint32 internal constant LZ_SRC_EID = 40267; // Amoy
+    uint32 internal constant LZ_DEST_EID = 40161; // Sepolia
 
     /**
      * @notice Main execution function
@@ -42,7 +42,7 @@ contract SendMessageScript is Script {
         // Set HomeChainCoordinator contract address as peer on BaseChainCoordinator
         // Convert address to bytes32
         bytes32 receiver = bytes32(uint256(uint160(HOME_CHAIN_COORDINATOR_ADDRESS)));
-        _baseChainCoordinator.setPeer(SRC_EID, receiver);
+        _baseChainCoordinator.setPeer(LZ_SRC_EID, receiver);
         vm.stopBroadcast();
 
         // Set up source chain fork
@@ -57,7 +57,7 @@ contract SendMessageScript is Script {
 
         // Set BaseChainCoordinator contract address as peer on HomeChainCoordinator
         bytes32 baseChainReceiver = bytes32(uint256(uint160(BASE_CHAIN_COORDINATOR_ADDRESS)));
-        _homeChainCoordinator.setPeer(DEST_EID, baseChainReceiver);
+        _homeChainCoordinator.setPeer(LZ_DEST_EID, baseChainReceiver);
         vm.stopBroadcast();
     }
 }

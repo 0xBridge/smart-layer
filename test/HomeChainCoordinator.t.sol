@@ -104,7 +104,7 @@ contract HomeChainCoordinatorTest is Test {
 
         // Deploy implementation and proxy for eBTC using ERC1967Proxy
         eBTC eBTCImplementation = new eBTC();
-        bytes memory initData = abi.encodeWithSelector(eBTC.initialize.selector, address(eBTCManagerInstance));
+        bytes memory initData = abi.encodeCall(eBTC.initialize, address(eBTCManagerInstance));
         ERC1967Proxy proxy = new ERC1967Proxy(address(eBTCImplementation), initData);
         eBTCToken = eBTC(address(proxy));
 
@@ -120,16 +120,18 @@ contract HomeChainCoordinatorTest is Test {
 
         // Deploy implementation and proxy for BitcoinLightClient using ERC1967Proxy
         BitcoinLightClient bitcoinLightClientImplementation = new BitcoinLightClient();
-        bytes memory lightClientInitData = abi.encodeWithSelector(
-            BitcoinLightClient.initialize.selector,
-            owner,
-            MINT_BLOCK_VERSION,
-            MINT_BLOCK_TIMESTAMP,
-            MINT_DIFFICULTY_BITS,
-            MINT_NONCE,
-            MINT_HEIGHT,
-            MINT_PREV_BLOCK,
-            MINT_MERKLE_ROOT
+        bytes memory lightClientInitData = abi.encodeCall(
+            BitcoinLightClient.initialize,
+            (
+                owner,
+                MINT_BLOCK_VERSION,
+                MINT_BLOCK_TIMESTAMP,
+                MINT_DIFFICULTY_BITS,
+                MINT_NONCE,
+                MINT_HEIGHT,
+                MINT_PREV_BLOCK,
+                MINT_MERKLE_ROOT
+            )
         );
         ERC1967Proxy lightClientProxy = new ERC1967Proxy(address(bitcoinLightClientImplementation), lightClientInitData);
         btcLightClient = BitcoinLightClient(address(lightClientProxy));
