@@ -13,7 +13,7 @@ import {IAttestationCenter, IAvsLogic} from "./interfaces/IAvsLogic.sol";
 /**
  * @title TasksManager
  * @notice Implementation of a secure 0xBridge AVS logic with ownership and pause functionality
- * @dev Manages tasks and processes attestations for bridge operations
+ * @dev Responsible for tasks creation and  providing hooks to be called by the attestation center
  */
 contract TasksManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     // using BN254 for BN254.G1Point;
@@ -35,12 +35,12 @@ contract TasksManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     bytes32[] internal _taskHashes;
     mapping(bytes32 _taskHash => bool) internal _completedTasks;
 
-    address internal _performer;
+    address internal _taskCreator;
     address internal immutable _attestationCenter;
     HomeChainCoordinator internal immutable _homeChainCoordinator;
 
     // Events
-    event PerformerUpdated(address oldPerformer, address newPerformer);
+    event TaskCreatorUpdated(address oldTaskCreator, address newTaskCreator);
     event NewTaskCreated(bytes32 indexed btcTxnHash);
     event TaskCompleted(bool indexed txnType, bytes32 indexed btcTxnHash);
 
@@ -55,11 +55,11 @@ contract TasksManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     }
 
     /**
-     * @notice Ensures the caller is the task performer
+     * @notice Ensures the caller is the task taskCreator
      * @dev Used to restrict createNewTask from only being called by a permissioned entity
      */
-    modifier onlyTaskPerformer() {
-        if (msg.sender != _performer) {
+    modifier onlyTaskCreator() {
+        if (msg.sender != _taskCreator) {
             revert CallerNotTaskGenerator();
         }
         _;
@@ -68,26 +68,26 @@ contract TasksManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     /**
      * @notice Initializes the TasksManager contract
      * @param initialOwner_ Address of the initial owner of the contract
-     * @param performer_ Address authorized to create new tasks
+     * @param taskCreator_ Address authorized to create new tasks
      * @param attestationCenter_ Address of the attestation center contract
      * @param homeChainCoordinator_ Address of the home chain coordinator contract
      */
-    constructor(address initialOwner_, address performer_, address attestationCenter_, address homeChainCoordinator_)
+    constructor(address initialOwner_, address taskCreator_, address attestationCenter_, address homeChainCoordinator_)
         Ownable()
     {
         _transferOwnership(initialOwner_);
-        _setPerformer(performer_);
+        _setTaskCreator(taskCreator_);
         _attestationCenter = attestationCenter_;
         _homeChainCoordinator = HomeChainCoordinator(payable(homeChainCoordinator_));
     }
 
     /**
-     * @notice Sets a new performer address
-     * @param newPerformer The address of the new performer
+     * @notice Sets a new taskCreator address
+     * @param newTaskCreator The address of the new taskCreator
      * @dev Only callable by the contract owner
      */
-    function setPerformer(address newPerformer) external onlyOwner {
-        _setPerformer(newPerformer);
+    function setTaskCreator(address newTaskCreator) external onlyOwner {
+        _setTaskCreator(newTaskCreator);
     }
 
     /**
@@ -101,7 +101,7 @@ contract TasksManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      * @param _taprootAddress The taproot address where the btc will be getting locked
      * @param _networkKey The network key for the AVS created from the participated operators
      * @param _operators The addresses of the operators for the network key creation
-     * @dev Only the authorized performer can create new tasks
+     * @dev Only the authorized taskCreator can create new tasks
      */
     function createNewTask(
         bool _txnType,
@@ -113,7 +113,7 @@ contract TasksManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         bytes32 _taprootAddress,
         bytes32 _networkKey,
         address[] calldata _operators
-    ) external onlyTaskPerformer {
+    ) external onlyTaskCreator {
         // Create the struct parameter for storeMessage
         HomeChainCoordinator.StoreMessageParams memory params = HomeChainCoordinator.StoreMessageParams({
             txnType: _txnType,
@@ -137,7 +137,7 @@ contract TasksManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      * @notice Validates task before submission to the attestation center
      * @param _taskInfo The task information struct
      * @param _isApproved Whether the task is approved
-     * @dev The task performer's signature (unused but kept for interface compatibility)
+     * @dev The task taskCreator's signature (unused but kept for interface compatibility)
      * @dev The attesters' signature (unused but kept for interface compatibility)
      * @dev The attesters' IDs (unused but kept for interface compatibility)
      * @dev Called by the attestation center before task submission
@@ -162,7 +162,7 @@ contract TasksManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      * @notice Processes task after submission to the attestation center
      * @param _taskInfo The task information struct
      * @dev The approval status (unused but kept for interface compatibility)
-     * @dev The task performer's signature (unused but kept for interface compatibility)
+     * @dev The task taskCreator's signature (unused but kept for interface compatibility)
      * @dev The attesters' signature (unused but kept for interface compatibility)
      * @dev The attesters' IDs (unused but kept for interface compatibility)
      * @dev Called by the attestation center after task submission
@@ -212,13 +212,13 @@ contract TasksManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     }
 
     /**
-     * @notice Internal function to set the performer address
-     * @param newPerformer Address of the new performer
+     * @notice Internal function to set the taskCreator address
+     * @param newTaskCreator Address of the new taskCreator
      */
-    function _setPerformer(address newPerformer) internal {
-        address oldPerformer = _performer;
-        _performer = newPerformer;
-        emit PerformerUpdated(oldPerformer, newPerformer);
+    function _setTaskCreator(address newTaskCreator) internal {
+        address oldTaskCreator = _taskCreator;
+        _taskCreator = newTaskCreator;
+        emit TaskCreatorUpdated(oldTaskCreator, newTaskCreator);
     }
 
     /**

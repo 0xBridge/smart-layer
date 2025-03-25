@@ -22,7 +22,7 @@ contract TasksManagerTest is Test {
 
     // Test accounts
     address private owner;
-    address private constant PERFORMER = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
+    address private constant TASKS_CREATOR = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
     address private constant USER = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
     address private constant ATTESTATION_CENTER = 0x276ef26eEDC3CFE0Cdf22fB033Abc9bF6b6a95B3;
 
@@ -59,7 +59,7 @@ contract TasksManagerTest is Test {
     ];
 
     // Events to test
-    event PerformerUpdated(address oldPerformer, address newPerformer);
+    event TaskCreatorUpdated(address oldTaskCreator, address newTaskCreator);
     event NewTaskCreated(bytes32 indexed btcTxnHash);
     event TaskCompleted(bytes32 indexed btcTxnHash);
 
@@ -124,7 +124,7 @@ contract TasksManagerTest is Test {
         vm.stopPrank();
 
         // Deploy TasksManager
-        tasksManager = new TasksManager(owner, PERFORMER, ATTESTATION_CENTER, address(homeChainCoordinator));
+        tasksManager = new TasksManager(owner, TASKS_CREATOR, ATTESTATION_CENTER, address(homeChainCoordinator));
         // Transfer ownership of HomeChainCoordinator to the tasksManager
         vm.prank(owner);
         homeChainCoordinator.transferOwnership(address(tasksManager));
@@ -141,20 +141,20 @@ contract TasksManagerTest is Test {
         assertTrue(tasksManager.owner() == owner);
     }
 
-    function testSetPerformer() public {
-        address newPerformer = makeAddr("newPerformer");
+    function testSetTaskCreator() public {
+        address newTaskCreator = makeAddr("newTaskCreator");
 
         vm.expectEmit(true, true, true, true);
-        emit PerformerUpdated(PERFORMER, newPerformer);
+        emit TaskCreatorUpdated(TASKS_CREATOR, newTaskCreator);
 
         vm.prank(owner);
-        tasksManager.setPerformer(newPerformer);
+        tasksManager.setTaskCreator(newTaskCreator);
     }
 
     function testCreateNewTask() public {
         uint256 initialTaskHashLength = tasksManager.getTaskHashesLength();
 
-        vm.prank(PERFORMER);
+        vm.prank(TASKS_CREATOR);
         tasksManager.createNewTask(
             true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
         );
@@ -162,7 +162,7 @@ contract TasksManagerTest is Test {
         assertEq(tasksManager.getTaskHashesLength(), initialTaskHashLength + 1);
     }
 
-    function testCreateNewTaskNotPerformer() public {
+    function testCreateNewTaskNotTaskCreator() public {
         vm.prank(USER);
         vm.expectRevert(TasksManager.CallerNotTaskGenerator.selector);
         tasksManager.createNewTask(
@@ -175,7 +175,7 @@ contract TasksManagerTest is Test {
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
             proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
             data: abi.encode(invalidTaskHash),
-            taskPerformer: PERFORMER,
+            taskPerformer: TASKS_CREATOR,
             taskDefinitionId: 0
         });
 
@@ -187,7 +187,7 @@ contract TasksManagerTest is Test {
 
     function testTaskLifecycle() public {
         // Create task
-        vm.prank(PERFORMER);
+        vm.prank(TASKS_CREATOR);
         tasksManager.createNewTask(
             true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
         );
@@ -200,7 +200,7 @@ contract TasksManagerTest is Test {
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
             proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
             data: abi.encode(BTC_TXN_HASH),
-            taskPerformer: PERFORMER,
+            taskPerformer: TASKS_CREATOR,
             taskDefinitionId: 0
         });
 

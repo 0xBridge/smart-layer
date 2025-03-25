@@ -46,7 +46,7 @@ interface IVault {
 }
 
 // interface
-contract AVSTest is Test {
+contract OthenticFlowTest is Test {
     address private constant SIGNER = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
 
     // Amoy Variables
@@ -87,7 +87,7 @@ contract AVSTest is Test {
     function alreadyDone_setUp() public {
         // 1. Deploy the AVS contracts - this can be done via the Othentic cli
 
-        // 2. Register the necessary performer/operators/attesters/aggregators on EigenLayer - to be executed by the deployer / AVS Multisig owner
+        // 2. Register the necessary task creator/operators/attesters/aggregators on EigenLayer - to be executed by the deployer / AVS Multisig owner
         // https://holesky.etherscan.io/tx/0x5e99ffa3be63df189d5e61309480e902ace42b65fbed715ee8432cc1a0e754df
         address initDelegationApprover = ZERO_ADDRESS;
         uint32 allocationDelay = 0;

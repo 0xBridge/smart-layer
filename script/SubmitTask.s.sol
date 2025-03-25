@@ -32,7 +32,7 @@ contract SubmitTask is Script {
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
             proofOfTask: "Just putting any random string here.",
             data: hex"000000008616134584b18a2e16e2b6f4b6f8acc7a1a975c2a8c6f8b10493e260", // hex bytes data
-            taskPerformer: 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE, // Generator / Performer address
+            taskPerformer: 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE, // Generator / Task creator address
             taskDefinitionId: 0
         });
 
