@@ -191,7 +191,7 @@
 //         PSBTData memory psbtData = homeChainCoordinator.getPSBTDataForTxnHash(BURN_BTC_TXN_HASH);
 
 //         // Verify the recorded data
-//         assertEq(psbtData.txnType, false, "Transaction type should be burn (false)");
+//         assertEq(psbtData.isMintTxn, false, "Transaction type should be burn (false)");
 //         assertEq(psbtData.rawTxn, BURN_RAW_TXN, "Raw transaction should match");
 
 //         // Completing the flow by verifying and updating burn status
@@ -213,8 +213,8 @@
 //         vm.startPrank(owner);
 
 //         // Create parameters for storing the message
-//         HomeChainCoordinator.StoreMessageParams memory params = HomeChainCoordinator.StoreMessageParams({
-//             txnType: false, // This is a burn transaction
+//         HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+//             isMintTxn: false, // This is a burn transaction
 //             blockHash: BURN_BLOCK_HASH,
 //             btcTxnHash: BURN_BTC_TXN_HASH,
 //             proof: burnProof,

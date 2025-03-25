@@ -190,7 +190,7 @@ contract HomeChainCoordinatorTest is Test {
 
         vm.recordLogs();
         vm.startPrank(owner);
-        HomeChainCoordinator.StoreMessageParams memory params = HomeChainCoordinator.StoreMessageParams(
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams(
             true, // isMint
             MINT_BLOCK_HASH,
             MINT_BTC_TXN_HASH,
@@ -256,7 +256,7 @@ contract HomeChainCoordinatorTest is Test {
 
         vm.selectFork(srcForkId);
 
-        HomeChainCoordinator.StoreMessageParams memory params = HomeChainCoordinator.StoreMessageParams(
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams(
             false, // isMint
             BURN_BLOCK_HASH,
             BURN_BTC_TXN_HASH,

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-// TODO: Break PSBTData into separate PSBTData and AVSData (txnType, taprootAddress, networkKey, operators) structs
+// TODO: Break PSBTData into separate PSBTData and AVSData (isMintTxn, taprootAddress, networkKey, operators) structs
 struct PSBTData {
-    bool txnType; // true for mint, false for burn
+    bool isMintTxn; // true for mint, false for burn
     bool status; // isMinted or isBurned depending on the transaction type
     uint32 chainId; // Chain Id of the destination chain (currently making use of chainEid)
     address user; // User address (could be the receiver of the eBTC token or the burner of the eBTC token)

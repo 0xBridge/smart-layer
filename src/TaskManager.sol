@@ -41,7 +41,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     // Events
     event TaskCreatorUpdated(address oldTaskCreator, address newTaskCreator);
     event NewTaskCreated(bytes32 indexed btcTxnHash);
-    event TaskCompleted(bool indexed txnType, bytes32 indexed btcTxnHash);
+    event TaskCompleted(bool indexed isMintTxn, bytes32 indexed btcTxnHash);
 
     /**
      * @notice Ensures the caller is the attestation center
@@ -82,16 +82,16 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
 
     /**
      * @notice Sets a new taskCreator address
-     * @param newTaskCreator The address of the new taskCreator
+     * @param _newTaskCreator The address of the new taskCreator
      * @dev Only callable by the contract owner
      */
-    function setTaskCreator(address newTaskCreator) external onlyOwner {
-        _setTaskCreator(newTaskCreator);
+    function setTaskCreator(address _newTaskCreator) external onlyOwner {
+        _setTaskCreator(_newTaskCreator);
     }
 
     /**
      * @notice Creates a new task for verification
-     * @param _txnType Whether the task is a mint (1) or burn (0)
+     * @param _isMintTxn Whether the task is a mint (1) or burn (0)
      * @param _blockHash The hash of the Bitcoin block
      * @param _btcTxnHash The hash of the Bitcoin transaction
      * @param _proof The merkle proof for transaction verification
@@ -103,7 +103,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      * @dev Only the authorized taskCreator can create new tasks
      */
     function createNewTask(
-        bool _txnType,
+        bool _isMintTxn,
         bytes32 _blockHash,
         bytes32 _btcTxnHash,
         bytes32[] calldata _proof,
@@ -114,8 +114,8 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         address[] calldata _operators
     ) external onlyTaskCreator {
         // Create the struct parameter for storeMessage
-        HomeChainCoordinator.StoreMessageParams memory params = HomeChainCoordinator.StoreMessageParams({
-            txnType: _txnType,
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+            isMintTxn: _isMintTxn,
             blockHash: _blockHash,
             btcTxnHash: _btcTxnHash,
             proof: _proof,
@@ -133,7 +133,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     }
 
     /**
-     * @notice Validates task before submission to the attestation center
+     * @notice Hook to validate the task details before the task is created in attestation center
      * @param _taskInfo The task information struct
      * @param _isApproved Whether the task is approved
      * @dev The task taskCreator's signature (unused but kept for interface compatibility)
@@ -149,16 +149,16 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256[] calldata
     ) external view onlyAttestationCenter {
         // Decode task hash from taskInfo data
-        (bool txnType, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
+        (bool isMintTxn, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
 
         // Check that the task is valid, hasn't been responsed yet
         if (!_isApproved) revert TaskNotApproved();
-        if (!isTaskValid(btcTxnHash)) revert InvalidTask();
+        if (!isTaskExists(btcTxnHash)) revert InvalidTask();
         if (isTaskCompleted(btcTxnHash)) revert TaskAlreadyCompleted();
     }
 
     /**
-     * @notice Processes task after submission to the attestation center
+     * @notice Hook to validate the task details after the task is created in attestation center
      * @param _taskInfo The task information struct
      * @dev The approval status (unused but kept for interface compatibility)
      * @dev The task taskCreator's signature (unused but kept for interface compatibility)
@@ -174,12 +174,12 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256[] calldata
     ) external onlyAttestationCenter {
         // Decode task hash (btcTxnHash) from taskInfo data
-        (bool txnType, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
+        (bool isMintTxn, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
 
         // Mark task as completed
         _completedTasks[btcTxnHash] = true;
 
-        if (txnType) {
+        if (isMintTxn) {
             // Get task data wrt task Id
             PSBTData memory psbtData = _homeChainCoordinator.getPSBTDataForTxnHash(btcTxnHash);
 
@@ -191,7 +191,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         }
 
         // emitting event
-        emit TaskCompleted(txnType, btcTxnHash);
+        emit TaskCompleted(isMintTxn, btcTxnHash);
     }
 
     /**
@@ -212,12 +212,12 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
 
     /**
      * @notice Internal function to set the taskCreator address
-     * @param newTaskCreator Address of the new taskCreator
+     * @param _newTaskCreator Address of the new taskCreator
      */
-    function _setTaskCreator(address newTaskCreator) internal {
+    function _setTaskCreator(address _newTaskCreator) internal {
         address oldTaskCreator = _taskCreator;
-        _taskCreator = newTaskCreator;
-        emit TaskCreatorUpdated(oldTaskCreator, newTaskCreator);
+        _taskCreator = _newTaskCreator;
+        emit TaskCreatorUpdated(oldTaskCreator, _newTaskCreator);
     }
 
     /**
@@ -234,7 +234,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      * @param _taskHash The task hash to check
      * @return True if task exists and is valid
      */
-    function isTaskValid(bytes32 _taskHash) public view returns (bool) {
+    function isTaskExists(bytes32 _taskHash) public view returns (bool) {
         PSBTData memory task = _homeChainCoordinator.getPSBTDataForTxnHash(_taskHash);
         return task.rawTxn.length > 0;
     }

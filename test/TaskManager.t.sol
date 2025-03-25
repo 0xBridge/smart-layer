@@ -193,7 +193,7 @@ contract TaskManagerTest is Test {
         );
 
         // Verify task is valid but not completed
-        assertTrue(taskManager.isTaskValid(BTC_TXN_HASH));
+        assertTrue(taskManager.isTaskExists(BTC_TXN_HASH));
         assertFalse(taskManager.isTaskCompleted(BTC_TXN_HASH));
 
         // Simulate task completion through attestation center
