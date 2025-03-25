@@ -54,7 +54,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     }
 
     /**
-     * @notice Ensures the caller is the task taskCreator
+     * @notice Ensures the caller is the taskCreator
      * @dev Used to restrict createNewTask from only being called by a permissioned entity
      */
     modifier onlyTaskCreator() {
@@ -136,7 +136,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      * @notice Hook to validate the task details before the task is created in attestation center
      * @param _taskInfo The task information struct
      * @param _isApproved Whether the task is approved
-     * @dev The task taskCreator's signature (unused but kept for interface compatibility)
+     * @dev The taskCreator's signature (unused but kept for interface compatibility)
      * @dev The attesters' signature (unused but kept for interface compatibility)
      * @dev The attesters' IDs (unused but kept for interface compatibility)
      * @dev Called by the attestation center before task submission
@@ -161,7 +161,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      * @notice Hook to validate the task details after the task is created in attestation center
      * @param _taskInfo The task information struct
      * @dev The approval status (unused but kept for interface compatibility)
-     * @dev The task taskCreator's signature (unused but kept for interface compatibility)
+     * @dev The taskCreator's signature (unused but kept for interface compatibility)
      * @dev The attesters' signature (unused but kept for interface compatibility)
      * @dev The attesters' IDs (unused but kept for interface compatibility)
      * @dev Called by the attestation center after task submission
