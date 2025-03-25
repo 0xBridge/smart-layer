@@ -11,11 +11,11 @@ import {HomeChainCoordinator, PSBTData} from "./HomeChainCoordinator.sol";
 import {IAttestationCenter, IAvsLogic} from "./interfaces/IAvsLogic.sol";
 
 /**
- * @title TasksManager
+ * @title TaskManager
  * @notice Implementation of a secure 0xBridge AVS logic with ownership and pause functionality
  * @dev Responsible for tasks creation and  providing hooks to be called by the attestation center
  */
-contract TasksManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
+contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     // using BN254 for BN254.G1Point;
 
     // Errors
@@ -29,7 +29,6 @@ contract TasksManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     error WithdrawalFailed();
 
     // Constants
-    bytes32 internal constant TASK_DOMAIN = keccak256("TasksManager");
     uint16 internal constant TASK_DEFINITION_ID = 1; // For task-specific voting power
 
     bytes32[] internal _taskHashes;
@@ -66,7 +65,7 @@ contract TasksManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     }
 
     /**
-     * @notice Initializes the TasksManager contract
+     * @notice Initializes the TaskManager contract
      * @param initialOwner_ Address of the initial owner of the contract
      * @param taskCreator_ Address authorized to create new tasks
      * @param attestationCenter_ Address of the attestation center contract

@@ -9,18 +9,18 @@ import {HomeChainCoordinator} from "../src/HomeChainCoordinator.sol";
 import {BaseChainCoordinator} from "../src/BaseChainCoordinator.sol";
 import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 import {eBTCManager} from "../src/eBTCManager.sol";
-import {TasksManager} from "../src/TasksManager.sol";
+import {TaskManager} from "../src/TaskManager.sol";
 import {eBTC} from "../src/eBTC.sol";
 import {eBTCMock} from "../src/mocks/eBTCMock.sol";
 
 /**
- * @title AVSDeployment
+ * @title TaskManagerDeployer
  * @notice Script for deploying all contracts needed for the base chain functionality
  * @dev Sets up the required contracts and configures their relationships
  */
-contract AVSDeployment is Script {
+contract TaskManagerDeployer is Script {
     // Contract instances
-    TasksManager internal _tasksManager;
+    TaskManager internal _taskManager;
     HomeChainCoordinator internal _homeChainCoordinator;
     BaseChainCoordinator internal _baseChainCoordinator;
     BitcoinLightClient internal _btcLightClient;
@@ -111,8 +111,8 @@ contract AVSDeployment is Script {
         console.log("Set peer in HomeChainCoordinator");
         _homeChainCoordinator.transferOwnership(AGGREGATOR);
         console.log("Transferred ownership of HomeChainCoordinator");
-        _tasksManager = new TasksManager(OWNER, GENERATOR, ATTESTATION_CENTER, address(_homeChainCoordinator));
-        console.log("Deployed TasksManager", address(_tasksManager));
+        _taskManager = new TaskManager(OWNER, GENERATOR, ATTESTATION_CENTER, address(_homeChainCoordinator));
+        console.log("Deployed TaskManager", address(_taskManager));
         vm.stopBroadcast();
 
         vm.selectFork(_destForkId);

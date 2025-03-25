@@ -5,16 +5,16 @@ import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {LayerZeroV2Helper} from "lib/pigeon/src/layerzero-v2/LayerZeroV2Helper.sol";
 import {HelperConfig} from "../script/HelperConfig.s.sol";
-import {TasksManager} from "../src/TasksManager.sol";
+import {TaskManager} from "../src/TaskManager.sol";
 import {HomeChainCoordinator} from "../src/HomeChainCoordinator.sol";
 import {BaseChainCoordinator} from "../src/BaseChainCoordinator.sol";
 import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 import {IAttestationCenter} from "../src/interfaces/IAttestationCenter.sol";
 import {eBTCManager} from "../src/eBTCManager.sol";
 
-contract TasksManagerTest is Test {
+contract TaskManagerTest is Test {
     // Main contracts
-    TasksManager private tasksManager;
+    TaskManager private taskManager;
     HomeChainCoordinator private homeChainCoordinator;
     BaseChainCoordinator private baseChainCoordinator;
     BitcoinLightClient private btcLightClient;
@@ -123,22 +123,22 @@ contract TasksManagerTest is Test {
         homeChainCoordinator.setPeer(destNetworkConfig.chainEid, receiver);
         vm.stopPrank();
 
-        // Deploy TasksManager
-        tasksManager = new TasksManager(owner, TASKS_CREATOR, ATTESTATION_CENTER, address(homeChainCoordinator));
-        // Transfer ownership of HomeChainCoordinator to the tasksManager
+        // Deploy TaskManager
+        taskManager = new TaskManager(owner, TASKS_CREATOR, ATTESTATION_CENTER, address(homeChainCoordinator));
+        // Transfer ownership of HomeChainCoordinator to the taskManager
         vm.prank(owner);
-        homeChainCoordinator.transferOwnership(address(tasksManager));
+        homeChainCoordinator.transferOwnership(address(taskManager));
 
         // Fund contracts
         vm.deal(owner, 100 ether);
-        vm.deal(address(tasksManager), 10 ether);
+        vm.deal(address(taskManager), 10 ether);
         vm.deal(address(homeChainCoordinator), 10 ether);
 
         // lzHelper = new LayerZeroV2Helper();
     }
 
     function testInitialState() public {
-        assertTrue(tasksManager.owner() == owner);
+        assertTrue(taskManager.owner() == owner);
     }
 
     function testSetTaskCreator() public {
@@ -148,24 +148,24 @@ contract TasksManagerTest is Test {
         emit TaskCreatorUpdated(TASKS_CREATOR, newTaskCreator);
 
         vm.prank(owner);
-        tasksManager.setTaskCreator(newTaskCreator);
+        taskManager.setTaskCreator(newTaskCreator);
     }
 
     function testCreateNewTask() public {
-        uint256 initialTaskHashLength = tasksManager.getTaskHashesLength();
+        uint256 initialTaskHashLength = taskManager.getTaskHashesLength();
 
         vm.prank(TASKS_CREATOR);
-        tasksManager.createNewTask(
+        taskManager.createNewTask(
             true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
         );
 
-        assertEq(tasksManager.getTaskHashesLength(), initialTaskHashLength + 1);
+        assertEq(taskManager.getTaskHashesLength(), initialTaskHashLength + 1);
     }
 
     function testCreateNewTaskNotTaskCreator() public {
         vm.prank(USER);
-        vm.expectRevert(TasksManager.CallerNotTaskGenerator.selector);
-        tasksManager.createNewTask(
+        vm.expectRevert(TaskManager.CallerNotTaskGenerator.selector);
+        taskManager.createNewTask(
             true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
         );
     }
@@ -180,21 +180,21 @@ contract TasksManagerTest is Test {
         });
 
         vm.prank(ATTESTATION_CENTER);
-        vm.expectRevert(TasksManager.InvalidTask.selector);
+        vm.expectRevert(TaskManager.InvalidTask.selector);
 
-        tasksManager.beforeTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
+        taskManager.beforeTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
     }
 
     function testTaskLifecycle() public {
         // Create task
         vm.prank(TASKS_CREATOR);
-        tasksManager.createNewTask(
+        taskManager.createNewTask(
             true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
         );
 
         // Verify task is valid but not completed
-        assertTrue(tasksManager.isTaskValid(BTC_TXN_HASH));
-        assertFalse(tasksManager.isTaskCompleted(BTC_TXN_HASH));
+        assertTrue(taskManager.isTaskValid(BTC_TXN_HASH));
+        assertFalse(taskManager.isTaskCompleted(BTC_TXN_HASH));
 
         // Simulate task completion through attestation center
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
@@ -205,14 +205,14 @@ contract TasksManagerTest is Test {
         });
 
         vm.prank(ATTESTATION_CENTER);
-        tasksManager.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
+        taskManager.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
 
         // Verify task is now completed
-        assertTrue(tasksManager.isTaskCompleted(BTC_TXN_HASH));
+        assertTrue(taskManager.isTaskCompleted(BTC_TXN_HASH));
     }
 
     function testQuoteGasFees() public {
-        (uint256 nativeFee, uint256 lzTokenFee) = tasksManager.quote(BTC_TXN_HASH, RAW_TXN, false);
+        (uint256 nativeFee, uint256 lzTokenFee) = taskManager.quote(BTC_TXN_HASH, RAW_TXN, false);
 
         assertTrue(nativeFee > 0);
         assertEq(lzTokenFee, 0); // When payInLzToken is false
@@ -220,30 +220,30 @@ contract TasksManagerTest is Test {
 
     function testPause() public {
         vm.prank(owner);
-        tasksManager.pause();
-        assertTrue(tasksManager.paused());
+        taskManager.pause();
+        assertTrue(taskManager.paused());
 
         vm.prank(owner);
-        tasksManager.unpause();
-        assertFalse(tasksManager.paused());
+        taskManager.unpause();
+        assertFalse(taskManager.paused());
     }
 
     function testPauseNotOwner() public {
         vm.startPrank(makeAddr("randomUser"));
         vm.expectRevert("Ownable: caller is not the owner");
-        tasksManager.pause();
+        taskManager.pause();
         vm.stopPrank();
     }
 
     function testWithdraw() public {
         uint256 initialBalance = address(owner).balance;
-        uint256 contractBalance = address(tasksManager).balance;
+        uint256 contractBalance = address(taskManager).balance;
 
         vm.prank(owner);
-        tasksManager.withdraw();
+        taskManager.withdraw();
 
         assertEq(address(owner).balance, initialBalance + contractBalance);
-        assertEq(address(tasksManager).balance, 0);
+        assertEq(address(taskManager).balance, 0);
     }
 
     // receive() external payable {}

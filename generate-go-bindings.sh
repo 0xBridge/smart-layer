@@ -23,7 +23,7 @@ rm -rf ../0xbridge-demo-avs/0xbridge-contracts/bindings*
 forge clean
 forge build
 
-avs_service_contracts="TasksManager HomeChainCoordinator"
+avs_service_contracts="TaskManager HomeChainCoordinator"
 for contract in $avs_service_contracts; do
     create_binding . $contract ../0xbridge-demo-avs/0xbridge-contracts/bindings
 done
