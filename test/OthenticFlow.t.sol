@@ -77,10 +77,10 @@ contract OthenticFlowTest is Test {
     address private constant L1_MESSAGE_HANDLER = 0xf8fc6e50865A0dB5493A435f9C31C24161E114FC;
 
     // Holesky constants
-    address private constant EL_DELEGATION_MANAGER = 0xA44151489861Fe9e3055d95adC98FbD462B948e7;
+    address private constant EIGEN_DELEGATION_MANAGER = 0xA44151489861Fe9e3055d95adC98FbD462B948e7;
     address private constant STAKED_ETH = 0x3F1c547b21f65e10480dE3ad8E19fAAC46C95034;
     address private constant LIDO_REFERRAL_ADDRESS = 0x11d00000000000000000000000000000000011d0;
-    address private constant EL_STRATEGY_MANAGER = 0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6;
+    address private constant EIGEN_STRATEGY_MANAGER = 0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6;
     address private constant ST_ETH_STRATEGY = 0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3;
 
     // 1. Deploy the AVS contracts - Done via the Othentic cli
@@ -91,7 +91,7 @@ contract OthenticFlowTest is Test {
         // https://holesky.etherscan.io/tx/0x5e99ffa3be63df189d5e61309480e902ace42b65fbed715ee8432cc1a0e754df
         address initDelegationApprover = ZERO_ADDRESS;
         uint32 allocationDelay = 0;
-        IELDelegationManagerAddress(EL_DELEGATION_MANAGER).registerAsOperator(
+        IELDelegationManagerAddress(EIGEN_DELEGATION_MANAGER).registerAsOperator(
             initDelegationApprover, allocationDelay, metadataURI
         ); // Deployer (AVS_MULTISIG_OWNER)
 
@@ -101,8 +101,8 @@ contract OthenticFlowTest is Test {
 
         // 4. Deposit into strategy to setup operator voting power - to be executed by the operators individually
         // https://holesky.etherscan.io/tx/0x905df28a75ddc9d84b1f50304345ddadc6cc47576989ae5d60cfcb310a4720d6
-        ILiquidStakedEther(STAKED_ETH).approve(EL_STRATEGY_MANAGER, ethAmountToStake);
-        IStrategyManager(EL_STRATEGY_MANAGER).depositIntoStrategy(ST_ETH_STRATEGY, STAKED_ETH, ethAmountToStake);
+        ILiquidStakedEther(STAKED_ETH).approve(EIGEN_STRATEGY_MANAGER, ethAmountToStake);
+        IStrategyManager(EIGEN_STRATEGY_MANAGER).depositIntoStrategy(ST_ETH_STRATEGY, STAKED_ETH, ethAmountToStake);
 
         // 5. Register operators to AVS (same as step 1) - to be executed by the operators individually
         // https://holesky.etherscan.io/tx/0xbec6a362cf15c06cfc3932684518fe9367e851cdbac873531d5d6c16e45b2ce6

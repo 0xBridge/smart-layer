@@ -32,7 +32,15 @@ contract HelperConfig is Script {
     constructor() {
         // Get current chainId
         uint256 chainId = block.chainid;
+        _initNetworkConfig(chainId);
+    }
 
+    /**
+     * @notice Inits the network configuration for the current chain from a JSON file
+     * @param chainId Chain ID to set configuration for
+     * @dev Reverts if chain ID is not found in the network json file
+     */
+    function _initNetworkConfig(uint256 chainId) internal {
         // Read and parse network config for current chain
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script/network-config.json");
