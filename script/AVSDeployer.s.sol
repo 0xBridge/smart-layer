@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.25;
 
-import {Script, console} from "forge-std/Script.sol";
-import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import {ISignatureUtils} from
-    "@eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
+import {Script} from "forge-std/Script.sol";
+import {HelperConfig} from "./HelperConfig.s.sol";
 
 // Create interfaces for the L1 and L2 factory contracts based on the methods 0x14d6ec60 and 0x8a64a2e0 respectively
 interface IL1AVSFactory {
@@ -31,58 +29,107 @@ interface IL2AVSFactory {
 }
 
 contract AVSDeployerScript is Script {
-    // Holesky addresses
-    address private constant ZERO_ADDRESS = address(0);
-    address private constant WETH_ADDRESS = 0x94373a4919B3240D86eA41593D5eBa789FEF3848;
-
     // Contract addresses
-    address private constant L1_FACTORY_ADDRESS = 0xf053F341C021F57f4a17C25476DF4761b0728D53;
-    address private constant L2_FACTORY_ADDRESS = 0xc2a881Dd3e6a9C21C18A998E47f90120BC9D87Aa;
+    string private constant AVS_NAME = "test-0xBridge-new"; // NOTE: This should be changed to a unique name every time a new AVS is deployed
+    uint256 private constant SOME_UINT256 = 0;
+    address private constant ZERO_ADDRESS = address(0);
+
+    // Selectors to be called based on the deployed txns (on L1 and L2)
+    bytes4 private constant L1_SELECTOR = 0x14d6ec60;
+    bytes4 private constant L2_SELECTOR = 0x8a64a2e0;
+
+    // Amount to transfer when initializing bridges to the message handlers
+    uint256 private constant L1_TRANSFER_AMOUNT = 1 ether;
+    uint256 private constant L2_TRANSFER_AMOUNT = 2 ether;
 
     // Configurable parameters
-    string private constant AVS_NAME = "test-0xBridge";
-    uint256 private constant DESTINATION_CHAIN_ID = 80002; // 0x13882
-    uint256 private constant SOURCE_CHAIN_ID = 17000; // 0x4268
-    uint256 private constant SOME_UINT256 = 0;
-
-    // Amount to transfer when initializing bridge
-    uint256 private constant L1_TRANSFER_AMOUNT = 1 ether;
-    uint256 private constant L2_TRANSFER_AMOUNT = 10 ether;
-
-    function setUp() public {
-        // Get the required hardcoded values from env or constants above
-    }
+    uint256 srcForkId;
+    uint256 destForkId;
+    HelperConfig.NetworkConfig srcNetworkConfig;
+    HelperConfig.NetworkConfig destNetworkConfig;
 
     function run() public {
-        // Start broadcasting transactions from the operator's wallet
-        vm.startBroadcast();
+        // Create destination chain to be used for deployment later
+        string memory destRpcUrl = vm.envString("AMOY_RPC_URL");
+        destForkId = vm.createSelectFork(destRpcUrl);
+        HelperConfig destConfig = new HelperConfig();
+        destNetworkConfig = destConfig.getConfig();
 
-        // Deploy L1 AVS contracts
-        IL1AVSFactory l1Factory = IL1AVSFactory(L1_FACTORY_ADDRESS);
+        // Set up source chain
+        string memory srcRpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
+        srcForkId = vm.createSelectFork(srcRpcUrl);
+        HelperConfig srcConfig = new HelperConfig();
+        srcNetworkConfig = srcConfig.getConfig();
+
+        uint256 privateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+
+        // Start broadcasting transactions from the operator's wallet
+        vm.startBroadcast(privateKey);
+
+        // Create L1 AVS deployment params
         IL1AVSFactory.L1AVSFactoryParams memory l1Params = IL1AVSFactory.L1AVSFactoryParams({
             avsName: AVS_NAME,
             someAddress: ZERO_ADDRESS,
-            tokenBackingAVS: WETH_ADDRESS,
-            chainId: DESTINATION_CHAIN_ID
+            tokenBackingAVS: srcNetworkConfig.weth,
+            chainId: destNetworkConfig.chainId
         });
 
-        l1Factory.deploy{value: L1_TRANSFER_AMOUNT}(l1Params); // TODO: Call this via function selector
-        // console.log("L1 Bridge deployed at:", deployedL1Bridge);
+        // Convert l1Params to ABI-encoded bytes
+        bytes memory l1ParamsEncoded = abi.encode(l1Params);
+        callWithSelector(srcNetworkConfig.othenticFactory, L1_SELECTOR, l1ParamsEncoded, L1_TRANSFER_AMOUNT);
+        vm.stopBroadcast();
 
-        // Deploy L2 AVS contracts
-        IL2AVSFactory l2Factory = IL2AVSFactory(L2_FACTORY_ADDRESS);
+        // Set up destination chain
+        vm.selectFork(destForkId);
+
+        // Start broadcasting transactions from the operator's wallet
+        vm.startBroadcast(privateKey);
+
+        // Create L2 AVS deployment params
         IL2AVSFactory.L2AVSFactoryParams memory l2Params = IL2AVSFactory.L2AVSFactoryParams({
             avsName: AVS_NAME,
             someAddress: ZERO_ADDRESS,
-            tokenBackingAVS: WETH_ADDRESS,
+            tokenBackingAVS: srcNetworkConfig.weth, // This is srcNetworkConfig.weth only and not destNetworkConfig.weth
             someUint256: SOME_UINT256,
-            chainId: SOURCE_CHAIN_ID
+            chainId: srcNetworkConfig.chainId
         });
 
-        l2Factory.functionName{value: L2_TRANSFER_AMOUNT}(l2Params); // TODO: Call this via function selector
-        console.log("L2 Bridge initialized with 0.8 POL");
-
+        // Convert l2Params to ABI-encoded bytes
+        bytes memory l2ParamsEncoded = abi.encode(l2Params);
+        callWithSelector(destNetworkConfig.othenticFactory, L2_SELECTOR, l2ParamsEncoded, L2_TRANSFER_AMOUNT);
         vm.stopBroadcast();
-        console.log("Bridge deployment completed successfully!");
+    }
+
+    /**
+     * @notice Sends a transaction to a contract using a function selector and encoded parameters
+     * @param target The address of the contract to call
+     * @param selector The 4-byte function selector
+     * @param params The ABI-encoded parameters (without the selector)
+     * @param value The amount of ETH to send with the call
+     * @return success Whether the call was successful
+     * @return returnData The data returned by the call
+     */
+    function callWithSelector(address target, bytes4 selector, bytes memory params, uint256 value)
+        public
+        payable
+        returns (bool success, bytes memory returnData)
+    {
+        // Combine the selector with the encoded parameters
+        bytes memory callData = abi.encodePacked(selector, params);
+
+        // Execute the call and return the result
+        (success, returnData) = target.call{value: value}(callData);
+
+        if (!success) {
+            // If call reverts, try to decode the revert reason
+            if (returnData.length > 0) {
+                assembly {
+                    let returnDataSize := mload(returnData)
+                    revert(add(32, returnData), returnDataSize)
+                }
+            } else {
+                revert("Call failed with no return data");
+            }
+        }
     }
 }

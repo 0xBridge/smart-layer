@@ -17,6 +17,9 @@ contract HelperConfig is Script {
         uint32 chainEid;
         address endpoint;
         address account;
+        address weth;
+        uint256 chainId;
+        address othenticFactory;
     }
 
     // Constants
@@ -53,9 +56,21 @@ contract HelperConfig is Script {
                 abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".endpoint")), (address));
             uint32 chainEid =
                 abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".chainEid")), (uint32));
+            address weth = abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".weth")), (address));
+            uint256 chainId =
+                abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".chainId")), (uint256));
+            address othenticFactory =
+                abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".othenticFactory")), (address));
 
             // Set the local network config
-            _localNetworkConfig = NetworkConfig({chainEid: chainEid, endpoint: endpoint, account: OWNER_WALLET});
+            _localNetworkConfig = NetworkConfig({
+                chainEid: chainEid,
+                endpoint: endpoint,
+                account: OWNER_WALLET,
+                weth: weth,
+                chainId: chainId,
+                othenticFactory: othenticFactory
+            });
         } catch {
             revert HelperConfig__InvalidChainId();
         }
