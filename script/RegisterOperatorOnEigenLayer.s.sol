@@ -10,7 +10,7 @@ interface IEigenLayerDelegationManager {
         external;
 }
 
-contract RegisterEigenLayerOperatorScript is Script {
+contract RegisterOperatorOnEigenLayerScript is Script {
     // Contract address from the provided transaction
     address private EIGEN_DELEGATION_MANAGER = 0xA44151489861Fe9e3055d95adC98FbD462B948e7; // TODO: Get from config
 
@@ -22,7 +22,7 @@ contract RegisterEigenLayerOperatorScript is Script {
         "https://othentic.mypinata.cloud/ipfs/QmbfNEJrEE2X6XeHeST5TFrwRyUXDCDzqfknJe7fG1mjgc/operator.json";
 
     function run() public {
-        // Set up signle chain
+        // Set up single chain
         string memory rpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         vm.createSelectFork(rpcUrl);
 
