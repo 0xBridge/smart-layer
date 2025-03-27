@@ -32,7 +32,11 @@ interface IStrategyManager {
 }
 
 interface IAVSGovernance {
-    // function registerOperatorToEigenLayer(_eigenSig) external;
+    function registerOperatorToEigenLayer(
+        ISignatureUtils.SignatureWithSaltAndExpiry calldata _eigenSig,
+        bytes calldata _authToken
+    ) external;
+
     function registerAsOperator(
         uint256[4] calldata _blsKey,
         address _rewardsReceiver,
@@ -85,10 +89,11 @@ contract OthenticFlowTest is Test {
 
     // 1. Deploy the AVS contracts - Done via the Othentic cli
     function alreadyDone_setUp() public {
-        // 1. Deploy the AVS contracts - this can be done via the Othentic cli
+        // 1. Deploy the AVS contracts - this can be done via the Othentic cli - Sorted
 
         // 2. Register the necessary task creator/operators/attesters/aggregators on EigenLayer - to be executed by the deployer / AVS Multisig owner
-        // https://holesky.etherscan.io/tx/0x5e99ffa3be63df189d5e61309480e902ace42b65fbed715ee8432cc1a0e754df
+        // https://holesky.etherscan.io/tx/0xbec6a362cf15c06cfc3932684518fe9367e851cdbac873531d5d6c16e45b2ce6
+        // https://holesky.etherscan.io/tx/0x42ae1fc91f36ea155a4422a0f546fdb519e2abe9b35e16a1881763215914c147
         address initDelegationApprover = ZERO_ADDRESS;
         uint32 allocationDelay = 0;
         IELDelegationManagerAddress(EIGEN_DELEGATION_MANAGER).registerAsOperator(
@@ -105,11 +110,9 @@ contract OthenticFlowTest is Test {
         IStrategyManager(EIGEN_STRATEGY_MANAGER).depositIntoStrategy(ST_ETH_STRATEGY, STAKED_ETH, ethAmountToStake);
 
         // 5. Register operators to AVS (same as step 1) - to be executed by the operators individually
-        // https://holesky.etherscan.io/tx/0xbec6a362cf15c06cfc3932684518fe9367e851cdbac873531d5d6c16e45b2ce6
         // https://holesky.etherscan.io/tx/0x8b61105ecfc3cd2207b58fade0784039d67c21f353f9bda681ba7c63713daaee
         // https://holesky.etherscan.io/tx/0x98bec0dedea862d9f6bfeae17eb5120d2b7459f3f9283d03a66e890f4bbed8a2
-        // https://holesky.etherscan.io/tx/0x42ae1fc91f36ea155a4422a0f546fdb519e2abe9b35e16a1881763215914c147
-        // IAVSGovernance(AVS_GOVERNANCE_ADDRESS).registerOperatorToEigenLayer(_eigenSig);
+        // IAVSGovernance(AVS_GOVERNANCE_ADDRESS).registerOperatorToEigenLayer(_eigenSig, _authToken);
         // IAVSGovernance(AVS_GOVERNANCE_ADDRESS).registerAsOperator(uint256[4] calldata _blsKey, address _rewardsReceiver, ISignatureUtils.SignatureWithSaltAndExpiry memory _operatorSignature, BLSAuthLibrary.Signature calldata _blsRegistrationSignature);
 
         // 6. Make sure the rewards are deposited to the AVS treasury

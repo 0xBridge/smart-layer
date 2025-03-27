@@ -3,7 +3,6 @@
     "name": "Ethereum Mainnet",
     "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
     "weth": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
-    "chainId": 1,
     "chainEid": 30101,
     "othenticFactory": "0x64EA2F2DEE9eED5439468e92cf8Af8cD9ea0A994"
   },
@@ -11,7 +10,6 @@
     "name": "Ethereum Sepolia",
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
     "weth": "0x0000000000000000000000000000000000000000",
-    "chainId": 11155111,
     "chainEid": 40161,
     "othenticFactory": "0x0000000000000000000000000000000000000000"
   },
@@ -19,7 +17,6 @@
     "name": "Ethereum Holesky",
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
     "weth": "0x94373a4919B3240D86eA41593D5eBa789FEF3848",
-    "chainId": 17000,
     "chainEid": 40217,
     "othenticFactory": "0xf053F341C021F57f4a17C25476DF4761b0728D53"
   },
@@ -27,7 +24,6 @@
     "name": "Polygon Mainnet",
     "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
     "weth": "0x0000000000000000000000000000000000000000",
-    "chainId": 137,
     "chainEid": 30109,
     "othenticFactory": "0x28e06CE6B25529e736D45Aff7c82Ef4Fc6F710bE"
   },
@@ -35,7 +31,6 @@
     "name": "Polygon Amoy",
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
     "weth": "0x0000000000000000000000000000000000000000",
-    "chainId": 80002,
     "chainEid": 40267,
     "othenticFactory": "0xc2a881Dd3e6a9C21C18A998E47f90120BC9D87Aa"
   },
@@ -43,7 +38,6 @@
     "name": "Arbitrum One",
     "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
     "weth": "0x0000000000000000000000000000000000000000",
-    "chainId": 42161,
     "chainEid": 30110,
     "othenticFactory": "0xB9ac7e784b8aE6754FCe47653f5F8F53fa838D8"
   },
@@ -51,7 +45,6 @@
     "name": "Arbitrum Sepolia",
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
     "weth": "0x0000000000000000000000000000000000000000",
-    "chainId": 421614,
     "chainEid": 40231,
     "othenticFactory": "0x390c4f2047250C8494963A6d2f1faE7935866D23"
   },
@@ -59,7 +52,6 @@
     "name": "Base",
     "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
     "weth": "0x0000000000000000000000000000000000000000",
-    "chainId": 8453,
     "chainEid": 30184,
     "othenticFactory": "0x750e442F3C5b897F5518e50Eb8aBB8644340B42b"
   },
@@ -67,7 +59,6 @@
     "name": "Base Sepolia",
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
     "weth": "0x0000000000000000000000000000000000000000",
-    "chainId": 84532,
     "chainEid": 40245,
     "othenticFactory": "0xC9D62Af2d0Dd94bDdFEb54fd2c4Cf3B860cEDf1a"
   },
@@ -75,7 +66,6 @@
     "name": "OP Mainnet",
     "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
     "weth": "0x0000000000000000000000000000000000000000",
-    "chainId": 10,
     "chainEid": 30111,
     "othenticFactory": "0x0000000000000000000000000000000000000000"
   },
@@ -83,7 +73,6 @@
     "name": "OP Sepolia",
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
     "weth": "0x0000000000000000000000000000000000000000",
-    "chainId": 11155420,
     "chainEid": 40232,
     "othenticFactory": "0x0000000000000000000000000000000000000000"
   },
@@ -91,7 +80,6 @@
     "name": "CoreDAO Mainnet",
     "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
     "weth": "0x0000000000000000000000000000000000000000",
-    "chainId": 1116,
     "chainEid": 30153,
     "othenticFactory": "0x0000000000000000000000000000000000000000"
   },
@@ -99,7 +87,6 @@
     "name": "CoreDAO Testnet",
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
     "weth": "0x0000000000000000000000000000000000000000",
-    "chainId": 1115,
     "chainEid": 40153,
     "othenticFactory": "0x0000000000000000000000000000000000000000"
   },
@@ -107,7 +94,6 @@
     "name": "CoreDAO Testnet2",
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
     "weth": "0x0000000000000000000000000000000000000000",
-    "chainId": 1114,
     "chainEid": 40153,
     "othenticFactory": "0x0000000000000000000000000000000000000000"
   },
@@ -115,7 +101,6 @@
     "name": "Binance Smart Chain",
     "endpoint": "0x1a44076050125825900e736c501f859c50fE728c",
     "weth": "0x0000000000000000000000000000000000000000",
-    "chainId": 56,
     "chainEid": 30102,
     "othenticFactory": "0x0000000000000000000000000000000000000000"
   },
@@ -123,7 +108,6 @@
     "name": "Binance Smart Chain Testnet",
     "endpoint": "0x6EDCE65403992e310A62460808c4b910D972f10f",
     "weth": "0x0000000000000000000000000000000000000000",
-    "chainId": 97,
     "chainEid": 40102,
     "othenticFactory": "0x0000000000000000000000000000000000000000"
   }
