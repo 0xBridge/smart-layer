@@ -11,7 +11,9 @@ interface IVault {
 
 contract DepositRewardsScript is Script {
     address private AVS_TREASURY = vm.envAddress("L1_AVS_TREASURY");
-    uint256 private constant WETH_AMOUNT_TO_REWARD = 10 ether;
+    address private ATTESTATION_CENTER = vm.envAddress("ATTESTATION_CENTER_ADDRESS");
+    address private ERC20_TO_BE_REWARDED;
+    uint256 private ERC20_AMOUNT_TO_REWARD;
 
     // Configuration parameters
     HelperConfig.NetworkConfig srcNetworkConfig;
@@ -28,9 +30,16 @@ contract DepositRewardsScript is Script {
         // Start broadcasting transactions from the PRIVATE_KEY_AVS_OWNER's wallet
         vm.startBroadcast(privateKey);
 
-        IERC20(srcNetworkConfig.weth).approve(AVS_TREASURY, WETH_AMOUNT_TO_REWARD);
-        IVault(AVS_TREASURY).depositERC20(srcNetworkConfig.weth, WETH_AMOUNT_TO_REWARD); // Deployer (PRIVATE_KEY_AVS_OWNER)
+        ERC20_TO_BE_REWARDED = ERC20_TO_BE_REWARDED == address(0) ? srcNetworkConfig.weth : ERC20_TO_BE_REWARDED;
+        ERC20_AMOUNT_TO_REWARD =
+            ERC20_AMOUNT_TO_REWARD == 0 ? _calculateERC20AmountToBeRewarded() : ERC20_AMOUNT_TO_REWARD; // 1 WETH
+        IERC20(ERC20_TO_BE_REWARDED).approve(AVS_TREASURY, ERC20_AMOUNT_TO_REWARD);
+        IVault(AVS_TREASURY).depositERC20(ERC20_TO_BE_REWARDED, ERC20_AMOUNT_TO_REWARD); // Deployer (PRIVATE_KEY_AVS_OWNER)
 
         vm.stopBroadcast();
+    }
+
+    function _calculateERC20AmountToBeRewarded() internal returns (uint256) {
+        // TODO: Implement the logic to calculate the amount of ERC20 to be rewarded
     }
 }

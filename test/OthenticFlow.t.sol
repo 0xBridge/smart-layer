@@ -89,7 +89,7 @@ contract OthenticFlowTest is Test {
 
     // 1. Deploy the AVS contracts - Done via the Othentic cli
     function alreadyDone_setUp() public {
-        // 1. Deploy the AVS contracts - this can be done via the Othentic cli - Sorted
+        // 1. Deploy the AVS contracts - this can be done via the Othentic cli only as the Othentic factory contracts are not open-sourced yet
 
         // 2. Register the necessary task creator/operators/attesters/aggregators on EigenLayer - to be executed by the deployer / AVS Multisig owner
         // https://holesky.etherscan.io/tx/0xbec6a362cf15c06cfc3932684518fe9367e851cdbac873531d5d6c16e45b2ce6
@@ -126,7 +126,7 @@ contract OthenticFlowTest is Test {
 
         // 7. Claim Rewards - Can be done post submitTask (Didn't see the rewards disbursed on L1)
         // https://amoy.polygonscan.com/tx/0x887194727b6c46a8139a6520709cff19f8631dcecd2c92b521f8d94d3e5a130c
-        // IAttestationCenter(ATTESTATION_CENTER).requestBatchPayment(); // Deployer (AVS_MULTISIG_OWNER)
+        IAttestationCenter(ATTESTATION_CENTER).requestBatchPayment(); // Deployer (AVS_MULTISIG_OWNER)
     }
 
     function setUp() public {

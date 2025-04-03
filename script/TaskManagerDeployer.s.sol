@@ -33,7 +33,7 @@ contract TaskManagerDeployer is Script {
 
     // Constants
     address internal constant OWNER = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
-    address internal constant AGGREGATOR = 0x534e9B3EA1F77f687074685a5F7C8a568eF6D586;
+    // address internal constant AGGREGATOR = 0x534e9B3EA1F77f687074685a5F7C8a568eF6D586;
     address internal constant GENERATOR = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
     address internal constant ATTESTATION_CENTER = 0x276ef26eEDC3CFE0Cdf22fB033Abc9bF6b6a95B3;
 
@@ -41,14 +41,14 @@ contract TaskManagerDeployer is Script {
     uint256 internal _sourceForkId;
     uint256 internal _destForkId;
 
-    // Bitcoin SPV Testnet constants (Block #68741)
+    // Bitcoin SPV Testnet constants (Block #75728)
     uint32 internal constant BLOCK_VERSION = 536870912;
-    uint32 internal constant BLOCK_TIMESTAMP = 1738656278;
+    uint32 internal constant BLOCK_TIMESTAMP = 1743682039;
     uint32 internal constant DIFFICULTY_BITS = 486604799;
-    uint32 internal constant NONCE = 4059174314;
-    uint32 internal constant HEIGHT = 68741;
-    bytes32 internal constant PREV_BLOCK = 0x000000000000123625879059bc5035363bcc5d4dde895f427bbe9b8866d51d7f;
-    bytes32 internal constant MERKLE_ROOT = 0x58863b7cb847987c2a0f711e1bb3b910d9a748636c6a7c34cf865ab9ac2048ac;
+    uint32 internal constant NONCE = 3598052123;
+    uint32 internal constant HEIGHT = 75728;
+    bytes32 internal constant PREV_BLOCK = 0x0000000098fc0394363837d13a3075ec22a3006abd288f25967382614249e835;
+    bytes32 internal constant MERKLE_ROOT = 0xe32d2d38030cfa35db3b74f80a68cc8f5f9281fa6306cb6ec1236b099b71cf13;
 
     /**
      * @notice Main deployment function
@@ -60,7 +60,7 @@ contract TaskManagerDeployer is Script {
         HelperConfig srcConfig = new HelperConfig();
         _srcNetworkConfig = srcConfig.getConfig();
 
-        string memory destRpcUrl = vm.envString("SEPOLIA_RPC_URL");
+        string memory destRpcUrl = vm.envString("BSC_TESTNET_RPC_URL");
         _destForkId = vm.createSelectFork(destRpcUrl);
         HelperConfig destConfig = new HelperConfig();
         _destNetworkConfig = destConfig.getConfig();
@@ -109,8 +109,8 @@ contract TaskManagerDeployer is Script {
         console.log("Deployed HomeChainCoordinator", address(_homeChainCoordinator));
         _homeChainCoordinator.setPeer(_destNetworkConfig.chainEid, receiver);
         console.log("Set peer in HomeChainCoordinator");
-        _homeChainCoordinator.transferOwnership(AGGREGATOR);
-        console.log("Transferred ownership of HomeChainCoordinator");
+        // _homeChainCoordinator.transferOwnership(AGGREGATOR);
+        // console.log("Transferred ownership of HomeChainCoordinator");
         _taskManager = new TaskManager(OWNER, GENERATOR, ATTESTATION_CENTER, address(_homeChainCoordinator));
         console.log("Deployed TaskManager", address(_taskManager));
         vm.stopBroadcast();
