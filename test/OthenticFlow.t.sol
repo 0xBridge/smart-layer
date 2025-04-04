@@ -120,12 +120,13 @@ contract OthenticFlowTest is Test {
         IERC20(WETH).approve(AVS_TREASURY, wethTreasuryAmountDeposit);
         IVault(AVS_TREASURY).depositERC20(WETH, wethTreasuryAmountDeposit); // Deployer (AVS_MULTISIG_OWNER)
 
-        // Unpause first to allow rewards disburse - defaulted to pause
+        // 7. Unpause first to allow rewards disburse - defaulted to pause
         // https://amoy.polygonscan.com/tx/0x5fd0a7919ae8af9785cccf670dfb0ad9897bdfc7a6b2f50156cb1453063f55c4
         IAttestationCenter(ATTESTATION_CENTER).unpause(REWARDS_FLOW); // Deployer (AVS_MULTISIG_OWNER)
 
-        // 7. Claim Rewards - Can be done post submitTask (Didn't see the rewards disbursed on L1)
-        // https://amoy.polygonscan.com/tx/0x887194727b6c46a8139a6520709cff19f8631dcecd2c92b521f8d94d3e5a130c
+        // 8. Claim Rewards - Can be done post submitTask
+        // https://amoy.polygonscan.com/tx/0xe2d1f66b5daa2fa5cf4984b7105c1ce063f2ff3b6f3e9b5b654ba15277619cb1
+        // https://holesky.etherscan.io/tx/0xd1c93b03f3bc4e1a421427f2f312b50dcb2ce17ca3bc82957f3950b5890c29fe
         IAttestationCenter(ATTESTATION_CENTER).requestBatchPayment(); // Deployer (AVS_MULTISIG_OWNER)
     }
 

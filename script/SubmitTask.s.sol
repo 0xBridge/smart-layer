@@ -30,8 +30,8 @@ contract SubmitTask is Script {
 
         // Create the task info
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
-            proofOfTask: "Just putting any random string here.",
-            data: hex"000000008616134584b18a2e16e2b6f4b6f8acc7a1a975c2a8c6f8b10493e260", // hex bytes data
+            proofOfTask: "Random string to signify proofOfTask",
+            data: hex"530255c1131123e472d6f38e7ac4aab9a596b8632aefd28afa92d7e6ea43409d", // hex bytes data
             taskPerformer: 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE, // Generator / Task creator address
             taskDefinitionId: 0
         });
@@ -44,8 +44,8 @@ contract SubmitTask is Script {
             1082501311440838732190290197012581182681773299437476198311483876744319338514
         ];
         uint256[] memory attestersIds = new uint256[](2);
-        attestersIds[0] = 3;
-        attestersIds[1] = 4;
+        attestersIds[0] = 2;
+        attestersIds[1] = 3;
 
         // Start the broadcast as aggregator
         vm.startBroadcast(privateKeyGenerator);

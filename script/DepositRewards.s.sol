@@ -25,16 +25,15 @@ contract DepositRewardsScript is Script {
         HelperConfig srcConfig = new HelperConfig();
         srcNetworkConfig = srcConfig.getConfig();
 
-        uint256 privateKey = vm.envUint("PRIVATE_KEY_AVS_OWNER");
+        uint256 privateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
 
-        // Start broadcasting transactions from the PRIVATE_KEY_AVS_OWNER's wallet
         vm.startBroadcast(privateKey);
 
         ERC20_TO_BE_REWARDED = ERC20_TO_BE_REWARDED == address(0) ? srcNetworkConfig.weth : ERC20_TO_BE_REWARDED;
         ERC20_AMOUNT_TO_REWARD =
             ERC20_AMOUNT_TO_REWARD == 0 ? _calculateERC20AmountToBeRewarded() : ERC20_AMOUNT_TO_REWARD; // 1 WETH
         IERC20(ERC20_TO_BE_REWARDED).approve(AVS_TREASURY, ERC20_AMOUNT_TO_REWARD);
-        IVault(AVS_TREASURY).depositERC20(ERC20_TO_BE_REWARDED, ERC20_AMOUNT_TO_REWARD); // Deployer (PRIVATE_KEY_AVS_OWNER)
+        IVault(AVS_TREASURY).depositERC20(ERC20_TO_BE_REWARDED, ERC20_AMOUNT_TO_REWARD);
 
         vm.stopBroadcast();
     }
