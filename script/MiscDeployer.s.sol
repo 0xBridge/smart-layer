@@ -63,22 +63,4 @@ contract MiscDeployer is Script {
 
         vm.stopBroadcast();
     }
-
-    /**
-     * @notice Sets the newly deployed BitcoinLightClient on an existing HomeChainCoordinator
-     * @param homeChainCoordinatorAddress The address of the existing HomeChainCoordinator
-     */
-    function setLightClientOnCoordinator(address homeChainCoordinatorAddress) public {
-        require(address(_btcLightClient) != address(0), "BitcoinLightClient not deployed");
-        require(homeChainCoordinatorAddress != address(0), "Invalid HomeChainCoordinator address");
-
-        _homeChainCoordinator = HomeChainCoordinator(homeChainCoordinatorAddress);
-
-        uint256 privateKey = vm.envUint("OWNER_PRIVATE_KEY");
-
-        vm.startBroadcast(privateKey);
-        _homeChainCoordinator.setBitcoinLightClient(address(_btcLightClient));
-        console.log("Set BitcoinLightClient on HomeChainCoordinator at", homeChainCoordinatorAddress);
-        vm.stopBroadcast();
-    }
 }
