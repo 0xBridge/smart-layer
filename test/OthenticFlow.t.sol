@@ -162,17 +162,9 @@ contract OthenticFlowTest is Test {
         attestersIds[0] = 3;
         attestersIds[1] = 4;
 
-        IAttestationCenter.EcdsaTaskSubmissionDetails memory ecdsaTaskSubmissionDetails = IAttestationCenter
-            .EcdsaTaskSubmissionDetails({
-            isApproved: isApproved,
-            tpSignature: tpSignature,
-            taSignature: taSignature,
-            attestersIds: attestersIds
-        });
-
         // Submit the task
         vm.prank(SIGNER);
-        attestationCenter.submitTask(taskInfo, ecdsaTaskSubmissionDetails);
+        attestationCenter.submitTask(taskInfo, isApproved, tpSignature, taSignature, attestersIds);
 
         // Distribute rewards
         // vm.prank(AVS_MULTISIG_OWNER);

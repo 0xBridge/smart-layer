@@ -14,13 +14,10 @@ interface IStrategyManager {
 
 contract SetupVotingPowerScript is Script {
     // Holesky addresses
-    address private constant EIGEN_DELEGATION_MANAGER = 0xA44151489861Fe9e3055d95adC98FbD462B948e7;
     address private constant STAKED_ETH = 0x3F1c547b21f65e10480dE3ad8E19fAAC46C95034;
     address private constant LIDO_REFERRAL_ADDRESS = 0x11d00000000000000000000000000000000011d0;
     address private constant EIGEN_STRATEGY_MANAGER = 0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6;
     address private constant ST_ETH_STRATEGY = 0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3;
-    address private constant AVS_GOVERNANCE_ADDRESS = 0xD23c43e9742be53029A0964C10c28EE3203420D1;
-    address private constant ZERO_ADDRESS = address(0);
 
     // Configurable parameters
     uint256 private constant ETH_AMOUNT_TO_STAKE = 0.01 ether; // NOTE: This should be changed to the desired amount

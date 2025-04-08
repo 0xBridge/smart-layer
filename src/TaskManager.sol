@@ -21,15 +21,13 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     // Errors
     error TaskNotApproved();
     error TaskNotFound();
-    error InvalidTask();
+    error TaskLengthInvalid();
+    error InvalidTask(bytes32 taskHash);
     error TaskAlreadyCompleted();
     error InvalidSignatures();
     error CallerNotAttestationCenter();
     error CallerNotTaskGenerator();
     error WithdrawalFailed();
-
-    // Constants
-    uint16 internal constant TASK_DEFINITION_ID = 1; // For task-specific voting power
 
     bytes32[] internal _taskHashes;
     mapping(bytes32 _taskHash => bool) internal _completedTasks;
@@ -153,7 +151,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
 
         // Check that the task is valid, hasn't been responsed yet
         if (!_isApproved) revert TaskNotApproved();
-        if (!isTaskExists(btcTxnHash)) revert InvalidTask();
+        if (!isTaskExists(btcTxnHash)) revert InvalidTask(btcTxnHash);
         if (isTaskCompleted(btcTxnHash)) revert TaskAlreadyCompleted();
     }
 
@@ -184,7 +182,6 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
             PSBTData memory psbtData = _homeChainCoordinator.getPSBTDataForTxnHash(btcTxnHash);
 
             (uint256 nativeFee,) = quote(btcTxnHash, psbtData.rawTxn, false);
-            // Send message after successful verification
             _homeChainCoordinator.sendMessage{value: nativeFee}(btcTxnHash);
         } else {
             _homeChainCoordinator.updateBurnStatus(btcTxnHash);
@@ -291,7 +288,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      */
     function getTaskHashes(uint256 _startIndex, uint256 _endIndex) external view returns (bytes32[] memory) {
         // Check if the start index is greater than the end index
-        if (_startIndex > _endIndex) revert InvalidTask();
+        if (_startIndex > _endIndex) revert TaskLengthInvalid();
 
         // Check if the end index is greater than the length of the task hashes
         if (_endIndex > _taskHashes.length) revert TaskNotFound();

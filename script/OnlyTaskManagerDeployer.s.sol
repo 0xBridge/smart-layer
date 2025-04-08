@@ -20,8 +20,8 @@ contract OnlyTaskManagerDeployer is Script {
     // Constants
     address internal constant OWNER = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
     address internal constant GENERATOR = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
-    address internal constant ATTESTATION_CENTER = 0x276ef26eEDC3CFE0Cdf22fB033Abc9bF6b6a95B3;
-    address internal constant HOME_CHAIN_COORDINATOR = 0xA9925AcaB0EF01B486105058dBb0158482E23B75;
+    address internal constant ATTESTATION_CENTER = 0xf8858A9d9794C1A73272f21a7dB84471F491797F;
+    address internal constant HOME_CHAIN_COORDINATOR = 0x1bc82fD583a5C614f3f228C9455753Bdf0290240;
 
     // Fork IDs
     uint256 internal _sourceForkId;
