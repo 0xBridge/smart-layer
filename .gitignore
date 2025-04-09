@@ -21,3 +21,4 @@ gas-report.txt
 
 # Deployment files
 deployments/
+*.txt

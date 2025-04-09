@@ -78,7 +78,7 @@ contract HomeChainCoordinatorTest is Test {
     event MessageSent(uint32 dstEid, string message, bytes32 receiver, uint256 nativeFee);
 
     function setUp() public {
-        string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory srcRpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         srcForkId = vm.createSelectFork(srcRpcUrl);
         HelperConfig srcConfig = new HelperConfig();
         srcNetworkConfig = srcConfig.getConfig();

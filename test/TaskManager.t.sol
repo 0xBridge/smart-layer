@@ -64,7 +64,7 @@ contract TaskManagerTest is Test {
     event TaskCompleted(bytes32 indexed btcTxnHash);
 
     function setUp() public {
-        string memory rpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory rpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         sourceForkId = vm.createSelectFork(rpcUrl);
         HelperConfig config = new HelperConfig();
         srcNetworkConfig = config.getConfig();

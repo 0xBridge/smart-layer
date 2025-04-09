@@ -46,7 +46,7 @@ contract SupportNewNetworkScript is Script {
         vm.stopBroadcast();
 
         // Set up source chain fork
-        string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory srcRpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         uint256 srcForkId = vm.createSelectFork(srcRpcUrl);
         uint256 aggregatorPrivateKey = vm.envUint("AGGREGATOR_PRIVATE_KEY");
         vm.startBroadcast(aggregatorPrivateKey);

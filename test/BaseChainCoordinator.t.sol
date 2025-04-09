@@ -45,7 +45,7 @@
 
 //     function setUp() public {
 //         // Get network configurations
-//         string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
+//         string memory srcRpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
 //         srcForkId = vm.createSelectFork(srcRpcUrl);
 
 //         HelperConfig srcConfig = new HelperConfig();

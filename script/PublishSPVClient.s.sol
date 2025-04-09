@@ -12,7 +12,7 @@ import {HelperConfig} from "./HelperConfig.s.sol";
  * @dev Submits new block headers to keep the SPV client up-to-date
  */
 contract PublishSPVClient is Script {
-    address private constant BTC_LIGHT_CLIENT = 0x7949780E6330FAB7b0067E179f42b013Be7cDd7B; // Replace with actual deployed address
+    address private constant BTC_LIGHT_CLIENT = 0x9dd7A1C190470e656A0b65C985ab83a7B3453005; // Replace with actual deployed address
     // Contract instance
     BitcoinLightClient internal _btcLightClient;
 
@@ -31,7 +31,7 @@ contract PublishSPVClient is Script {
      */
     function run() public {
         // Connect to the network where the BitcoinLightClient is deployed
-        string memory rpcUrl = vm.envString("AMOY_RPC_URL"); // Use the relevant network
+        string memory rpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL"); // Use the relevant network
         _forkId = vm.createSelectFork(rpcUrl);
 
         HelperConfig config = new HelperConfig();

@@ -132,7 +132,7 @@ contract OthenticFlowTest is Test {
 
     function setUp() public {
         // Create and select the network on which the task is to be submitted
-        string memory homeRpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory homeRpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         homeForkId = vm.createSelectFork(homeRpcUrl);
     }
 

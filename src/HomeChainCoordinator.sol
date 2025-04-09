@@ -54,7 +54,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     uint256 public maxGasTokenAmount = 1 ether; // Max amount that can be put as the native token amount
     uint256 public minBTCAmount = 1000; // Min BTC amount / satoshis that needs to be locked
 
-    bytes internal constant OPTIONS = hex"0003010011010000000000000000000000000000c350";
+    bytes internal constant OPTIONS = hex"00030100110100000000000000000000000000030D40";
 
     // Events
     event MessageCreated(bool indexed isMintTxn, bytes32 indexed blockHash, bytes32 indexed btcTxnHash);

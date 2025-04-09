@@ -18,7 +18,7 @@ contract SubmitTask is Script {
      * @dev Submits a task and distributes rewards
      */
     function run() external {
-        string memory rpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory rpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         vm.createSelectFork(rpcUrl);
 
         // Set up private keys and derive addresses

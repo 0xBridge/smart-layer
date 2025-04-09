@@ -22,7 +22,7 @@ contract DistributeRewards is Script {
      * @dev Calls the requestBatchPayment function on the AttestationCenter
      */
     function run() external {
-        string memory rpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory rpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         vm.createSelectFork(rpcUrl);
 
         // Set the private key for the AVS governance owner

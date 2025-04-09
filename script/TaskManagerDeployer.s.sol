@@ -34,7 +34,7 @@ contract TaskManagerDeployer is Script {
     // Constants
     address internal constant OWNER = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
     address internal constant GENERATOR = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
-    address internal constant ATTESTATION_CENTER = 0xf8858A9d9794C1A73272f21a7dB84471F491797F;
+    address internal constant ATTESTATION_CENTER = 0xEA40f823f46CB372Cf58C184a9Ee7ECCF0200f07;
 
     // Fork IDs
     uint256 internal _sourceForkId;
@@ -54,7 +54,7 @@ contract TaskManagerDeployer is Script {
      * @dev Deploys and configures all necessary contracts on both source and destination chains
      */
     function run() public {
-        string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory srcRpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         _sourceForkId = vm.createSelectFork(srcRpcUrl);
         HelperConfig srcConfig = new HelperConfig();
         _srcNetworkConfig = srcConfig.getConfig();
