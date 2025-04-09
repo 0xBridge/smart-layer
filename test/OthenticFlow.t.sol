@@ -32,7 +32,11 @@ interface IStrategyManager {
 }
 
 interface IAVSGovernance {
-    // function registerOperatorToEigenLayer(_eigenSig) external;
+    function registerOperatorToEigenLayer(
+        ISignatureUtils.SignatureWithSaltAndExpiry calldata _eigenSig,
+        bytes calldata _authToken
+    ) external;
+
     function registerAsOperator(
         uint256[4] calldata _blsKey,
         address _rewardsReceiver,
@@ -77,21 +81,22 @@ contract OthenticFlowTest is Test {
     address private constant L1_MESSAGE_HANDLER = 0xf8fc6e50865A0dB5493A435f9C31C24161E114FC;
 
     // Holesky constants
-    address private constant EL_DELEGATION_MANAGER = 0xA44151489861Fe9e3055d95adC98FbD462B948e7;
+    address private constant EIGEN_DELEGATION_MANAGER = 0xA44151489861Fe9e3055d95adC98FbD462B948e7;
     address private constant STAKED_ETH = 0x3F1c547b21f65e10480dE3ad8E19fAAC46C95034;
     address private constant LIDO_REFERRAL_ADDRESS = 0x11d00000000000000000000000000000000011d0;
-    address private constant EL_STRATEGY_MANAGER = 0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6;
+    address private constant EIGEN_STRATEGY_MANAGER = 0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6;
     address private constant ST_ETH_STRATEGY = 0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3;
 
     // 1. Deploy the AVS contracts - Done via the Othentic cli
     function alreadyDone_setUp() public {
-        // 1. Deploy the AVS contracts - this can be done via the Othentic cli
+        // 1. Deploy the AVS contracts - this can be done via the Othentic cli only as the Othentic factory contracts are not open-sourced yet
 
         // 2. Register the necessary task creator/operators/attesters/aggregators on EigenLayer - to be executed by the deployer / AVS Multisig owner
-        // https://holesky.etherscan.io/tx/0x5e99ffa3be63df189d5e61309480e902ace42b65fbed715ee8432cc1a0e754df
+        // https://holesky.etherscan.io/tx/0xbec6a362cf15c06cfc3932684518fe9367e851cdbac873531d5d6c16e45b2ce6
+        // https://holesky.etherscan.io/tx/0x42ae1fc91f36ea155a4422a0f546fdb519e2abe9b35e16a1881763215914c147
         address initDelegationApprover = ZERO_ADDRESS;
         uint32 allocationDelay = 0;
-        IELDelegationManagerAddress(EL_DELEGATION_MANAGER).registerAsOperator(
+        IELDelegationManagerAddress(EIGEN_DELEGATION_MANAGER).registerAsOperator(
             initDelegationApprover, allocationDelay, metadataURI
         ); // Deployer (AVS_MULTISIG_OWNER)
 
@@ -101,15 +106,13 @@ contract OthenticFlowTest is Test {
 
         // 4. Deposit into strategy to setup operator voting power - to be executed by the operators individually
         // https://holesky.etherscan.io/tx/0x905df28a75ddc9d84b1f50304345ddadc6cc47576989ae5d60cfcb310a4720d6
-        ILiquidStakedEther(STAKED_ETH).approve(EL_STRATEGY_MANAGER, ethAmountToStake);
-        IStrategyManager(EL_STRATEGY_MANAGER).depositIntoStrategy(ST_ETH_STRATEGY, STAKED_ETH, ethAmountToStake);
+        ILiquidStakedEther(STAKED_ETH).approve(EIGEN_STRATEGY_MANAGER, ethAmountToStake);
+        IStrategyManager(EIGEN_STRATEGY_MANAGER).depositIntoStrategy(ST_ETH_STRATEGY, STAKED_ETH, ethAmountToStake);
 
         // 5. Register operators to AVS (same as step 1) - to be executed by the operators individually
-        // https://holesky.etherscan.io/tx/0xbec6a362cf15c06cfc3932684518fe9367e851cdbac873531d5d6c16e45b2ce6
         // https://holesky.etherscan.io/tx/0x8b61105ecfc3cd2207b58fade0784039d67c21f353f9bda681ba7c63713daaee
         // https://holesky.etherscan.io/tx/0x98bec0dedea862d9f6bfeae17eb5120d2b7459f3f9283d03a66e890f4bbed8a2
-        // https://holesky.etherscan.io/tx/0x42ae1fc91f36ea155a4422a0f546fdb519e2abe9b35e16a1881763215914c147
-        // IAVSGovernance(AVS_GOVERNANCE_ADDRESS).registerOperatorToEigenLayer(_eigenSig);
+        // IAVSGovernance(AVS_GOVERNANCE_ADDRESS).registerOperatorToEigenLayer(_eigenSig, _authToken);
         // IAVSGovernance(AVS_GOVERNANCE_ADDRESS).registerAsOperator(uint256[4] calldata _blsKey, address _rewardsReceiver, ISignatureUtils.SignatureWithSaltAndExpiry memory _operatorSignature, BLSAuthLibrary.Signature calldata _blsRegistrationSignature);
 
         // 6. Make sure the rewards are deposited to the AVS treasury
@@ -117,13 +120,14 @@ contract OthenticFlowTest is Test {
         IERC20(WETH).approve(AVS_TREASURY, wethTreasuryAmountDeposit);
         IVault(AVS_TREASURY).depositERC20(WETH, wethTreasuryAmountDeposit); // Deployer (AVS_MULTISIG_OWNER)
 
-        // Unpause first to allow rewards disburse - defaulted to pause
+        // 7. Unpause first to allow rewards disburse - defaulted to pause
         // https://amoy.polygonscan.com/tx/0x5fd0a7919ae8af9785cccf670dfb0ad9897bdfc7a6b2f50156cb1453063f55c4
         IAttestationCenter(ATTESTATION_CENTER).unpause(REWARDS_FLOW); // Deployer (AVS_MULTISIG_OWNER)
 
-        // 7. Claim Rewards - Can be done post submitTask (Didn't see the rewards disbursed on L1)
-        // https://amoy.polygonscan.com/tx/0x887194727b6c46a8139a6520709cff19f8631dcecd2c92b521f8d94d3e5a130c
-        // IAttestationCenter(ATTESTATION_CENTER).requestBatchPayment(); // Deployer (AVS_MULTISIG_OWNER)
+        // 8. Claim Rewards - Can be done post submitTask
+        // https://amoy.polygonscan.com/tx/0xe2d1f66b5daa2fa5cf4984b7105c1ce063f2ff3b6f3e9b5b654ba15277619cb1
+        // https://holesky.etherscan.io/tx/0xd1c93b03f3bc4e1a421427f2f312b50dcb2ce17ca3bc82957f3950b5890c29fe
+        IAttestationCenter(ATTESTATION_CENTER).requestBatchPayment(); // Deployer (AVS_MULTISIG_OWNER)
     }
 
     function setUp() public {
@@ -158,17 +162,9 @@ contract OthenticFlowTest is Test {
         attestersIds[0] = 3;
         attestersIds[1] = 4;
 
-        IAttestationCenter.EcdsaTaskSubmissionDetails memory ecdsaTaskSubmissionDetails = IAttestationCenter
-            .EcdsaTaskSubmissionDetails({
-            isApproved: isApproved,
-            tpSignature: tpSignature,
-            taSignature: taSignature,
-            attestersIds: attestersIds
-        });
-
         // Submit the task
         vm.prank(SIGNER);
-        attestationCenter.submitTask(taskInfo, ecdsaTaskSubmissionDetails);
+        attestationCenter.submitTask(taskInfo, isApproved, tpSignature, taSignature, attestersIds);
 
         // Distribute rewards
         // vm.prank(AVS_MULTISIG_OWNER);

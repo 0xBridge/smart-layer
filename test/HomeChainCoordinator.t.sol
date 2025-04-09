@@ -71,7 +71,7 @@ contract HomeChainCoordinatorTest is Test {
     address[] private OPERATORS = [
         0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE,
         0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E,
-        0x276ef26eEDC3CFE0Cdf22fB033Abc9bF6b6a95B3
+        0xEC1Fa15145c4d27F7e8645F2F68c0E0303AE5690
     ];
 
     // Events

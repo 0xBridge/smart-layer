@@ -11,7 +11,7 @@ import {IAttestationCenter} from "../src/interfaces/IAttestationCenter.sol";
  */
 contract SubmitTask is Script {
     // Constants
-    address internal constant ATTESTATION_CENTER = 0x276ef26eEDC3CFE0Cdf22fB033Abc9bF6b6a95B3;
+    address internal constant ATTESTATION_CENTER = 0xf8858A9d9794C1A73272f21a7dB84471F491797F;
 
     /**
      * @notice Main execution function
@@ -22,7 +22,7 @@ contract SubmitTask is Script {
         vm.createSelectFork(rpcUrl);
 
         // Set up private keys and derive addresses
-        uint256 privateKeyGenerator = vm.envUint("GENERATOR_PRIVATE_KEY"); // Should have been Aggregator address private key
+        uint256 privateKey = vm.envUint("AGGREGATOR_PRIVATE_KEY"); // Should have been Aggregator address private key
         uint256 privateKeyAvsGovernanceOwner = vm.envUint("OWNER_PRIVATE_KEY");
 
         // Create the AttestationCenter contract instance
@@ -30,47 +30,39 @@ contract SubmitTask is Script {
 
         // Create the task info
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
-            proofOfTask: "Just putting any random string here.",
-            data: hex"000000008616134584b18a2e16e2b6f4b6f8acc7a1a975c2a8c6f8b10493e260", // hex bytes data
+            proofOfTask: "Random",
+            data: hex"0000000000000000000000000000000000000000000000000000000000000001b0a97d6e5c2844480b0b6b025b68dee5f70d16938f31f2cc1854814605c2a4f9", // hex bytes data
             taskPerformer: 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE, // Generator / Task creator address
             taskDefinitionId: 0
         });
 
         // Signature data (Commented as it seems to be a placeholder or example)
         bytes memory tpSignature =
-            hex"b8490b65ed3a418c1026b06c9984381ab099dc946981aa282e8eac2ccaf78c7f6ad3b6f01de81f29c21ed7ad974063785ef38e153c501dc0b3125ae5a9e8cd5a1b";
+            hex"bfd5d696e42816bdfc9a86651af10ebc76c12052d78ac6819c6a9b9487f980ee64fcbe4747be2c820e3d74aeef0c6efa37eeb420a985c4d52b2a152c8e5af6101b";
         uint256[2] memory taSignature = [
-            20150624192400228108359345405435493754751152575474227883524848041839664309077,
-            1082501311440838732190290197012581182681773299437476198311483876744319338514
+            19565671344821917801848597049102853064663301028077529815173197353806345535554,
+            20642961566332536318617767370272501731800998997438704887582871778001478237442
         ];
         uint256[] memory attestersIds = new uint256[](2);
-        attestersIds[0] = 3;
-        attestersIds[1] = 4;
+        attestersIds[0] = 2;
+        attestersIds[1] = 3;
 
         // Start the broadcast as aggregator
-        vm.startBroadcast(privateKeyGenerator);
+        vm.startBroadcast(privateKey);
 
         // Submit the task
-        attestationCenter.submitTask(
-            taskInfo,
-            IAttestationCenter.EcdsaTaskSubmissionDetails({
-                isApproved: true,
-                tpSignature: tpSignature,
-                taSignature: taSignature,
-                attestersIds: attestersIds
-            })
-        );
+        attestationCenter.submitTask(taskInfo, true, tpSignature, taSignature, attestersIds);
 
         // Stop the broadcast
         vm.stopBroadcast();
 
-        // Start the broadcast as AVS governance owner
-        vm.startBroadcast(privateKeyAvsGovernanceOwner);
+        // // Start the broadcast as AVS governance owner
+        // vm.startBroadcast(privateKeyAvsGovernanceOwner);
 
-        // Distribute rewards
-        attestationCenter.requestBatchPayment();
+        // // Distribute rewards
+        // attestationCenter.requestBatchPayment();
 
-        // Stop the broadcast
-        vm.stopBroadcast();
+        // // Stop the broadcast
+        // vm.stopBroadcast();
     }
 }

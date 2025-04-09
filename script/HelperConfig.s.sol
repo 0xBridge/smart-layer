@@ -17,6 +17,10 @@ contract HelperConfig is Script {
         uint32 chainEid;
         address endpoint;
         address account;
+        address weth;
+        uint256 chainId;
+        address othenticFactory;
+        address eigenDelegationManager;
     }
 
     // Constants
@@ -32,7 +36,15 @@ contract HelperConfig is Script {
     constructor() {
         // Get current chainId
         uint256 chainId = block.chainid;
+        _initNetworkConfig(chainId);
+    }
 
+    /**
+     * @notice Inits the network configuration for the current chain from a JSON file
+     * @param chainId Chain ID to set configuration for
+     * @dev Reverts if chain ID is not found in the network json file
+     */
+    function _initNetworkConfig(uint256 chainId) internal {
         // Read and parse network config for current chain
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script/network-config.json");
@@ -45,9 +57,23 @@ contract HelperConfig is Script {
                 abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".endpoint")), (address));
             uint32 chainEid =
                 abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".chainEid")), (uint32));
+            address weth = abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".weth")), (address));
+            address othenticFactory =
+                abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".othenticFactory")), (address));
+            address eigenDelegationManager = abi.decode(
+                vm.parseJson(json, string.concat(".", vm.toString(chainId), ".eigenDelegationManager")), (address)
+            );
 
             // Set the local network config
-            _localNetworkConfig = NetworkConfig({chainEid: chainEid, endpoint: endpoint, account: OWNER_WALLET});
+            _localNetworkConfig = NetworkConfig({
+                chainEid: chainEid,
+                endpoint: endpoint,
+                account: OWNER_WALLET,
+                weth: weth,
+                chainId: chainId,
+                othenticFactory: othenticFactory,
+                eigenDelegationManager: eigenDelegationManager
+            });
         } catch {
             revert HelperConfig__InvalidChainId();
         }

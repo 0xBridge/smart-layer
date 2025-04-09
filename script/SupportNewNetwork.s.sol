@@ -6,11 +6,11 @@ import {HomeChainCoordinator} from "../src/HomeChainCoordinator.sol";
 import {BaseChainCoordinator} from "../src/BaseChainCoordinator.sol";
 
 /**
- * @title SendMessageScript
+ * @title SupportNewNetworkScript
  * @notice Script to configure cross-chain communication between networks
  * @dev Sets up peer relationships between HomeChainCoordinator and BaseChainCoordinator
  */
-contract SendMessageScript is Script {
+contract SupportNewNetworkScript is Script {
     // Contract instances
     HomeChainCoordinator internal _homeChainCoordinator;
     BaseChainCoordinator internal _baseChainCoordinator;

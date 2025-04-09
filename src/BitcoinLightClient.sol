@@ -325,4 +325,107 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
         // Decode metadata from OP_RETURN data
         return BitcoinTxnParser.decodeMetadata(opReturnData);
     }
+
+    /**
+     * @notice Submit a historical block header
+     * @param blockVersion Block version
+     * @param blockTimestamp Block timestamp
+     * @param difficultyBits Block difficulty bits
+     * @param nonce Block nonce
+     * @param height Block height
+     * @param prevBlock Previous block hash
+     * @param merkleRoot Block merkle root
+     * @param intermediateHeaders Array of intermediate headers (in chronological order from latest checkpoint)
+     * @return blockHash The hash of the submitted block
+     */
+    function submitHistoricalBlockHeader(
+        uint32 blockVersion,
+        uint32 blockTimestamp,
+        uint32 difficultyBits,
+        uint32 nonce,
+        uint32 height,
+        bytes32 prevBlock,
+        bytes32 merkleRoot,
+        bytes[] calldata intermediateHeaders
+    ) external returns (bytes32 blockHash) {
+        BitcoinUtils.BlockHeader memory header = BitcoinUtils.BlockHeader({
+            version: blockVersion,
+            timestamp: blockTimestamp,
+            difficultyBits: difficultyBits,
+            nonce: nonce,
+            height: height,
+            prevBlock: prevBlock,
+            merkleRoot: merkleRoot
+        });
+        blockHash = BitcoinUtils.getBlockHashFromParams(header);
+        _submitHistoricalBlockHeader(blockHash, header, intermediateHeaders);
+    }
+
+    /**
+     * @notice Internal function to submit historical block header
+     * @param blockHash Block hash
+     * @param header Block header
+     * @param intermediateHeaders Array of intermediate headers (in chronological order from latest checkpoint)
+     * @dev Validates proof of work and chain connection from latest checkpoint down to historical header
+     */
+    function _submitHistoricalBlockHeader(
+        bytes32 blockHash,
+        BitcoinUtils.BlockHeader memory header,
+        bytes[] calldata intermediateHeaders
+    ) internal {
+        if (!BitcoinUtils.verifyProofOfWork(blockHash, header.difficultyBits)) {
+            revert INVALID_PROOF_OF_WORK();
+        }
+
+        // For historical headers, we need to verify the chain connection from latest checkpoint down
+        if (intermediateHeaders.length > 0) {
+            bool isValid = verifyHistoricalHeaderChain(header, intermediateHeaders);
+            if (!isValid) revert INVALID_HEADER_CHAIN();
+        } else {
+            // If no intermediate headers, check if this header connects to an existing header
+            if (_headers[header.prevBlock].height == 0) revert CHAIN_NOT_CONNECTED();
+        }
+
+        // Store the header
+        _headers[blockHash] = header;
+
+        emit BlockHeaderSubmitted(blockHash, header.prevBlock, header.height);
+    }
+
+    /**
+     * @notice Verify a chain of headers from latest checkpoint down to historical header
+     * @param historicalHeader The historical header being submitted
+     * @param intermediateHeaders Array of intermediate headers in chronological order from latest checkpoint
+     * @return True if the header chain is valid and connects from latest checkpoint to historical header
+     */
+    function verifyHistoricalHeaderChain(
+        BitcoinUtils.BlockHeader memory historicalHeader,
+        bytes[] calldata intermediateHeaders
+    ) public view returns (bool) {
+        bytes32 currentHash = _latestCheckpointHeaderHash;
+        BitcoinUtils.BlockHeader memory currentHeader = _headers[currentHash];
+
+        // Verify headers in chronological order from latest checkpoint down
+        for (uint256 i = 0; i < intermediateHeaders.length; i++) {
+            BitcoinUtils.BlockHeader memory intermediateHeader = BitcoinUtils.parseBlockHeader(intermediateHeaders[i]);
+
+            // Verify the current header points to the intermediate header
+            if (currentHeader.prevBlock != BitcoinUtils.getBlockHashFromParams(intermediateHeader)) {
+                return false;
+            }
+
+            // Verify proof of work for intermediate header
+            bytes32 intermediateHash = BitcoinUtils.getBlockHashFromParams(intermediateHeader);
+            if (!BitcoinUtils.verifyProofOfWork(intermediateHash, intermediateHeader.difficultyBits)) {
+                return false;
+            }
+
+            // Move to next header
+            currentHash = intermediateHash;
+            currentHeader = intermediateHeader;
+        }
+
+        // Finally verify connection to the historical header
+        return currentHeader.prevBlock == BitcoinUtils.getBlockHashFromParams(historicalHeader);
+    }
 }
