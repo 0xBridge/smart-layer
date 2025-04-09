@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {Script, console} from "forge-std/Script.sol";
+import {IAttestationCenter} from "../src/interfaces/IAttestationCenter.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {HelperConfig} from "./HelperConfig.s.sol";
 
@@ -12,14 +13,17 @@ interface IVault {
 contract DepositRewardsScript is Script {
     address private AVS_TREASURY = vm.envAddress("L1_AVS_TREASURY");
     address private ATTESTATION_CENTER = vm.envAddress("ATTESTATION_CENTER_ADDRESS");
-    address private ERC20_TO_BE_REWARDED;
-    uint256 private ERC20_AMOUNT_TO_REWARD = 30 ether; // 160 ether + 10% Othentic fee
+    address private erc20ToBeRewarded;
+    uint256 private erc20AmountToBeRewarded;
 
     // Configuration parameters
     HelperConfig.NetworkConfig srcNetworkConfig;
+    HelperConfig.NetworkConfig destNetworkConfig;
 
     function run() public {
-        // Set up single chain
+        _calculateERC20AmountToBeRewarded();
+
+        // Set up source chain fork
         string memory srcRpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         vm.createSelectFork(srcRpcUrl);
         HelperConfig srcConfig = new HelperConfig();
@@ -29,16 +33,30 @@ contract DepositRewardsScript is Script {
 
         vm.startBroadcast(privateKey);
 
-        ERC20_TO_BE_REWARDED = ERC20_TO_BE_REWARDED == address(0) ? srcNetworkConfig.weth : ERC20_TO_BE_REWARDED;
-        ERC20_AMOUNT_TO_REWARD =
-            ERC20_AMOUNT_TO_REWARD == 0 ? _calculateERC20AmountToBeRewarded() : ERC20_AMOUNT_TO_REWARD; // 1 WETH
-        IERC20(ERC20_TO_BE_REWARDED).approve(AVS_TREASURY, ERC20_AMOUNT_TO_REWARD);
-        IVault(AVS_TREASURY).depositERC20(ERC20_TO_BE_REWARDED, ERC20_AMOUNT_TO_REWARD);
+        erc20ToBeRewarded = erc20ToBeRewarded == address(0) ? srcNetworkConfig.weth : erc20ToBeRewarded;
+        console.log("Amount to be rewarded: ", erc20AmountToBeRewarded);
+        // TODO: You can also check if the L1_AVS_TREASURY on L1 already has the required erc20AmountToBeRewarded and skip the deposit if it does
+        IERC20(erc20ToBeRewarded).approve(AVS_TREASURY, erc20AmountToBeRewarded);
+        IVault(AVS_TREASURY).depositERC20(erc20ToBeRewarded, erc20AmountToBeRewarded);
 
         vm.stopBroadcast();
     }
 
-    function _calculateERC20AmountToBeRewarded() internal returns (uint256) {
-        // TODO: Implement the logic to calculate the amount of ERC20 to be rewarded
+    function _calculateERC20AmountToBeRewarded() internal returns (uint256 amountToBeRewarded) {
+        // Set up destination chain fork
+        string memory destRpcUrl = vm.envString("AMOY_RPC_URL");
+        vm.createSelectFork(destRpcUrl);
+        HelperConfig destConfig = new HelperConfig();
+        destNetworkConfig = destConfig.getConfig();
+
+        uint256 numOfActiveOperators = IAttestationCenter(ATTESTATION_CENTER).numOfActiveOperators();
+        for (uint256 i = 1; i <= numOfActiveOperators; i++) {
+            IAttestationCenter.PaymentDetails memory paymentDetail =
+                IAttestationCenter(ATTESTATION_CENTER).getOperatorPaymentDetail(i);
+            if (paymentDetail.feeToClaim > 0) {
+                amountToBeRewarded += paymentDetail.feeToClaim;
+            }
+        }
+        erc20AmountToBeRewarded = erc20AmountToBeRewarded == 0 ? amountToBeRewarded : erc20AmountToBeRewarded;
     }
 }
