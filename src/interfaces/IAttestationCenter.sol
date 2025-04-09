@@ -18,6 +18,11 @@ interface IAttestationCenter {
     ) external;
 
     function unpause(bytes4 _pausableFlow) external;
+
     // Only AVS Governance Multisig address can call this function - Disburses funds to the respective operators
+    function requestPayment(uint256 _operatorId) external;
+
     function requestBatchPayment() external;
+
+    function requestBatchPayment(uint256 _from, uint256 _to) external;
 }

@@ -13,7 +13,7 @@ contract DepositRewardsScript is Script {
     address private AVS_TREASURY = vm.envAddress("L1_AVS_TREASURY");
     address private ATTESTATION_CENTER = vm.envAddress("ATTESTATION_CENTER_ADDRESS");
     address private ERC20_TO_BE_REWARDED;
-    uint256 private ERC20_AMOUNT_TO_REWARD;
+    uint256 private ERC20_AMOUNT_TO_REWARD = 30 ether; // 160 ether + 10% Othentic fee
 
     // Configuration parameters
     HelperConfig.NetworkConfig srcNetworkConfig;
