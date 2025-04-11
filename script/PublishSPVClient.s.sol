@@ -12,7 +12,7 @@ import {HelperConfig} from "./HelperConfig.s.sol";
  * @dev Submits new block headers to keep the SPV client up-to-date
  */
 contract PublishSPVClient is Script {
-    address private constant BTC_LIGHT_CLIENT = 0x9dd7A1C190470e656A0b65C985ab83a7B3453005; // Replace with actual deployed address
+    address private constant BTC_LIGHT_CLIENT = 0x1b42b15e721b313D7df2415483B9731749d5d5fe; // Replace with actual deployed address
     // Contract instance
     BitcoinLightClient internal _btcLightClient;
 

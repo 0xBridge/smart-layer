@@ -35,7 +35,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     uint32 internal immutable _homeEid;
 
     uint256 public minBTCAmount = 1000; // Min BTC amount / satoshis that needs to be burned
-    bytes internal constant OPTIONS = hex"0003010011010000000000000000000000000000c350"; // Options for message sending
+    bytes internal constant OPTIONS = hex"00030100110100000000000000000000000000030D40"; // Options for message sending
 
     // Events
     event MessageSent(uint32 dstEid, bytes message, bytes32 receiver, uint256 nativeFee);
@@ -279,10 +279,12 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         address _eBTCToken = _eBTCManagerInstance.getEBTCTokenAddress();
         if (_eBTCToken == address(0)) revert InvalidTokenAddress();
         IERC20 eBTCToken = IERC20(_eBTCToken);
-        SafeERC20.safeTransferFrom(eBTCToken, msg.sender, address(this), _amount);
         SafeERC20.safePermit(
-            IERC20Permit(address(eBTCToken)), msg.sender, address(_eBTCManagerInstance), _amount, _deadline, _v, _r, _s
+            IERC20Permit(address(eBTCToken)), msg.sender, address(this), _amount, _deadline, _v, _r, _s
         );
+        SafeERC20.safeTransferFrom(eBTCToken, msg.sender, address(this), _amount);
+        SafeERC20.safeApprove(eBTCToken, address(_eBTCManagerInstance), _amount);
+        // Call the internal function to burn and unlock
         _burnAndUnlock(_rawTxn, _amount);
     }
 
