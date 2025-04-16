@@ -11,7 +11,7 @@ import {IAttestationCenter} from "../src/interfaces/IAttestationCenter.sol";
  */
 contract CreateTask is Script {
     // Constants
-    address internal constant TASK_MANAGER = 0x5484bB4C30925F4Dad0CAA7e05649ae6D7f93392;
+    address internal constant TASK_MANAGER = 0x193E4337379B597C7842bdc17bF1Cb2782b27762;
 
     // Bitcoin SPV Testnet constants (from test file)
     bytes32 internal constant MINT_BLOCK_HASH = 0x00000000ad4e9e95f8c6459a406accc761f78b2092b931a6d954f545dcc14e0d;
