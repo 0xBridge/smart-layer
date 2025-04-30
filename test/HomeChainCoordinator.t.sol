@@ -256,10 +256,11 @@ contract HomeChainCoordinatorTest is Test {
 
         vm.selectFork(srcForkId);
 
+        bytes32 keccakTxnHash = keccak256(BURN_RAW_TXN);
         HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams(
             false, // isMint
             BURN_BLOCK_HASH,
-            BURN_BTC_TXN_HASH,
+            keccakTxnHash,
             burnProof,
             burnTxnIndex,
             BURN_RAW_TXN,
@@ -270,12 +271,12 @@ contract HomeChainCoordinatorTest is Test {
 
         vm.startPrank(owner);
         homeChainCoordinator.submitBlockAndStoreMessage(BURN_BLOCK_HEADER, new bytes[](0), params);
-        homeChainCoordinator.updateBurnStatus(BURN_BTC_TXN_HASH);
+        homeChainCoordinator.updateBurnStatus(keccakTxnHash, BURN_BTC_TXN_HASH);
         vm.stopPrank();
 
         // Get primary status of the burn and the eBTC balance of the user on the destination chain
-        PSBTData memory burnPsbtData = homeChainCoordinator.getPSBTDataForTxnHash(BURN_BTC_TXN_HASH);
-        assertEq(burnPsbtData.status, true);
+        PSBTData memory burnPsbtData = homeChainCoordinator.getPSBTDataForTxnHash(keccakTxnHash);
+        assertEq(burnPsbtData.actualTxnHash, BURN_BTC_TXN_HASH);
 
         vm.selectFork(destForkId);
         uint256 balance = eBTCToken.balanceOf(BTC_RECEIVER);

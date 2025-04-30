@@ -147,7 +147,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256[] calldata
     ) external view onlyAttestationCenter {
         // Decode task hash from taskInfo data
-        (bool isMintTxn, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
+        (bool isMintTxn, bytes32 btcTxnHash, bytes32 actualTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32, bytes32));
 
         // Check that the task is valid, hasn't been responsed yet
         if (!_isApproved) revert TaskNotApproved();
@@ -172,7 +172,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256[] calldata
     ) external onlyAttestationCenter {
         // Decode task hash (btcTxnHash) from taskInfo data
-        (bool isMintTxn, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
+        (bool isMintTxn, bytes32 btcTxnHash, bytes32 actualTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32, bytes32));
 
         // Mark task as completed
         _completedTasks[btcTxnHash] = true;
@@ -184,7 +184,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
             (uint256 nativeFee,) = quote(btcTxnHash, psbtData.rawTxn, false);
             _homeChainCoordinator.sendMessage{value: nativeFee}(btcTxnHash);
         } else {
-            _homeChainCoordinator.updateBurnStatus(btcTxnHash);
+            _homeChainCoordinator.updateBurnStatus(btcTxnHash, actualTxnHash);
         }
 
         // emitting event

@@ -234,7 +234,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
      * @notice Get the latest block header
      * @return The latest checkpoint block header
      */
-    function getLatestCheckpoint() external view returns (BitcoinUtils.BlockHeader memory) {
+    function getLatestHeader() external view returns (BitcoinUtils.BlockHeader memory) {
         return _headers[_latestCheckpointHeaderHash];
     }
 

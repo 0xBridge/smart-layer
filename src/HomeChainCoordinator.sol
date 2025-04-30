@@ -63,11 +63,11 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes32 indexed guid,
         uint32 srcEid,
         bytes32 indexed sender,
-        bytes32 indexed btcTxnHash,
+        bytes32 indexed burnKeccakHash,
         bool isMintTxn,
-        uint256 amount
+        bytes rawTxn
     );
-    event UpdateTxnStatus(bytes32 indexed btcTxnHash);
+    event UpdateTxnStatus(bytes32 indexed btcTxnHash, bytes32 indexed actualTxnHash);
 
     /**
      * @notice Initializes the HomeChainCoordinator contract
@@ -156,7 +156,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             // 2. Store PSBT data for mint transaction
             psbtData = PSBTData({
                 isMintTxn: params.isMintTxn,
-                status: false,
+                actualTxnHash: bytes32(0),
                 chainId: metadata.chainId,
                 user: metadata.receiverAddress,
                 rawTxn: params.rawTxn,
@@ -167,25 +167,14 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
                 nativeTokenAmount: metadata.nativeTokenAmount
             });
         } else {
-            // 0. Get existing PSBT data for burn transaction
+            // 0. Get existing PSBT data for keccak partially signed burn transaction hash
             psbtData = _btcTxnHash_psbtData[params.btcTxnHash];
-
-            // 1. Validate input in a separate function call
-            _validateInput(merkleRoot, params.btcTxnHash, params.proof, params.index, params.rawTxn, psbtData.chainId);
-            // 2. Validate taproot address at the time of task creation
-            _validateTaprootAddress(params.taprootAddress, psbtData);
-            // 3. Update the PSBT data with the required burn transaction details
+            psbtData.taprootAddress = params.taprootAddress;
             psbtData.networkKey = params.networkKey;
             psbtData.operators = params.operators;
         }
         _btcTxnHash_psbtData[params.btcTxnHash] = psbtData;
         emit MessageCreated(params.isMintTxn, params.blockHash, params.btcTxnHash);
-    }
-
-    function _validateTaprootAddress(bytes32 taprootAddress, PSBTData memory psbtData) internal pure {
-        if (taprootAddress != psbtData.taprootAddress) {
-            revert InvalidTaprootAddress();
-        }
     }
 
     // NOTE: The message will come from the endpoint but for now we're considering it to be the owner
@@ -220,11 +209,14 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     ) internal {
         bytes memory payload =
             abi.encode(_metadata.receiverAddress, _btcTxnHash, _metadata.lockedAmount, _metadata.nativeTokenAmount);
-
+        PSBTData memory psbtData = getPSBTDataForTxnHash(_btcTxnHash);
+        psbtData.actualTxnHash = _btcTxnHash;
+        _btcTxnHash_psbtData[_btcTxnHash] = psbtData; // Update the status of the transaction
+        
         if (_dstEid == _chainEid) {
             _handleSameChainMessage(_dstEid, _btcTxnHash, payload);
         } else {
-            _handleCrossChainMessage(_dstEid, _btcTxnHash, payload);
+            _handleCrossChainMessage(_dstEid, payload);
         }
         emit MessageSent(_dstEid, _btcTxnHash, msg.sender, block.timestamp);
     }
@@ -243,13 +235,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     /**
      * @notice Handles cross-chain message sending
      */
-    function _handleCrossChainMessage(uint32 _dstEid, bytes32 _btcTxnHash, bytes memory _payload)
+    function _handleCrossChainMessage(uint32 _dstEid, bytes memory _payload)
         internal
         returns (MessagingReceipt memory)
     {
-        PSBTData memory psbtData = getPSBTDataForTxnHash(_btcTxnHash);
-        psbtData.status = true;
-        _btcTxnHash_psbtData[_btcTxnHash] = psbtData; // Update the status of the transaction
         return _lzSend(_dstEid, _payload, OPTIONS, MessagingFee(msg.value, 0), msg.sender);
     }
 
@@ -278,7 +267,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         }
 
         // 2. Check if the message already exists or is processed
-        if (_btcTxnHash_psbtData[_btcTxnHash].status) {
+        if (_btcTxnHash_psbtData[_btcTxnHash].actualTxnHash == _btcTxnHash) {
             revert TxnAlreadyProcessed(_btcTxnHash);
         }
 
@@ -393,7 +382,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @notice Updates the burn status of a given BTC transaction hash
      * @param _btcTxnHash The BTC transaction hash
      */
-    function updateBurnStatus(bytes32 _btcTxnHash) external whenNotPaused onlyOwner {
+    function updateBurnStatus(bytes32 _btcTxnHash, bytes32 _actualTxnHash) external whenNotPaused onlyOwner {
         // 1. Check if the transaction exists
         PSBTData memory psbtData = _btcTxnHash_psbtData[_btcTxnHash];
         if (psbtData.rawTxn.length == 0) {
@@ -401,16 +390,16 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         }
 
         // 2. Update the status of the transaction
-        if (psbtData.status) {
+        if (psbtData.actualTxnHash != bytes32(0)) {
             revert InvalidStatusUpdate();
         }
-        psbtData.status = true;
+        psbtData.actualTxnHash = _actualTxnHash;
 
         // 3. Update the PSBT data
         _btcTxnHash_psbtData[_btcTxnHash] = psbtData;
 
         // 4. Emit event for the updated status
-        emit UpdateTxnStatus(_btcTxnHash);
+        emit UpdateTxnStatus(_btcTxnHash, _actualTxnHash);
     }
 
     /**
@@ -441,49 +430,38 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
         // 3. Parse psbt and get eBTC burn amount, taproot address, network key, and receiver BTC address
         (uint256 amount, bytes memory rawTxn) = abi.decode(_message, (uint256, bytes));
-        (BitcoinTxnParser.Input[] memory unlockTxnInputs, BitcoinTxnParser.UnlockTxnData[] memory unlockTxnData) =
-            BitcoinTxnParser.extractUnlockOutputs(rawTxn);
-        bytes32 mintTxid = unlockTxnInputs[0].txid;
-        console.logBytes32(mintTxid);
-        bytes32 mintTaprootAddress = _btcTxnHash_psbtData[mintTxid].taprootAddress;
-        console.logBytes32(mintTaprootAddress);
-        // Check if the amount being unlocked is less than or equal the eBTC amount burnt
-        // TODO: || unlockTxnData[0].amount > amount Put it back with correct mint metadata value
-        if (unlockTxnData.length == 0 || mintTaprootAddress == bytes32(0)) {
-            revert InvalidRequest();
-        }
 
         // 4. User should not be able to manipulate any existing _btcTxnHash_psbtData data (either mint or burn)
-        bytes32 btcTxnHash = TxidCalculator.calculateTxid(rawTxn);
-        if (_btcTxnHash_psbtData[btcTxnHash].rawTxn.length != 0) {
+        bytes32 burnKeccakHash = keccak256(rawTxn);
+        if (_btcTxnHash_psbtData[burnKeccakHash].rawTxn.length != 0) {
             revert InvalidRequest();
         }
 
         // 5. Store PSBT data for burn transaction validation
         PSBTData memory psbtData = PSBTData({
             isMintTxn: false, // This is a burn transaction
-            status: false, // Transaction is not yet processed
+            actualTxnHash: bytes32(0), // Transaction is not yet processed
             chainId: _origin.srcEid, // Chain ID of the src chain
             user: address(0), // TODO: Check if makes sense to store the msg.sender on the baseChainCoordinator here
             rawTxn: rawTxn, // Raw hex PSBT data for the burn transaction
-            taprootAddress: mintTaprootAddress, // Taproot address for the mint or burn transaction
+            taprootAddress: "", // Taproot address for the mint or burn transaction
             networkKey: "", // AVS Bitcoin address
             operators: new address[](0), // Array of operators with whom AVS network key is created
-            lockedAmount: unlockTxnData[0].amount, // Amount unlocked in the burn transaction
-            nativeTokenAmount: unlockTxnData[1].amount // unlockTxnData[1].amount could be saved as the burn fees
+            lockedAmount: amount, // Amount unlocked in the burn transaction
+            nativeTokenAmount: 0 // unlockTxnData[1].amount could be saved as the burn fees
         });
 
         // 6. Store the psbtData with the respective Bitcoin transaction hash
-        _btcTxnHash_psbtData[btcTxnHash] = psbtData;
+        _btcTxnHash_psbtData[burnKeccakHash] = psbtData;
 
         // 7. Create task for AVS (can be implemented through a TaskManager contract) - This will be done by the task generator
         emit MessageReceived(
             _guid,
             _origin.srcEid,
             _origin.sender,
-            btcTxnHash,
+            burnKeccakHash,
             false, // This is a burn transaction
-            unlockTxnData[0].amount
+            rawTxn
         );
     }
 

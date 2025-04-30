@@ -260,7 +260,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
     /**
      * @notice Sends a message to the specified chain
-     * @param _rawTxn The raw PSBT data for the burn transaction
+     * @param _rawTxn The raw partially signed (not finalized signed) PSBT data for the burn transaction
      * @param _amount The amount of BTC to burn
      * @param _deadline Expiration time for the permit signature
      * @param _v v of the permit signature
@@ -290,7 +290,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
     /**
      * @notice Sends a message to the specified chain
-     * @param _rawTxn The raw PSBT data for the burn transaction
+     * @param _rawTxn The raw partially signed (not finalized signed) PSBT data for the burn transaction
      * @param _amount The amount of BTC to burn
      */
     function burnAndUnlock(bytes calldata _rawTxn, uint256 _amount) external payable {
@@ -304,13 +304,14 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
     /**
      * @notice Burns eBTC tokens and sends a message to the specified chain
-     * @param _rawTxn The raw PSBT data for the burn transaction
+     * @param _rawTxn The raw partially signed (not finalized signed) PSBT data for the burn transaction
      * @param _amount The amount of BTC to burn
      */
     function _burnAndUnlock(bytes calldata _rawTxn, uint256 _amount) internal {
         if (_rawTxn.length == 0) revert InvalidPSBTData();
         // Shouldn't allow an already existing PSBT to be sent to HomeChainCoordinator via BaseChainCoordinator
-        bytes32 _btcTxnHash = TxidCalculator.calculateTxid(_rawTxn);
+        // bytes32 _btcTxnHash = TxidCalculator.calculateTxid(_rawTxn);
+        bytes32 _btcTxnHash = keccak256(_rawTxn);
         if (_btcTxnHash_txnData[_btcTxnHash].user != address(0)) {
             revert InvalidBurnRequest(_btcTxnHash);
         }

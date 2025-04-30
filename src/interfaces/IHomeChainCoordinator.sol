@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 // TODO: Break PSBTData into separate PSBTData and AVSData (isMintTxn, taprootAddress, networkKey, operators) structs
 struct PSBTData {
     bool isMintTxn; // true for mint, false for burn
-    bool status; // isMinted or isBurned depending on the transaction type
+    bytes32 actualTxnHash; // Replaced status with actualTxnHash
     uint32 chainId; // Chain Id of the destination chain (currently making use of chainEid)
     address user; // User address (could be the receiver of the eBTC token or the burner of the eBTC token)
     bytes rawTxn; // Raw hex PSBT data for the mint or burn transaction

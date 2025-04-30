@@ -45,7 +45,7 @@ contract PublishSPVClient is Script {
 
         // Get the latest block info for logging
         bytes32 latestHash = _btcLightClient.getLatestHeaderHash();
-        BitcoinUtils.BlockHeader memory latestHeader = _btcLightClient.getLatestCheckpoint();
+        BitcoinUtils.BlockHeader memory latestHeader = _btcLightClient.getLatestHeader();
         console.log("Current latest block height:", latestHeader.height);
         console.logBytes32(latestHash);
 
@@ -117,7 +117,7 @@ contract PublishSPVClient is Script {
 
         // Get the updated latest block info
         bytes32 newLatestHash = _btcLightClient.getLatestHeaderHash();
-        BitcoinUtils.BlockHeader memory newLatestHeader = _btcLightClient.getLatestCheckpoint();
+        BitcoinUtils.BlockHeader memory newLatestHeader = _btcLightClient.getLatestHeader();
         console.log("New latest block height:", newLatestHeader.height);
         console.logBytes32(newLatestHash);
 
