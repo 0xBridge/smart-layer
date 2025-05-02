@@ -29,7 +29,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
 
     // State variables (Ensure the storage layout is maintained)
     bytes32 internal _latestCheckpointHeaderHash;
-    mapping(bytes32 => BitcoinUtils.BlockHeader) internal _headers;
+    mapping(bytes32 blockHash => BitcoinUtils.BlockHeader blockHeader) internal _headers;
 
     // Events
     event BlockHeaderSubmitted(bytes32 indexed blockHash, bytes32 indexed prevBlock, uint32 height);
