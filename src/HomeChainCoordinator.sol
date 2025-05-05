@@ -167,7 +167,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
                 nativeTokenAmount: metadata.nativeTokenAmount
             });
         } else {
-            // 0. Get existing PSBT data for keccak partially signed burn transaction hash
+            // 0. Get existing PSBT data for keccak hash of partially signed burn transaction
             psbtData = _btcTxnHash_psbtData[params.btcTxnHash];
             psbtData.taprootAddress = params.taprootAddress;
             psbtData.networkKey = params.networkKey;
@@ -428,8 +428,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             revert InvalidPSBTData();
         }
 
-        // 3. Parse psbt and get eBTC burn amount, taproot address, network key, and receiver BTC address
-        (uint256 amount, bytes memory rawTxn) = abi.decode(_message, (uint256, bytes));
+        // 3. Parse amount, user, and raw transaction data from the message
+        (uint256 amount, address user, bytes memory rawTxn) = abi.decode(_message, (uint256, address, bytes));
 
         // 4. User should not be able to manipulate any existing _btcTxnHash_psbtData data (either mint or burn)
         bytes32 burnKeccakHash = keccak256(rawTxn);
@@ -442,8 +442,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             isMintTxn: false, // This is a burn transaction
             actualTxnHash: bytes32(0), // Transaction is not yet processed
             chainId: _origin.srcEid, // Chain ID of the src chain
-            user: address(0), // TODO: Check if makes sense to store the msg.sender on the baseChainCoordinator here
-            rawTxn: rawTxn, // Raw hex PSBT data for the burn transaction
+            user: user, // user address from which the burn transaction is initiated
+            rawTxn: rawTxn, // Partially signed raw hex PSBT data for the burn transaction
             taprootAddress: "", // Taproot address for the mint or burn transaction
             networkKey: "", // AVS Bitcoin address
             operators: new address[](0), // Array of operators with whom AVS network key is created

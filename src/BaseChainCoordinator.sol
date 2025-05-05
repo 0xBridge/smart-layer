@@ -322,18 +322,35 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         _btcTxnHash_txnData[_btcTxnHash] = TxnData({status: true, user: msg.sender, amount: _amount});
 
         // Pack the amount into _extraData
-        bytes memory amountAndRawTxn = abi.encode(_amount, _rawTxn);
+        bytes memory payload = abi.encode(_amount, msg.sender, _rawTxn);
 
         // Pass the psbt data to the HomeChainCoordinator in the burn transaction
         _lzSend(
             _homeEid, // HomeChainCoordinator chainEid
-            amountAndRawTxn,
+            payload,
             OPTIONS,
             MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
-            address(this) // Refund address in case of failed source message.
+            msg.sender // Refund address in case of failed source message.
         );
 
         emit MessageSent(_homeEid, _rawTxn, peers[_homeEid], msg.value);
+    }
+
+    /**
+     * @notice Quotes the gas needed to pay for the full omnichain transaction
+     * @param _destChainEid The chainEid of the destination chain
+     * @param _payload The payload to be sent to the destination chain, abi encoded amount and rawTxn
+     * @param _payInLzToken Boolean for which token to return fee in
+     * @return nativeFee Estimated gas fee in native gas
+     * @return lzTokenFee Estimated gas fee in ZRO token
+     */
+    function quote(uint32 _destChainEid, bytes memory _payload, bool _payInLzToken)
+        public
+        view
+        returns (uint256 nativeFee, uint256 lzTokenFee)
+    {
+        MessagingFee memory fee = _quote(_destChainEid, _payload, OPTIONS, _payInLzToken);
+        return (fee.nativeFee, fee.lzTokenFee);
     }
 
     /**
