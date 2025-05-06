@@ -106,7 +106,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
         uint32 blockTimestamp,
         uint32 difficultyBits,
         uint32 nonce,
-        uint32 height,
+        uint32 height, // TODO: Remove height from params and calculate it in the contract
         bytes32 prevBlock,
         bytes32 merkleRoot,
         bytes[] calldata intermediateHeaders

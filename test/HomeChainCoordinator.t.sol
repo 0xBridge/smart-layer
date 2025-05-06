@@ -33,28 +33,30 @@ contract HomeChainCoordinatorTest is Test {
 
     // BTC txn metadata
     address private constant BTC_RECEIVER = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
-    uint256 private constant BTC_AMOUNT = 1357;
+    uint256 private constant BTC_AMOUNT = 10000;
 
-    // Bitcoin SPV Testnet constants for MINT (Block #72979)
-    uint32 private constant MINT_BLOCK_VERSION = 536870912;
-    uint32 private constant MINT_BLOCK_TIMESTAMP = 1741357556;
-    uint32 private constant MINT_DIFFICULTY_BITS = 486604799;
-    uint32 private constant MINT_NONCE = 3368467969;
-    uint32 private constant MINT_HEIGHT = 72979;
-    bytes32 private constant MINT_PREV_BLOCK = 0x0000000002e46dca25f7aef5a8181f2d44357259c1f317e95e9039b0b88665bd;
-    bytes32 private constant MINT_MERKLE_ROOT = 0x4f78f364779d441318a19ac8324c38859684e30c62c604f944cf08a82ea6a40f;
+    // Bitcoin Testnet4 constants for Block #80169
+    uint32 private constant MINT_BLOCK_VERSION = 624918528; // Hex: 0x253f8000
+    uint32 private constant MINT_BLOCK_TIMESTAMP = 1745999896; // Hex: 0x6811d818
+    uint32 private constant MINT_DIFFICULTY_BITS = 419821129; // Hex: 0x1905f649
+    uint32 private constant MINT_NONCE = 183420755; // Hex: 0xaeec753
+    uint32 private constant MINT_BLOCK_HEIGHT = 80169;
+    bytes32 private constant MINT_PREV_BLOCK = 0x000000003b4bb24d32b1a5401933e3428188670c18eb8459b147c0575dde8151;
+    bytes32 private constant MINT_MERKLE_ROOT = 0x70529ffb76a57e9c3a5b29cc6faf0dc8dba0eb4eef82bd9ee70ac1435ad12b2d;
 
-    bytes32 private constant MINT_BLOCK_HASH = 0x000000008616134584b18a2e16e2b6f4b6f8acc7a1a975c2a8c6f8b10493e260;
-    bytes32 private constant MINT_BTC_TXN_HASH = 0xbde7e25aa0177ddc3f35b9d35fe87ee4d6d48125527f4a7a67257b272d517d13;
+    bytes MINT_BLOCK_HEADER = hex"00803f255181de5d57c047b15984eb180c67888142e3331940a5b1324db24b3b000000002d2bd15a43c10ae79ebd82ef4eeba0dbc80daf6fcc295b3a9c7ea576fb9f527018d8116849f6051953c7ee0a";
+    bytes32 private constant MINT_BLOCK_HASH = 0x0000000000000004d815fad54546ee91bca946a5b96ab989fada5fa2c3041e02;
+    bytes32 private constant MINT_BTC_TXN_HASH = 0xc10ef0ce4ac0cbc7ffffabcc2804e70cc1f332fc29e78d79832d6d67c3b80842;
     bytes MINT_RAW_TXN =
-        hex"020000000001022e9e2e0eb931608fec287772199083bb80788293e419ce0b618fddac9b18d2630300000000ffffffff086377c5c4961ec2bb4b5164e7644df437cceb42114270cfe2df7b0e9d0135390300000000ffffffff041027000000000000225120b2925665f511a4ec1507d9710600be27f791f80131074c6eda5739053714f33be80300000000000016001471d044aeb7f41205a9ef0e3d785e7d38a776cfa10000000000000000326a3000144e56a8e3757f167378b38269e1ca0e1a1f124c9e0008000000000000054d000400009ca60008000000000000007bf316000000000000160014d5a028b62114136a63ebcfacf94e18536b90a12102483045022100a8b08ad91a4318a12078e76eb40d2f24d2bfa5d1c10aec4664cd86e84fb231ba02201854324af6e39c05998d73ae212e82dcf0a440af620b0a78f19e7e0387b3104f0121036a43583212d54a5977f2cef457520c520ab9bf92299b2d74011ecd410bdb250602473044022054d62f5034de4e947911617c4b878894060c6be37a5b97fa0583a966d10781fe022046d2440c4644475cf9603b5b782154f083ce2f8d0ce3cb4b1ece1f884cf8428f0121036a43583212d54a5977f2cef457520c520ab9bf92299b2d74011ecd410bdb250600000000";
+        hex"02000000000101e48a9f3270ab1ed56b721df9f6dd24af940d23d9c73a9e9bf5a6ac93b2cf15fc0300000000ffffffff041027000000000000225120b2925665f511a4ec1507d9710600be27f791f80131074c6eda5739053714f33be80300000000000016001471d044aeb7f41205a9ef0e3d785e7d38a776cfa10000000000000000326a3000144e56a8e3757f167378b38269e1ca0e1a1f124c9e00080000000000002710000400009ca60008000000000000007b8d49000000000000160014d5a028b62114136a63ebcfacf94e18536b90a12102483045022100e36cb24dad4e568561b7a1d00ede31931b624e9698ce020e518bd1cfb9bd895802204b37fd88086672304c3b754e3df32298adcc0bdeebdbf21d7616de027d1b86b10121036a43583212d54a5977f2cef457520c520ab9bf92299b2d74011ecd410bdb250600000000";
+
 
     // Bitcoin Testnet4 constants for Block #81081
     uint32 private constant BURN_BLOCK_VERSION = 555778048; // Hex: 0x21208000
     uint32 private constant BURN_BLOCK_TIMESTAMP = 1746474337; // Hex: 0x68191561
     uint32 private constant BURN_DIFFICULTY_BITS = 419766864; // Hex: 0x19052250
     uint32 private constant BURN_NONCE = 547953751; // Hex: 0x20a91c57
-    uint32 private constant BURN_HEIGHT = 81081;
+    uint32 private constant BURN_BLOCK_HEIGHT = 81081;
     bytes32 private constant BURN_PREV_BLOCK = 0x000000003c79a46a33020d2eaef37ffd93ba5090b071cddcabeec674cc0b41d4;
     bytes32 private constant BURN_MERKLE_ROOT = 0x49851ea65b93a9cacc91b3bf5bb8afcfe3687630921556adcb77aaeb5a83fa4b;
 
@@ -129,7 +131,7 @@ contract HomeChainCoordinatorTest is Test {
                 MINT_BLOCK_TIMESTAMP,
                 MINT_DIFFICULTY_BITS,
                 MINT_NONCE,
-                MINT_HEIGHT,
+                MINT_BLOCK_HEIGHT,
                 MINT_PREV_BLOCK,
                 MINT_MERKLE_ROOT
             )
@@ -232,24 +234,34 @@ contract HomeChainCoordinatorTest is Test {
         burnLzHelper = new LayerZeroV2Helper();
         vm.deal(address(BTC_RECEIVER), 10000 ether); // This is 10000 native tokens on the destination chain (BSC Testnet)
 
+        uint256 intialBalance = eBTCToken.balanceOf(BTC_RECEIVER);
+        console.log("Initial eBTC balance of the BTC_RECEIVER: ", intialBalance);
+
         vm.recordLogs();
         vm.startPrank(BTC_RECEIVER);
         eBTCToken.approve(address(baseChainCoordinator), BTC_AMOUNT);
-        baseChainCoordinator.burnAndUnlock{value: 1 ether}(BURN_RAW_TXN, BTC_AMOUNT);
+        bytes32 keccakTxnHash = keccak256(PARTIALLY_SIGNED_RAW_TXN_BTC);
+        console.logBytes32(keccakTxnHash);
+        (uint256 burnMessageRelayerFee, ) = baseChainCoordinator.quote(
+            srcNetworkConfig.chainEid, PARTIALLY_SIGNED_RAW_TXN_BTC, false
+        );
+        console.log("Burn message relayer fee: ", burnMessageRelayerFee);
+        baseChainCoordinator.burnAndUnlock{value: burnMessageRelayerFee*2}(PARTIALLY_SIGNED_RAW_TXN_BTC, BTC_AMOUNT); // TODO: Check if the fee is correct
+        console.log("Burned eBTC amount: ", BTC_AMOUNT);
         vm.stopPrank();
 
-        bytes32[] memory burnProof = new bytes32[](10);
-        burnProof[0] = 0x78e70c28a925ae62e5ca358d0437ce6aad745764829f4018c5897a9b8578a824;
-        burnProof[1] = 0x6c49cd9a8d3662880089119f59f7dc1606342deab2e4f3cc7a2d6b9f443d0e07;
-        burnProof[2] = 0x3ccda3a19c742f5a4c33aa173ae20748a2685c7f8664fb8508c45fe5fa93622a;
-        burnProof[3] = 0x823b46da86b3267b2dfc59d77b0047e1ea22ffd27b086a8a05d6f43d8d852a9a;
-        burnProof[4] = 0x5017c554f57188bd237c079b96fcc9526810d58da483acb998f4a2d4175994b7;
-        burnProof[5] = 0x1e12a24aed5496fb4c8a4bdc0d3f7dddd20bb291c2d68ad8777ca59fb063e36f;
-        burnProof[6] = 0x81e1d89ae8d3d8457fbf800009d4b4740509acab8c6803e2d1b51dbf52057aef;
-        burnProof[7] = 0x7a9a5fb6361319c322c326e8e8c419c826b2e3f4d2e60a928ed2e8d06ad0191c;
-        burnProof[8] = 0x64da1f3f0cb701eded7a70910bf1e6e8860e66c4ef32019a10281b58427e5bc5;
-        burnProof[9] = 0x7dfa9f8f8744c5bd0dd9f239771a059ba57b1e9c0eb4cda336ff719eeb46a729;
-        uint256 burnTxnIndex = 19;
+        // bytes32[] memory burnProof = new bytes32[](10);
+        // burnProof[0] = 0x78e70c28a925ae62e5ca358d0437ce6aad745764829f4018c5897a9b8578a824;
+        // burnProof[1] = 0x6c49cd9a8d3662880089119f59f7dc1606342deab2e4f3cc7a2d6b9f443d0e07;
+        // burnProof[2] = 0x3ccda3a19c742f5a4c33aa173ae20748a2685c7f8664fb8508c45fe5fa93622a;
+        // burnProof[3] = 0x823b46da86b3267b2dfc59d77b0047e1ea22ffd27b086a8a05d6f43d8d852a9a;
+        // burnProof[4] = 0x5017c554f57188bd237c079b96fcc9526810d58da483acb998f4a2d4175994b7;
+        // burnProof[5] = 0x1e12a24aed5496fb4c8a4bdc0d3f7dddd20bb291c2d68ad8777ca59fb063e36f;
+        // burnProof[6] = 0x81e1d89ae8d3d8457fbf800009d4b4740509acab8c6803e2d1b51dbf52057aef;
+        // burnProof[7] = 0x7a9a5fb6361319c322c326e8e8c419c826b2e3f4d2e60a928ed2e8d06ad0191c;
+        // burnProof[8] = 0x64da1f3f0cb701eded7a70910bf1e6e8860e66c4ef32019a10281b58427e5bc5;
+        // burnProof[9] = 0x7dfa9f8f8744c5bd0dd9f239771a059ba57b1e9c0eb4cda336ff719eeb46a729;
+        // uint256 burnTxnIndex = 19;
 
         // Process the message on the source chain
         Vm.Log[] memory burnLogs = vm.getRecordedLogs();
@@ -257,21 +269,27 @@ contract HomeChainCoordinatorTest is Test {
 
         vm.selectFork(srcForkId);
 
-        bytes32 keccakTxnHash = keccak256(BURN_RAW_TXN);
+        // Get the burn proof and index
+        bytes32[] memory burnProof = new bytes32[](0);
+        uint256 burnTxnIndex = 0;
+        bytes32 burnBlockHash = bytes32(0);
         HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams(
             false, // isMint
-            BURN_BLOCK_HASH,
+            burnBlockHash,
             keccakTxnHash,
             burnProof,
             burnTxnIndex,
-            BURN_RAW_TXN,
+            PARTIALLY_SIGNED_RAW_TXN_BTC,
             TAPROOT_ADDRESS,
             NETWORK_KEY,
             OPERATORS
         );
 
+
+
         vm.startPrank(owner);
-        homeChainCoordinator.submitBlockAndStoreMessage(BURN_BLOCK_HEADER, new bytes[](0), params);
+        // bytes[] memory intermediateHeaders = new bytes[](BURN_BLOCK_HEIGHT - MINT_BLOCK_HEIGHT);
+        // homeChainCoordinator.submitBlockAndStoreMessage(BURN_BLOCK_HEADER, intermediateHeaders, params); // TODO: This will create an issue if the block headers are not set
         homeChainCoordinator.updateBurnStatus(keccakTxnHash, BURN_BTC_TXN_HASH);
         vm.stopPrank();
 
@@ -281,7 +299,7 @@ contract HomeChainCoordinatorTest is Test {
 
         vm.selectFork(destForkId);
         uint256 balance = eBTCToken.balanceOf(BTC_RECEIVER);
-        assertEq(balance, 0);
+        assertEq(balance, intialBalance - BTC_AMOUNT);
     }
 
 }

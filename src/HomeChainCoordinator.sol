@@ -143,8 +143,8 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     }
 
     function _storeMessage(NewTaskParams memory params) internal {
-        bytes32 merkleRoot; // TODO: Uncomment this line when the light client is available (Rahul's requirement for testing)
-        // bytes32 merkleRoot = _lightClient.getMerkleRootForBlock(params.blockHash);
+        bytes32 merkleRoot; 
+        // bytes32 merkleRoot = _lightClient.getMerkleRootForBlock(params.blockHash); // TODO: Uncomment this line when the light client is available (Rahul's requirement for testing)
 
         PSBTData memory psbtData;
         // 1 for mint, 0 for burn
@@ -168,7 +168,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
             });
         } else {
             // 0. Get existing PSBT data for keccak hash of partially signed burn transaction
-            psbtData = _btcTxnHash_psbtData[params.btcTxnHash];
+            psbtData = _btcTxnHash_psbtData[params.btcTxnHash]; // btcTxnHash for the burn transaction would be the keccak hash of the rawTxn
             psbtData.taprootAddress = params.taprootAddress;
             psbtData.networkKey = params.networkKey;
             psbtData.operators = params.operators;
@@ -378,6 +378,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         return _btcTxnHash_psbtData[_btcTxnHash];
     }
 
+    // TODO: Ideally at the time of updating the status, we should also check the burn proof and txn index, which is done at the time of mint as well
     /**
      * @notice Updates the burn status of a given BTC transaction hash
      * @param _btcTxnHash The BTC transaction hash
