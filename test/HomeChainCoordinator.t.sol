@@ -177,6 +177,7 @@ contract HomeChainCoordinatorTest is Test {
     function _sendMessage() internal {
         vm.selectFork(srcForkId);
 
+        // TODO: Update this based on the MINT_BTC_TXN_HASH
         (uint256 nativeFee,) = homeChainCoordinator.quote(MINT_BTC_TXN_HASH, MINT_RAW_TXN, false);
         bytes32[] memory proof = new bytes32[](10);
         proof[0] = 0x771f9e8396cf0951074953f3db7ae7854093bbec264a2d9c109c4680316785ad;
@@ -242,8 +243,10 @@ contract HomeChainCoordinatorTest is Test {
         eBTCToken.approve(address(baseChainCoordinator), BTC_AMOUNT);
         bytes32 keccakTxnHash = keccak256(PARTIALLY_SIGNED_RAW_TXN_BTC);
         console.logBytes32(keccakTxnHash);
+        bytes memory newPayload = abi.encode(BTC_AMOUNT, BTC_RECEIVER, PARTIALLY_SIGNED_RAW_TXN_BTC);
+        console.logBytes(newPayload);
         (uint256 burnMessageRelayerFee, ) = baseChainCoordinator.quote(
-            srcNetworkConfig.chainEid, PARTIALLY_SIGNED_RAW_TXN_BTC, false
+            srcNetworkConfig.chainEid, newPayload, false
         );
         console.log("Burn message relayer fee: ", burnMessageRelayerFee);
         baseChainCoordinator.burnAndUnlock{value: burnMessageRelayerFee*2}(PARTIALLY_SIGNED_RAW_TXN_BTC, BTC_AMOUNT); // TODO: Check if the fee is correct
