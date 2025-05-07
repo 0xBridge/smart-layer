@@ -1,88 +1,67 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.19;
 
 import {Script} from "forge-std/Script.sol";
-import {ERC20Mock} from "@openzeppelin/contracts/mocks/ERC20Mock.sol";
 
+/**
+ * @title HelperConfig
+ * @notice Configuration helper for network-specific settings
+ * @dev Loads configuration from JSON files based on the current chain ID
+ */
 contract HelperConfig is Script {
-    /*//////////////////////////////////////////////////////////////
-                                 ERRORS
-    //////////////////////////////////////////////////////////////*/
+    // Custom errors
     error HelperConfig__InvalidChainId();
 
-    /*//////////////////////////////////////////////////////////////
-                                 TYPES
-    //////////////////////////////////////////////////////////////*/
+    // Data structures
     struct NetworkConfig {
+        uint32 chainEid;
         address endpoint;
         address account;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            STATE VARIABLES
-    //////////////////////////////////////////////////////////////*/
-    uint256[] private networks = [
-        ETH_MAINNET_CHAIN_ID,
-        ETH_SEPOLIA_CHAIN_ID,
-        POLYGON_MAINNET_CHAIN_ID,
-        ARB_SEPOLIA_CHAIN_ID,
-        ARB_MAINNET_CHAIN_ID,
-        BASE_MAINNET_CHAIN_ID,
-        OP_MAINNET_CHAIN_ID
-    ];
+    // Constants
+    address internal constant OWNER_WALLET = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
 
-    uint256 constant ETH_MAINNET_CHAIN_ID = 1;
-    uint256 constant ETH_SEPOLIA_CHAIN_ID = 11155111;
-    uint256 constant POLYGON_MAINNET_CHAIN_ID = 137;
-    uint256 constant ARB_SEPOLIA_CHAIN_ID = 421614;
-    uint256 constant ARB_MAINNET_CHAIN_ID = 42161;
-    uint256 constant BASE_MAINNET_CHAIN_ID = 8453;
-    uint256 constant OP_MAINNET_CHAIN_ID = 10;
+    // State variables
+    NetworkConfig internal _localNetworkConfig;
 
-    // Update the OWNER_WALLET to your burner wallet!
-    address constant OWNER_WALLET = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
-    // address constant FOUNDRY_DEFAULT_WALLET = 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38;
-    // address constant ANVIL_DEFAULT_ACCOUNT = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
-
-    NetworkConfig public localNetworkConfig;
-    mapping(uint256 chainId => uint32) public chainId_endpointId;
-    mapping(uint32 endpointId => NetworkConfig) public networkConfigs;
-
-    /*//////////////////////////////////////////////////////////////
-                               FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
+    /**
+     * @notice Contract constructor
+     * @dev Loads network configuration based on current chain ID
+     */
     constructor() {
+        // Get current chainId
+        uint256 chainId = block.chainid;
+
+        // Read and parse network config for current chain
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/scripts/network-config.json");
+        string memory path = string.concat(root, "/script/network-config.json");
         string memory json = vm.readFile(path);
 
-        // Parse each network config from the JSON
-        for (uint256 i = 0; i < networks.length; i++) {
-            uint256 chainId = networks[i];
-            bytes memory networkData = vm.parseJson(json, string.concat(".", vm.toString(chainId)));
+        // Try to parse the network config for current chain
+        try vm.parseJson(json, string.concat(".", vm.toString(chainId))) returns (bytes memory) {
+            // First try to decode the endpoint and chainEid
+            address endpoint =
+                abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".endpoint")), (address));
+            uint32 chainEid =
+                abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".chainEid")), (uint32));
 
-            NetworkConfig memory config = abi.decode(networkData, (NetworkConfig));
-            uint32 endpointId =
-                abi.decode(vm.parseJson(json, string.concat(".", vm.toString(chainId), ".endpointId")), (uint32));
-
-            chainId_endpointId[chainId] = endpointId;
-            networkConfigs[endpointId] = NetworkConfig({
-                endpoint: config.endpoint,
-                account: OWNER_WALLET // We'll keep this constant
-            });
-        }
-    }
-
-    function getConfig() public view returns (NetworkConfig memory) {
-        uint32 endpointId = chainId_endpointId[block.chainid];
-        return getConfigByEndpointId(endpointId);
-    }
-
-    function getConfigByEndpointId(uint32 endpointId) public view returns (NetworkConfig memory) {
-        if (networkConfigs[endpointId].endpoint != address(0)) {
-            return networkConfigs[endpointId];
-        } else {
+            // Set the local network config
+            _localNetworkConfig = NetworkConfig({chainEid: chainEid, endpoint: endpoint, account: OWNER_WALLET});
+        } catch {
             revert HelperConfig__InvalidChainId();
         }
+    }
+
+    /**
+     * @notice Gets the network configuration
+     * @dev Reverts if chain ID is invalid or configuration is missing
+     * @return Network configuration for the current chain
+     */
+    function getConfig() public view returns (NetworkConfig memory) {
+        if (_localNetworkConfig.endpoint == address(0)) {
+            revert HelperConfig__InvalidChainId();
+        }
+        return _localNetworkConfig;
     }
 }

@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.19;
 
-struct MintData {
-    bool isMinted;
+import {
+    ILayerZeroReceiver, Origin
+} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroReceiver.sol";
+
+struct TxnData {
+    bool status;
     address user;
-    uint256 lockedAmount;
+    uint256 amount;
 }
 
-interface IBaseChainCoordinator {
-// Put functions that are must required for the base chain coordinator
-}
+interface IBaseChainCoordinator is ILayerZeroReceiver {}

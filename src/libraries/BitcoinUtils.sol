@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.19;
 
 library BitcoinUtils {
     error SHA256_FAILED();
@@ -296,7 +296,7 @@ library BitcoinUtils {
     /// @param proof Array of proof hashes (in natural byte order for now)
     /// @param index Index of the transaction in the block (0-based)
     /// @return bool True if the proof is valid
-    function verifyTxInclusion(bytes32 txId, bytes32 merkleRoot, bytes32[] calldata proof, uint256 index)
+    function verifyTxInclusion(bytes32 txId, bytes32 merkleRoot, bytes32[] memory proof, uint256 index)
         internal
         view
         returns (bool)

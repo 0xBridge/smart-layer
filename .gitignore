@@ -12,7 +12,12 @@ docs/
 
 # Dotenv file
 .env
+.env.avs
+.env.deployment
 broadcast/*
 
 # Gas files
 gas-report.txt
+
+# Deployment files
+deployments/

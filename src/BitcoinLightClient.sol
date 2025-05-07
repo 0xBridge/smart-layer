@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.19;
 
 import {UUPSUpgradeable} from "@openzeppelin-upgrades/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin-upgrades/contracts/access/AccessControlUpgradeable.sol";
@@ -7,6 +7,11 @@ import {Initializable} from "@openzeppelin-upgrades/contracts/proxy/utils/Initia
 import {BitcoinTxnParser} from "./libraries/BitcoinTxnParser.sol";
 import {BitcoinUtils} from "./libraries/BitcoinUtils.sol";
 
+/**
+ * @title BitcoinLightClient
+ * @notice A lightweight client for Bitcoin blockchain header validation and transaction verification
+ * @dev Implements SPV (Simple Payment Verification) for Bitcoin transactions
+ */
 contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgradeable {
     // Error codes
     error INVALID_HEADER_LENGTH();
@@ -14,21 +19,26 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
     error INVALID_HEADER_CHAIN();
     error CHAIN_NOT_CONNECTED();
     error INVALID_TRANSACTION_INDEX();
+    error BLOCK_NOT_FOUND();
 
     // Roles
-    bytes32 private constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+    bytes32 internal constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     // Length of a Bitcoin block header
-    uint8 private constant HEADER_LENGTH = 80;
+    uint8 internal constant HEADER_LENGTH = 80;
 
     // State variables (Ensure the storage layout is maintained)
-    bytes32 private latestCheckpointHeaderHash;
-    mapping(bytes32 => BitcoinUtils.BlockHeader) private headers;
+    bytes32 internal _latestCheckpointHeaderHash;
+    mapping(bytes32 => BitcoinUtils.BlockHeader) internal _headers;
 
     // Events
     event BlockHeaderSubmitted(bytes32 indexed blockHash, bytes32 indexed prevBlock, uint32 height);
     event ContractUpgraded(address indexed implementation);
 
+    /**
+     * @notice Constructor that initializes the contract
+     * @dev This disables initializers to prevent calling initialize() more than once
+     */
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -44,6 +54,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
      * @param height Initial block height
      * @param prevBlock Initial previous block hash
      * @param merkleRoot Initial merkle root
+     * @dev Can only be called once due to initializer modifier
      */
     function initialize(
         address admin,
@@ -73,12 +84,12 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
             merkleRoot: merkleRoot
         });
 
-        latestCheckpointHeaderHash = BitcoinUtils.getBlockHashFromParams(header);
-        headers[latestCheckpointHeaderHash] = header;
+        _latestCheckpointHeaderHash = BitcoinUtils.getBlockHashFromParams(header);
+        _headers[_latestCheckpointHeaderHash] = header;
     }
 
     /**
-     * @notice Submit a new block header fields along with intermediate headers (in reverse array order)
+     * @notice Submit a new block header fields along with intermediate headers
      * @param blockVersion Block version
      * @param blockTimestamp Block timestamp
      * @param difficultyBits Block difficulty bits
@@ -86,9 +97,9 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
      * @param height Block height
      * @param prevBlock Previous block hash
      * @param merkleRoot Block merkle root
-     * @param intermediateHeaders Array of intermediate headers
-     * @return blockHash Block hash
-     * @dev Only accounts with BLOCK_SUBMIT_ROLE can submit headers
+     * @param intermediateHeaders Array of intermediate headers (in reverse array order)
+     * @return blockHash The hash of the submitted block
+     * @dev Only accounts with appropriate role can submit headers
      */
     function submitBlockHeader(
         uint32 blockVersion,
@@ -114,11 +125,11 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
     }
 
     /**
-     * @notice Submit a new raw block header along with intermediate headers (in reverse array order)
+     * @notice Submit a new raw block header along with intermediate headers
      * @param rawHeader Raw block header bytes
-     * @param intermediateHeaders Array of intermediate headers
-     * @return blockHash Block hash
-     * @dev Only accounts with BLOCK_SUBMIT_ROLE can submit headers
+     * @param intermediateHeaders Array of intermediate headers (in reverse array order)
+     * @return blockHash The hash of the submitted block
+     * @dev Only accounts with appropriate role can submit headers
      */
     function submitRawBlockHeader(bytes calldata rawHeader, bytes[] calldata intermediateHeaders)
         external
@@ -134,6 +145,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
      * @param blockHash Block hash
      * @param header Block header
      * @param intermediateHeaders Array of intermediate headers
+     * @dev Validates proof of work and chain connection
      */
     function _submitBlockHeader(
         bytes32 blockHash,
@@ -148,13 +160,13 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
             bool isValid = verifyHeaderChain(header.prevBlock, intermediateHeaders);
             if (!isValid) revert INVALID_HEADER_CHAIN();
         } else {
-            if (header.prevBlock != latestCheckpointHeaderHash) revert CHAIN_NOT_CONNECTED();
+            if (header.prevBlock != _latestCheckpointHeaderHash) revert CHAIN_NOT_CONNECTED();
         }
 
-        uint32 latestHeaderHeight = headers[latestCheckpointHeaderHash].height;
+        uint32 latestHeaderHeight = _headers[_latestCheckpointHeaderHash].height;
         header.height = latestHeaderHeight + uint32(intermediateHeaders.length) + 1;
-        latestCheckpointHeaderHash = blockHash;
-        headers[latestCheckpointHeaderHash] = header;
+        _latestCheckpointHeaderHash = blockHash;
+        _headers[_latestCheckpointHeaderHash] = header;
 
         emit BlockHeaderSubmitted(blockHash, header.prevBlock, header.height);
     }
@@ -163,6 +175,8 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
      * @notice Verify a chain of headers connects properly
      * @param currentPrevHash Previous hash of the latest header
      * @param intermediateHeaders Array of intermediate headers
+     * @return True if the header chain is valid and connects to the latest checkpoint
+     * @dev Verifies proof of work and proper chaining of all intermediate headers
      */
     function verifyHeaderChain(bytes32 currentPrevHash, bytes[] calldata intermediateHeaders)
         public
@@ -184,13 +198,14 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
             currentPrevHash = intermediateHeader.prevBlock;
         }
 
-        return currentPrevHash == latestCheckpointHeaderHash;
+        return currentPrevHash == _latestCheckpointHeaderHash;
     }
 
     /**
      * @notice Get block hash from header
      * @param blockHeader Raw block header bytes
      * @return Block hash in reverse byte order
+     * @dev Computes double SHA256 hash of the header
      */
     function getBlockHash(bytes memory blockHeader) public view returns (bytes32) {
         if (blockHeader.length != HEADER_LENGTH) revert INVALID_HEADER_LENGTH();
@@ -201,36 +216,46 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
     /**
      * @notice Get block header for a given block hash
      * @param blockHash Block hash in reverse byte order
+     * @return The block header data structure
      */
     function getHeader(bytes32 blockHash) external view returns (BitcoinUtils.BlockHeader memory) {
-        return headers[blockHash];
+        return _headers[blockHash];
     }
 
     /**
      * @notice Get the latest block hash
+     * @return The latest checkpoint block hash
      */
     function getLatestHeaderHash() external view returns (bytes32) {
-        return latestCheckpointHeaderHash;
+        return _latestCheckpointHeaderHash;
     }
 
     /**
      * @notice Get the latest block header
+     * @return The latest checkpoint block header
      */
     function getLatestCheckpoint() external view returns (BitcoinUtils.BlockHeader memory) {
-        return headers[latestCheckpointHeaderHash];
+        return _headers[_latestCheckpointHeaderHash];
     }
 
     /**
      * @notice Get the merkle root for a block
+     * @param blockHash Block hash to get the merkle root for
+     * @return The merkle root of the specified block
+     * @dev Reverts if block not found (commented out for testing)
      */
     function getMerkleRootForBlock(bytes32 blockHash) external view returns (bytes32) {
-        return headers[blockHash].merkleRoot;
+        if (_headers[blockHash].height == 0) revert BLOCK_NOT_FOUND();
+        return _headers[blockHash].merkleRoot;
     }
 
     /**
      * @notice Generate merkle proof for a transaction
      * @param transactions Array of transaction hashes
      * @param index Binary path index
+     * @return proof Array of proof hashes
+     * @return directions Array of boolean values indicating left (false) or right (true) placements
+     * @dev Reverts if index is invalid
      */
     function generateMerkleProof(bytes32[] memory transactions, uint256 index)
         public
@@ -247,6 +272,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
      * @param merkleRoot Merkle root
      * @param proof Proof hashes
      * @param index Transaction index
+     * @return True if the transaction is included in the block
      */
     function verifyTxInclusion(bytes32 txId, bytes32 merkleRoot, bytes32[] calldata proof, uint256 index)
         external
@@ -259,6 +285,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
     /**
      * @notice Calculate merkle root
      * @param transactions Array of transaction hashes
+     * @return Calculated merkle root in Bitcoin's display format
      */
     function calculateMerkleRoot(bytes32[] calldata transactions) external view returns (bytes32) {
         bytes32[] memory txIdsInNaturalBytesOrder = BitcoinUtils.reverseBytes32Array(transactions);
@@ -267,14 +294,17 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
     }
 
     /**
-     * @dev Required override for UUPS proxy upgrade authorization
+     * @notice Authorization function for UUPS proxy upgrade
+     * @param newImplementation Address of the new implementation contract
+     * @dev Only accounts with UPGRADER_ROLE can upgrade the contract
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {
         emit ContractUpgraded(newImplementation);
     }
 
     /**
-     * @dev Version number for this contract implementation
+     * @notice Returns the version number for this contract implementation
+     * @return String representing the version number
      */
     function version() external pure returns (string memory) {
         return "1.0.0";
