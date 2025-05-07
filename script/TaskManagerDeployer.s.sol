@@ -110,8 +110,10 @@ contract TaskManagerDeployer is Script {
         console.log("Set peer in HomeChainCoordinator");
         _taskManager = new TaskManager(OWNER, GENERATOR, ATTESTATION_CENTER, address(_homeChainCoordinator));
         console.log("Deployed TaskManager", address(_taskManager));
-        _homeChainCoordinator.transferOwnership(address(_taskManager));
-        console.log("Transferred ownership of HomeChainCoordinator");
+        _homeChainCoordinator.setTaskGeneratorRole(address(_taskManager));
+        console.log("Set task generator role in HomeChainCoordinator");
+        _homeChainCoordinator.setTaskSubmitterRole(address(_taskManager));
+        console.log("Set task submitter role in HomeChainCoordinator");
         vm.stopBroadcast();
 
         vm.selectFork(_destForkId);

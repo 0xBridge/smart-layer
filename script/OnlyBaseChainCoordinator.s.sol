@@ -4,18 +4,23 @@ pragma solidity ^0.8.19;
 import {Script, console} from "forge-std/Script.sol";
 import {BaseChainCoordinator} from "../src/BaseChainCoordinator.sol";
 import {HelperConfig} from "./HelperConfig.s.sol";
+import {eBTCManager} from "../src/eBTCManager.sol"; // Assuming path
+import {eBTC} from "../src/eBTC.sol"; // Assuming path
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
- * @title OnlyTaskManagerDeployer
- * @notice Script for deploying only the TaskManager contract
- * @dev Deploys a TaskManager contract with the specified parameters
+ * @title OnlyBaseChainCoordinatorDeployer
+ * @notice Script for deploying eBTC, eBTCManager, and BaseChainCoordinator contracts
+ * @dev Deploys contracts with the specified parameters
  */
-contract OnlyTaskManagerDeployer is Script {
+contract OnlyBaseChainCoordinatorDeployer is Script {
     // Constants
-    address internal constant EBTC_MANAGER = 0x252EF6f6d4618a4896D2736e56F26FC7FAD4d6a1;
+    uint32 internal constant HOLESKY_CHAIN_EID = 40217; // Holesky LayerZero Endpoint ID
 
     // Contract instances
     BaseChainCoordinator internal _baseChainCoordinator;
+    eBTCManager internal _eBTCManager;
+    eBTC internal _eBTC;
 
     // Network configurations
     HelperConfig.NetworkConfig internal _destNetworkConfig;
@@ -24,7 +29,7 @@ contract OnlyTaskManagerDeployer is Script {
     uint256 internal _destForkId;
 
     function run() public {
-        string memory srcRpcUrl = vm.envString("BSC_TESTNET_RPC_URL");
+        string memory srcRpcUrl = vm.envString("CORE_TESTNET_RPC_URL");
         _destForkId = vm.createSelectFork(srcRpcUrl);
         HelperConfig destConfig = new HelperConfig();
         _destNetworkConfig = destConfig.getConfig();
@@ -33,14 +38,38 @@ contract OnlyTaskManagerDeployer is Script {
         address owner = vm.addr(privateKey);
 
         vm.startBroadcast(privateKey);
+
+        address eBTCManagerAddress = _deployEBTCContracts(owner);
+
         _baseChainCoordinator = new BaseChainCoordinator(
             _destNetworkConfig.endpoint, // endpoint
             owner, // owner
-            EBTC_MANAGER, // eBTCManager,
+            eBTCManagerAddress, // eBTCManager
             _destNetworkConfig.chainEid, // chainEid
-            40217 // HomeChainCoordinator chainEid on Holesky
-        ); // HomeChainCoordinator chainEid);
-        console.log("Deployed TaskManager", address(_baseChainCoordinator));
+            HOLESKY_CHAIN_EID // HomeChainCoordinator chainEid on Holesky
+        );
+        console.log("Deployed BaseChainCoordinator", address(_baseChainCoordinator));
         vm.stopBroadcast();
+    }
+
+    function _deployEBTCContracts(address owner) internal returns (address eBTCManagerAddress) {
+        console.log("Deploying eBTCManager contract...");
+        _eBTCManager = new eBTCManager(owner); // Assumes eBTCManager constructor takes owner
+        eBTCManagerAddress = address(_eBTCManager);
+        console.log("Deployed eBTCManager at:", eBTCManagerAddress);
+
+        console.log("Deploying eBTC implementation contract...");
+        eBTC eBTCImplementation = new eBTC(); // Assumes eBTC has a parameterless constructor for implementation
+        console.log("Deployed eBTC implementation at:", address(eBTCImplementation));
+
+        bytes memory initData = abi.encodeCall(eBTC.initialize, eBTCManagerAddress); // Assumes eBTC.initialize(address eBTCManager)
+        ERC1967Proxy proxy = new ERC1967Proxy(address(eBTCImplementation), initData);
+        _eBTC = eBTC(address(proxy));
+        console.log("Deployed eBTC proxy at:", address(_eBTC));
+
+        _eBTCManager.setEBTC(address(_eBTC)); // Assumes eBTCManager has setEBTC(address ebtcToken)
+        console.log("Set eBTC address in eBTCManager");
+
+        return eBTCManagerAddress;
     }
 }

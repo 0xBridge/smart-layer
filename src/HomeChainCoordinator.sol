@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import {console} from "forge-std/console.sol";
 import {OApp, Origin, MessagingFee, MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {BitcoinTxnParser} from "./libraries/BitcoinTxnParser.sol";
@@ -18,7 +19,8 @@ import {Origin, IBaseChainCoordinator} from "./interfaces/IBaseChainCoordinator.
  * @notice Contract for coordinating cross-chain messages on the home chain
  * @dev Handles verification and cross-chain messaging for Bitcoin transactions
  */
-contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoordinator {
+// Make this contract role based
+contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable, IHomeChainCoordinator {
     // Errors
     error TxnAlreadyProcessed(bytes32 btcTxnHash);
     error InvalidPSBTData();
@@ -55,6 +57,9 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     uint256 public minBTCAmount = 1000; // Min BTC amount / satoshis that needs to be locked
 
     bytes internal constant OPTIONS = hex"00030100110100000000000000000000000000030D40";
+    bytes32 internal constant TASK_GENERATOR_ROLE = keccak256("TASK_GENERATOR_ROLE");
+    bytes32 internal constant TASK_SUBMITTER_ROLE = keccak256("TASK_SUBMITTER_ROLE");
+
 
     // Events
     event MessageCreated(bool indexed isMintTxn, bytes32 indexed blockHash, bytes32 indexed btcTxnHash);
@@ -77,9 +82,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param chainEid_ The endpoint ID of the current chain
      */
     constructor(address lightClient_, address endpoint_, address owner_, uint32 chainEid_) OApp(endpoint_, owner_) {
-        _transferOwnership(owner_);
         _lightClient = BitcoinLightClient(lightClient_);
         _chainEid = chainEid_;
+        _setupRole(DEFAULT_ADMIN_ROLE, owner_);
+        _transferOwnership(owner_);
     }
 
     /**
@@ -114,6 +120,26 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     }
 
     /**
+     * @notice Sets the task submitter role for a specific address
+     * @param _account The address to set the task submitter role for
+     * @dev Only callable by the contract owner
+     */
+    function setTaskSubmitterRole(address _account) external onlyOwner {
+        if (_account == address(0)) revert InvalidReceiver(_account);
+        _grantRole(TASK_SUBMITTER_ROLE, _account);
+    }
+
+    /**
+     * @notice Sets the task generator role for a specific address
+     * @param _account The address to set the task generator role for
+     * @dev Only callable by the contract owner
+     */
+    function setTaskGeneratorRole(address _account) external onlyOwner {
+        if (_account == address(0)) revert InvalidReceiver(_account);
+        _grantRole(TASK_GENERATOR_ROLE, _account);
+    }
+
+    /**
      * @notice Submits a block and sends a message with PSBT data
      * @param _rawHeader The raw block header
      * @param _intermediateHeaders The intermediate headers
@@ -124,7 +150,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         bytes calldata _rawHeader,
         bytes[] calldata _intermediateHeaders,
         NewTaskParams calldata _params
-    ) external whenNotPaused nonReentrant onlyOwner {
+    ) external whenNotPaused nonReentrant onlyRole(TASK_GENERATOR_ROLE) {
         // 1. Submit block header along with intermediate headers to light client
         bytes32 blockHash = _lightClient.submitRawBlockHeader(_rawHeader, _intermediateHeaders);
         // 2. Validate if the block hash is valid
@@ -138,7 +164,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param params The parameters for storing the message
      * @dev Only callable by the contract owner
      */
-    function storeMessage(NewTaskParams calldata params) external whenNotPaused nonReentrant onlyOwner {
+    function storeMessage(NewTaskParams calldata params) external whenNotPaused nonReentrant onlyRole(TASK_GENERATOR_ROLE) {
         _storeMessage(params);
     }
 
@@ -184,7 +210,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param _btcTxnHash The BTC transaction hash
      * @dev Validates the PSBT data and sends the message through LayerZero
      */
-    function sendMessage(bytes32 _btcTxnHash) external payable whenNotPaused nonReentrant onlyOwner {
+    function sendMessage(bytes32 _btcTxnHash) external payable whenNotPaused nonReentrant onlyRole(TASK_SUBMITTER_ROLE) {
         // 0. Parse transaction outputs and metadata
         uint32 chainId = _btcTxnHash_psbtData[_btcTxnHash].chainId;
         // 1. Get the metadata as well as other fields required for the message
@@ -383,7 +409,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @notice Updates the burn status of a given BTC transaction hash
      * @param _btcTxnHash The BTC transaction hash
      */
-    function updateBurnStatus(bytes32 _btcTxnHash, bytes32 _actualTxnHash) external whenNotPaused onlyOwner {
+    function updateBurnStatus(bytes32 _btcTxnHash, bytes32 _actualTxnHash) external whenNotPaused onlyRole(TASK_SUBMITTER_ROLE) {
         // 1. Check if the transaction exists
         PSBTData memory psbtData = _btcTxnHash_psbtData[_btcTxnHash];
         if (psbtData.rawTxn.length == 0) {
