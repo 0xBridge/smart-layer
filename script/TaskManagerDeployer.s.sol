@@ -9,18 +9,18 @@ import {HomeChainCoordinator} from "../src/HomeChainCoordinator.sol";
 import {BaseChainCoordinator} from "../src/BaseChainCoordinator.sol";
 import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 import {eBTCManager} from "../src/eBTCManager.sol";
-import {AVSExtension} from "../src/AVSExtension.sol";
+import {TaskManager} from "../src/TaskManager.sol";
 import {eBTC} from "../src/eBTC.sol";
 import {eBTCMock} from "../src/mocks/eBTCMock.sol";
 
 /**
- * @title AVSDeployment
+ * @title TaskManagerDeployer
  * @notice Script for deploying all contracts needed for the base chain functionality
  * @dev Sets up the required contracts and configures their relationships
  */
-contract AVSDeployment is Script {
+contract TaskManagerDeployer is Script {
     // Contract instances
-    AVSExtension internal _avsExtension;
+    TaskManager internal _taskManager;
     HomeChainCoordinator internal _homeChainCoordinator;
     BaseChainCoordinator internal _baseChainCoordinator;
     BitcoinLightClient internal _btcLightClient;
@@ -79,7 +79,7 @@ contract AVSDeployment is Script {
         );
         console.log("Deployed BaseChainCoordinator", address(_baseChainCoordinator));
         eBTC eBTCImplementation = new eBTC();
-        bytes memory initData = abi.encodeWithSelector(eBTC.initialize.selector, address(_eBTCManagerInstance));
+        bytes memory initData = abi.encodeCall(eBTC.initialize, address(_eBTCManagerInstance));
         ERC1967Proxy proxy = new ERC1967Proxy(address(eBTCImplementation), initData);
         _eBTCToken = eBTC(address(proxy));
         console.log("Deployed eBTC and created proxy", address(_eBTCToken));
@@ -95,16 +95,9 @@ contract AVSDeployment is Script {
 
         vm.startBroadcast(privateKey);
         BitcoinLightClient bitcoinLightClientImplementation = new BitcoinLightClient();
-        bytes memory lightClientInitData = abi.encodeWithSelector(
-            BitcoinLightClient.initialize.selector,
-            OWNER,
-            BLOCK_VERSION,
-            BLOCK_TIMESTAMP,
-            DIFFICULTY_BITS,
-            NONCE,
-            HEIGHT,
-            PREV_BLOCK,
-            MERKLE_ROOT
+        bytes memory lightClientInitData = abi.encodeCall(
+            BitcoinLightClient.initialize,
+            (OWNER, BLOCK_VERSION, BLOCK_TIMESTAMP, DIFFICULTY_BITS, NONCE, HEIGHT, PREV_BLOCK, MERKLE_ROOT)
         );
         ERC1967Proxy lightClientProxy = new ERC1967Proxy(address(bitcoinLightClientImplementation), lightClientInitData);
         _btcLightClient = BitcoinLightClient(address(lightClientProxy));
@@ -118,8 +111,8 @@ contract AVSDeployment is Script {
         console.log("Set peer in HomeChainCoordinator");
         _homeChainCoordinator.transferOwnership(AGGREGATOR);
         console.log("Transferred ownership of HomeChainCoordinator");
-        _avsExtension = new AVSExtension(OWNER, GENERATOR, ATTESTATION_CENTER, address(_homeChainCoordinator));
-        console.log("Deployed AVSExtension", address(_avsExtension));
+        _taskManager = new TaskManager(OWNER, GENERATOR, ATTESTATION_CENTER, address(_homeChainCoordinator));
+        console.log("Deployed TaskManager", address(_taskManager));
         vm.stopBroadcast();
 
         vm.selectFork(_destForkId);

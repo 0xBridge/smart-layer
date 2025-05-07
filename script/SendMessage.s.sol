@@ -43,7 +43,7 @@ contract SendMessageScript is Script {
 
         vm.startBroadcast(aggregatorPrivateKey);
 
-        // Prepare Merkle proof
+        // Prepare Merkle proof (This would be needed to store the block data in the SPV contract)
         bytes32[] memory proof = new bytes32[](11);
         proof[0] = 0x58e3e27ef80ea9af7cbf6c68414a1a30c4936442fbb78d954763a385b2cf34b4;
         proof[1] = 0x9c60aac47f15333f997af21ef95f91fc170b2cf74550d5537bc0f8b7b268859f;
@@ -57,11 +57,6 @@ contract SendMessageScript is Script {
         proof[9] = 0x75a385f7ecc1a6c9571b60428cb2f91c0eaf2f88d6396a071cc50dca096d8cb1;
         proof[10] = 0xce78d0c5bcc327d656cab0e8bca278b21d6f3f4438cd57d36b31640efb834e15;
         uint256 index = 132;
-
-        // Prepare LayerZero options
-        bytes memory optionType = abi.encodePacked(uint16(3));
-        bytes memory options = OptionsBuilder.addExecutorLzReceiveOption(optionType, 200000, 0);
-        console.logBytes(options);
 
         // Calculate required messaging fee
         (uint256 nativeFee,) = _coordinator.quote(BTC_TXN_HASH, RAW_TXN, false);

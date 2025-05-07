@@ -38,7 +38,7 @@ contract eBTCTest is Test {
         implementation = new eBTC();
 
         // Deploy proxy
-        bytes memory initData = abi.encodeWithSelector(eBTC.initialize.selector, minter);
+        bytes memory initData = abi.encodeCall(eBTC.initialize, minter);
 
         ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
 

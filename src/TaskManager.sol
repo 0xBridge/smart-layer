@@ -11,11 +11,11 @@ import {HomeChainCoordinator, PSBTData} from "./HomeChainCoordinator.sol";
 import {IAttestationCenter, IAvsLogic} from "./interfaces/IAvsLogic.sol";
 
 /**
- * @title AVSExtension
+ * @title TaskManager
  * @notice Implementation of a secure 0xBridge AVS logic with ownership and pause functionality
- * @dev Manages tasks and processes attestations for bridge operations
+ * @dev Responsible for tasks creation and  providing hooks to be called by the attestation center
  */
-contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
+contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     // using BN254 for BN254.G1Point;
 
     // Errors
@@ -29,20 +29,19 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     error WithdrawalFailed();
 
     // Constants
-    bytes32 internal constant TASK_DOMAIN = keccak256("TasksManager");
     uint16 internal constant TASK_DEFINITION_ID = 1; // For task-specific voting power
 
     bytes32[] internal _taskHashes;
     mapping(bytes32 _taskHash => bool) internal _completedTasks;
 
-    address internal _performer;
+    address internal _taskCreator;
     address internal immutable _attestationCenter;
     HomeChainCoordinator internal immutable _homeChainCoordinator;
 
     // Events
-    event PerformerUpdated(address oldPerformer, address newPerformer);
+    event TaskCreatorUpdated(address oldTaskCreator, address newTaskCreator);
     event NewTaskCreated(bytes32 indexed btcTxnHash);
-    event TaskCompleted(bool indexed txnType, bytes32 indexed btcTxnHash);
+    event TaskCompleted(bool indexed isMintTxn, bytes32 indexed btcTxnHash);
 
     /**
      * @notice Ensures the caller is the attestation center
@@ -55,44 +54,44 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     }
 
     /**
-     * @notice Ensures the caller is the task performer
+     * @notice Ensures the caller is the taskCreator
      * @dev Used to restrict createNewTask from only being called by a permissioned entity
      */
-    modifier onlyTaskPerformer() {
-        if (msg.sender != _performer) {
+    modifier onlyTaskCreator() {
+        if (msg.sender != _taskCreator) {
             revert CallerNotTaskGenerator();
         }
         _;
     }
 
     /**
-     * @notice Initializes the AVSExtension contract
+     * @notice Initializes the TaskManager contract
      * @param initialOwner_ Address of the initial owner of the contract
-     * @param performer_ Address authorized to create new tasks
+     * @param taskCreator_ Address authorized to create new tasks
      * @param attestationCenter_ Address of the attestation center contract
      * @param homeChainCoordinator_ Address of the home chain coordinator contract
      */
-    constructor(address initialOwner_, address performer_, address attestationCenter_, address homeChainCoordinator_)
+    constructor(address initialOwner_, address taskCreator_, address attestationCenter_, address homeChainCoordinator_)
         Ownable()
     {
         _transferOwnership(initialOwner_);
-        _setPerformer(performer_);
+        _setTaskCreator(taskCreator_);
         _attestationCenter = attestationCenter_;
         _homeChainCoordinator = HomeChainCoordinator(payable(homeChainCoordinator_));
     }
 
     /**
-     * @notice Sets a new performer address
-     * @param newPerformer The address of the new performer
+     * @notice Sets a new taskCreator address
+     * @param _newTaskCreator The address of the new taskCreator
      * @dev Only callable by the contract owner
      */
-    function setPerformer(address newPerformer) external onlyOwner {
-        _setPerformer(newPerformer);
+    function setTaskCreator(address _newTaskCreator) external onlyOwner {
+        _setTaskCreator(_newTaskCreator);
     }
 
     /**
      * @notice Creates a new task for verification
-     * @param _txnType Whether the task is a mint (1) or burn (0)
+     * @param _isMintTxn Whether the task is a mint (1) or burn (0)
      * @param _blockHash The hash of the Bitcoin block
      * @param _btcTxnHash The hash of the Bitcoin transaction
      * @param _proof The merkle proof for transaction verification
@@ -101,10 +100,10 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      * @param _taprootAddress The taproot address where the btc will be getting locked
      * @param _networkKey The network key for the AVS created from the participated operators
      * @param _operators The addresses of the operators for the network key creation
-     * @dev Only the authorized performer can create new tasks
+     * @dev Only the authorized taskCreator can create new tasks
      */
     function createNewTask(
-        bool _txnType,
+        bool _isMintTxn,
         bytes32 _blockHash,
         bytes32 _btcTxnHash,
         bytes32[] calldata _proof,
@@ -113,10 +112,10 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         bytes32 _taprootAddress,
         bytes32 _networkKey,
         address[] calldata _operators
-    ) external onlyTaskPerformer {
+    ) external onlyTaskCreator {
         // Create the struct parameter for storeMessage
-        HomeChainCoordinator.StoreMessageParams memory params = HomeChainCoordinator.StoreMessageParams({
-            txnType: _txnType,
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+            isMintTxn: _isMintTxn,
             blockHash: _blockHash,
             btcTxnHash: _btcTxnHash,
             proof: _proof,
@@ -134,10 +133,10 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     }
 
     /**
-     * @notice Validates task before submission to the attestation center
+     * @notice Hook to validate the task details before the task is created in attestation center
      * @param _taskInfo The task information struct
      * @param _isApproved Whether the task is approved
-     * @dev The task performer's signature (unused but kept for interface compatibility)
+     * @dev The taskCreator's signature (unused but kept for interface compatibility)
      * @dev The attesters' signature (unused but kept for interface compatibility)
      * @dev The attesters' IDs (unused but kept for interface compatibility)
      * @dev Called by the attestation center before task submission
@@ -150,19 +149,19 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256[] calldata
     ) external view onlyAttestationCenter {
         // Decode task hash from taskInfo data
-        (bool txnType, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
+        (bool isMintTxn, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
 
         // Check that the task is valid, hasn't been responsed yet
         if (!_isApproved) revert TaskNotApproved();
-        if (!isTaskValid(btcTxnHash)) revert InvalidTask();
+        if (!isTaskExists(btcTxnHash)) revert InvalidTask();
         if (isTaskCompleted(btcTxnHash)) revert TaskAlreadyCompleted();
     }
 
     /**
-     * @notice Processes task after submission to the attestation center
+     * @notice Hook to validate the task details after the task is created in attestation center
      * @param _taskInfo The task information struct
      * @dev The approval status (unused but kept for interface compatibility)
-     * @dev The task performer's signature (unused but kept for interface compatibility)
+     * @dev The taskCreator's signature (unused but kept for interface compatibility)
      * @dev The attesters' signature (unused but kept for interface compatibility)
      * @dev The attesters' IDs (unused but kept for interface compatibility)
      * @dev Called by the attestation center after task submission
@@ -175,12 +174,12 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         uint256[] calldata
     ) external onlyAttestationCenter {
         // Decode task hash (btcTxnHash) from taskInfo data
-        (bool txnType, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
+        (bool isMintTxn, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
 
         // Mark task as completed
         _completedTasks[btcTxnHash] = true;
 
-        if (txnType) {
+        if (isMintTxn) {
             // Get task data wrt task Id
             PSBTData memory psbtData = _homeChainCoordinator.getPSBTDataForTxnHash(btcTxnHash);
 
@@ -192,7 +191,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         }
 
         // emitting event
-        emit TaskCompleted(txnType, btcTxnHash);
+        emit TaskCompleted(isMintTxn, btcTxnHash);
     }
 
     /**
@@ -212,13 +211,13 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     }
 
     /**
-     * @notice Internal function to set the performer address
-     * @param newPerformer Address of the new performer
+     * @notice Internal function to set the taskCreator address
+     * @param _newTaskCreator Address of the new taskCreator
      */
-    function _setPerformer(address newPerformer) internal {
-        address oldPerformer = _performer;
-        _performer = newPerformer;
-        emit PerformerUpdated(oldPerformer, newPerformer);
+    function _setTaskCreator(address _newTaskCreator) internal {
+        address oldTaskCreator = _taskCreator;
+        _taskCreator = _newTaskCreator;
+        emit TaskCreatorUpdated(oldTaskCreator, _newTaskCreator);
     }
 
     /**
@@ -235,7 +234,7 @@ contract AVSExtension is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      * @param _taskHash The task hash to check
      * @return True if task exists and is valid
      */
-    function isTaskValid(bytes32 _taskHash) public view returns (bool) {
+    function isTaskExists(bytes32 _taskHash) public view returns (bool) {
         PSBTData memory task = _homeChainCoordinator.getPSBTDataForTxnHash(_taskHash);
         return task.rawTxn.length > 0;
     }

@@ -46,7 +46,7 @@ interface IVault {
 }
 
 // interface
-contract AVSTest is Test {
+contract OthenticFlowTest is Test {
     address private constant SIGNER = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
 
     // Amoy Variables
@@ -87,7 +87,7 @@ contract AVSTest is Test {
     function alreadyDone_setUp() public {
         // 1. Deploy the AVS contracts - this can be done via the Othentic cli
 
-        // 2. Register the necessary performer/operators/attesters/aggregators on EigenLayer - to be executed by the deployer / AVS Multisig owner
+        // 2. Register the necessary task creator/operators/attesters/aggregators on EigenLayer - to be executed by the deployer / AVS Multisig owner
         // https://holesky.etherscan.io/tx/0x5e99ffa3be63df189d5e61309480e902ace42b65fbed715ee8432cc1a0e754df
         address initDelegationApprover = ZERO_ADDRESS;
         uint32 allocationDelay = 0;
@@ -140,27 +140,38 @@ contract AVSTest is Test {
 
         // Create the task info
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
-            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
-            data: hex"4920616d2049726f6e6d616e21", // hex bytes data
+            proofOfTask: "Just putting any random string here.",
+            data: hex"000000008616134584b18a2e16e2b6f4b6f8acc7a1a975c2a8c6f8b10493e260", // hex bytes data
             taskPerformer: SIGNER,
             taskDefinitionId: 0
         });
 
-        // Submit the task
+        // Create the required signatures
+        bool isApproved = true;
         bytes memory tpSignature =
-            hex"e4a74f4cf94b5056483d604eb56a6a31f7791f14f0dcf1aaba7c8b6656b39d763ee2054aa2ef9ddd4a60a2b34900a40e12af2fba6a973a9d994f3686efb44a2a1c";
+            hex"b8490b65ed3a418c1026b06c9984381ab099dc946981aa282e8eac2ccaf78c7f6ad3b6f01de81f29c21ed7ad974063785ef38e153c501dc0b3125ae5a9e8cd5a1b";
         uint256[2] memory taSignature = [
-            19645558472345704978511871013628884473537764836288391634501264483848712294175,
-            9290822072904786298812575352542794224867844172376967240593705323173043420837
+            20150624192400228108359345405435493754751152575474227883524848041839664309077,
+            1082501311440838732190290197012581182681773299437476198311483876744319338514
         ];
         uint256[] memory attestersIds = new uint256[](2);
         attestersIds[0] = 3;
         attestersIds[1] = 4;
 
+        IAttestationCenter.EcdsaTaskSubmissionDetails memory ecdsaTaskSubmissionDetails = IAttestationCenter
+            .EcdsaTaskSubmissionDetails({
+            isApproved: isApproved,
+            tpSignature: tpSignature,
+            taSignature: taSignature,
+            attestersIds: attestersIds
+        });
+
+        // Submit the task
         vm.prank(SIGNER);
-        // attestationCenter.submitTask(taskInfo, true, tpSignature, taSignature, attestersIds);
+        attestationCenter.submitTask(taskInfo, ecdsaTaskSubmissionDetails);
 
         // Distribute rewards
+        // vm.prank(AVS_MULTISIG_OWNER);
         // https://amoy.polygonscan.com/tx/0x887194727b6c46a8139a6520709cff19f8631dcecd2c92b521f8d94d3e5a130c
         // https://holesky.etherscan.io/tx/0x3c343b47ccd27f02683b74d77bc8bc2d206cba800a8290875b71b60d213ef441 (C)
         // attestationCenter.requestBatchPayment(); // Deployer (AVS_MULTISIG_OWNER)

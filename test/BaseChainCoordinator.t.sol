@@ -78,7 +78,7 @@
 
 //         // Deploy eBTC token
 //         eBTC eBTCImplementation = new eBTC();
-//         bytes memory initData = abi.encodeWithSelector(eBTC.initialize.selector, address(eBTCManagerInstance));
+//         bytes memory initData = abi.encodeCall(eBTC.initialize, address(eBTCManagerInstance));
 //         ERC1967Proxy proxy = new ERC1967Proxy(address(eBTCImplementation), initData);
 //         eBTCToken = eBTC(address(proxy));
 
@@ -101,16 +101,18 @@
 
 //         // Set up BitcoinLightClient for HomeChainCoordinator
 //         BitcoinLightClient bitcoinLightClientImplementation = new BitcoinLightClient();
-//         bytes memory lightClientInitData = abi.encodeWithSelector(
-//             BitcoinLightClient.initialize.selector,
-//             owner,
-//             536870912, // Block version
-//             1741357556, // Block timestamp
-//             486604799, // Difficulty bits
-//             3368467969, // Nonce
-//             1, // Height
-//             bytes32(0), // Prev block
-//             bytes32(0) // Merkle root
+//         bytes memory lightClientInitData = abi.encodeCall(
+//             BitcoinLightClient.initialize,
+//             (
+//                 owner,
+//                 536870912, // Block version
+//                 1741357556, // Block timestamp
+//                 486604799, // Difficulty bits
+//                 3368467969, // Nonce
+//                 1, // Height
+//                 bytes32(0), // Prev block
+//                 bytes32(0)
+//             ) // Merkle root
 //         );
 //         ERC1967Proxy lightClientProxy = new ERC1967Proxy(address(bitcoinLightClientImplementation), lightClientInitData);
 //         btcLightClient = BitcoinLightClient(address(lightClientProxy));
@@ -189,7 +191,7 @@
 //         PSBTData memory psbtData = homeChainCoordinator.getPSBTDataForTxnHash(BURN_BTC_TXN_HASH);
 
 //         // Verify the recorded data
-//         assertEq(psbtData.txnType, false, "Transaction type should be burn (false)");
+//         assertEq(psbtData.isMintTxn, false, "Transaction type should be burn (false)");
 //         assertEq(psbtData.rawTxn, BURN_RAW_TXN, "Raw transaction should match");
 
 //         // Completing the flow by verifying and updating burn status
@@ -211,8 +213,8 @@
 //         vm.startPrank(owner);
 
 //         // Create parameters for storing the message
-//         HomeChainCoordinator.StoreMessageParams memory params = HomeChainCoordinator.StoreMessageParams({
-//             txnType: false, // This is a burn transaction
+//         HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+//             isMintTxn: false, // This is a burn transaction
 //             blockHash: BURN_BLOCK_HASH,
 //             btcTxnHash: BURN_BTC_TXN_HASH,
 //             proof: burnProof,

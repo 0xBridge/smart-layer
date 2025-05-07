@@ -31,9 +31,10 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     error WithdrawalFailed();
     error InvalidStatusUpdate();
     error InvalidRequest();
+    error InvalidTaprootAddress();
 
-    struct StoreMessageParams {
-        bool txnType; // Whether the transaction is a mint or burn
+    struct NewTaskParams {
+        bool isMintTxn; // Whether the transaction is a mint or burn
         bytes32 blockHash; // The block hash for the transaction
         bytes32 btcTxnHash; // The BTC transaction hash
         bytes32[] proof; // The proof for the transaction
@@ -56,14 +57,14 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     bytes internal constant OPTIONS = hex"0003010011010000000000000000000000000000c350";
 
     // Events
-    event MessageCreated(bool indexed txnType, bytes32 indexed blockHash, bytes32 indexed btcTxnHash);
+    event MessageCreated(bool indexed isMintTxn, bytes32 indexed blockHash, bytes32 indexed btcTxnHash);
     event MessageSent(uint32 indexed dstEid, bytes32 indexed btcTxnHash, address indexed operator, uint256 timestamp);
     event MessageReceived(
         bytes32 indexed guid,
         uint32 srcEid,
         bytes32 indexed sender,
         bytes32 indexed btcTxnHash,
-        bool txnType,
+        bool isMintTxn,
         uint256 amount
     );
     event UpdateTxnStatus(bytes32 indexed btcTxnHash);
@@ -122,7 +123,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     function submitBlockAndStoreMessage(
         bytes calldata _rawHeader,
         bytes[] calldata _intermediateHeaders,
-        StoreMessageParams calldata _params
+        NewTaskParams calldata _params
     ) external whenNotPaused nonReentrant onlyOwner {
         // 1. Submit block header along with intermediate headers to light client
         bytes32 blockHash = _lightClient.submitRawBlockHeader(_rawHeader, _intermediateHeaders);
@@ -137,23 +138,23 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
      * @param params The parameters for storing the message
      * @dev Only callable by the contract owner
      */
-    function storeMessage(StoreMessageParams calldata params) external whenNotPaused nonReentrant onlyOwner {
+    function storeMessage(NewTaskParams calldata params) external whenNotPaused nonReentrant onlyOwner {
         _storeMessage(params);
     }
 
-    function _storeMessage(StoreMessageParams memory params) internal {
+    function _storeMessage(NewTaskParams memory params) internal {
         bytes32 merkleRoot = _lightClient.getMerkleRootForBlock(params.blockHash);
 
         PSBTData memory psbtData;
         // 1 for mint, 0 for burn
-        if (params.txnType) {
+        if (params.isMintTxn) {
             // 0. Parse PSBT data to get the metadata for the eBTC mint transaction
             BitcoinTxnParser.TransactionMetadata memory metadata = _validatePSBTData(params.rawTxn);
             // 1. Validate input in a separate function call
             _validateInput(merkleRoot, params.btcTxnHash, params.proof, params.index, params.rawTxn, metadata.chainId);
             // 2. Store PSBT data for mint transaction
             psbtData = PSBTData({
-                txnType: params.txnType,
+                isMintTxn: params.isMintTxn,
                 status: false,
                 chainId: metadata.chainId,
                 user: metadata.receiverAddress,
@@ -170,13 +171,20 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
             // 1. Validate input in a separate function call
             _validateInput(merkleRoot, params.btcTxnHash, params.proof, params.index, params.rawTxn, psbtData.chainId);
-            // 2. Update the PSBT data with the required burn transaction details
-            psbtData.taprootAddress = params.taprootAddress;
+            // 2. Validate taproot address at the time of task creation
+            _validateTaprootAddress(params.taprootAddress, psbtData);
+            // 3. Update the PSBT data with the required burn transaction details
             psbtData.networkKey = params.networkKey;
             psbtData.operators = params.operators;
         }
         _btcTxnHash_psbtData[params.btcTxnHash] = psbtData;
-        emit MessageCreated(params.txnType, params.blockHash, params.btcTxnHash);
+        emit MessageCreated(params.isMintTxn, params.blockHash, params.btcTxnHash);
+    }
+
+    function _validateTaprootAddress(bytes32 taprootAddress, PSBTData memory psbtData) internal pure {
+        if (taprootAddress != psbtData.taprootAddress) {
+            revert InvalidTaprootAddress();
+        }
     }
 
     // NOTE: The message will come from the endpoint but for now we're considering it to be the owner
@@ -452,7 +460,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
 
         // 5. Store PSBT data for burn transaction validation
         PSBTData memory psbtData = PSBTData({
-            txnType: false, // This is a burn transaction
+            isMintTxn: false, // This is a burn transaction
             status: false, // Transaction is not yet processed
             chainId: _origin.srcEid, // Chain ID of the src chain
             user: address(0), // TODO: Check if makes sense to store the msg.sender on the baseChainCoordinator here
@@ -481,7 +489,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
     /**
      * @notice Retrieves the AVS data for a given BTC transaction hash
      * @param _btcTxnHash The BTC transaction hash
-     * @return txnType The type of transaction (mint or burn)
+     * @return isMintTxn The type of transaction (mint or burn)
      * @return taprootAddress The taproot address for the transaction
      * @return networkKey The network key for the AVS
      * @return operators The operators for the AVS
@@ -492,7 +500,7 @@ contract HomeChainCoordinator is OApp, ReentrancyGuard, Pausable, IHomeChainCoor
         returns (bool, bytes32, bytes32, address[] memory)
     {
         PSBTData memory psbtData = _btcTxnHash_psbtData[_btcTxnHash];
-        return (psbtData.txnType, psbtData.taprootAddress, psbtData.networkKey, psbtData.operators);
+        return (psbtData.isMintTxn, psbtData.taprootAddress, psbtData.networkKey, psbtData.operators);
     }
 
     /**
