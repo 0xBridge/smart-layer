@@ -139,10 +139,13 @@ contract HomeChainCoordinatorTest is Test {
         ERC1967Proxy lightClientProxy = new ERC1967Proxy(address(bitcoinLightClientImplementation), lightClientInitData);
         btcLightClient = BitcoinLightClient(address(lightClientProxy));
 
-        vm.prank(owner);
+        vm.startPrank(owner);
         homeChainCoordinator = new HomeChainCoordinator(
             address(btcLightClient), srcNetworkConfig.endpoint, owner, srcNetworkConfig.chainEid
         );
+        homeChainCoordinator.setTaskGeneratorRole(owner);
+        homeChainCoordinator.setTaskSubmitterRole(owner);
+        vm.stopPrank();
         vm.makePersistent(address(homeChainCoordinator), address(btcLightClient));
 
         // Set the receiver first
