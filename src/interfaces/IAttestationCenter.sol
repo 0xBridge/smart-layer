@@ -42,4 +42,6 @@ interface IAttestationCenter {
     function requestBatchPayment(uint256 _from, uint256 _to) external;
 
     function getOperatorPaymentDetail(uint256 _operatorId) external view returns (PaymentDetails memory);
+
+    function setAvsLogic(address _avsLogic) external;
 }

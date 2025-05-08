@@ -16,6 +16,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 contract OnlyBaseChainCoordinatorDeployer is Script {
     // Constants
     uint32 internal constant HOLESKY_CHAIN_EID = 40217; // Holesky LayerZero Endpoint ID
+    uint256 internal constant DEFAULT_GAS_PRICE = 1_000_000_000; // 1 Gwei
 
     // Contract instances
     BaseChainCoordinator internal _baseChainCoordinator;
@@ -37,6 +38,7 @@ contract OnlyBaseChainCoordinatorDeployer is Script {
         uint256 privateKey = vm.envUint("OWNER_PRIVATE_KEY");
         address owner = vm.addr(privateKey);
 
+        vm.txGasPrice(DEFAULT_GAS_PRICE); // Set gas price for subsequent transactions
         vm.startBroadcast(privateKey);
 
         address eBTCManagerAddress = _deployEBTCContracts(owner);

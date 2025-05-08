@@ -247,7 +247,6 @@ contract HomeChainCoordinatorTest is Test {
         bytes32 keccakTxnHash = keccak256(PARTIALLY_SIGNED_RAW_TXN_BTC);
         console.logBytes32(keccakTxnHash);
         bytes memory newPayload = abi.encode(BTC_AMOUNT, BTC_RECEIVER, PARTIALLY_SIGNED_RAW_TXN_BTC);
-        console.logBytes(newPayload);
         (uint256 burnMessageRelayerFee, ) = baseChainCoordinator.quote(
             srcNetworkConfig.chainEid, newPayload, false
         );
@@ -290,8 +289,6 @@ contract HomeChainCoordinatorTest is Test {
             NETWORK_KEY,
             OPERATORS
         );
-
-
 
         vm.startPrank(owner);
         // bytes[] memory intermediateHeaders = new bytes[](BURN_BLOCK_HEIGHT - MINT_BLOCK_HEIGHT);

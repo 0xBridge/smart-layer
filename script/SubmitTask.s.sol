@@ -11,7 +11,7 @@ import {IAttestationCenter} from "../src/interfaces/IAttestationCenter.sol";
  */
 contract SubmitTask is Script {
     // Constants
-    address internal constant ATTESTATION_CENTER = 0xf8858A9d9794C1A73272f21a7dB84471F491797F;
+    address internal constant ATTESTATION_CENTER = 0xEA40f823f46CB372Cf58C184a9Ee7ECCF0200f07;
 
     /**
      * @notice Main execution function

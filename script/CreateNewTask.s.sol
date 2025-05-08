@@ -13,13 +13,13 @@ contract CreateNewTaskScript is Script {
     TaskManager internal taskManager;
 
     // Constants - to be updated for each deployment
-    address internal constant TM_ADDRESS = 0x193E4337379B597C7842bdc17bF1Cb2782b27762; // HomeChainCoordinator contract address on Amoy
+    address internal constant TASK_MANAGER = 0x193E4337379B597C7842bdc17bF1Cb2782b27762;
    
     /**
      * @notice Setup function for the script
      */
     function setUp() public {
-        taskManager = TaskManager(payable(TM_ADDRESS));
+        taskManager = TaskManager(payable(TASK_MANAGER));
     }
 
     /**
@@ -42,7 +42,9 @@ contract CreateNewTaskScript is Script {
         bytes32 networkKey = 0x07980efd70d3620584be0ab5123c13593488829982651b1fa5483809749a7f7a;
         bytes32[] memory proof = new bytes32[](0);
         address[] memory operators = new address[](1);
-        operators[0] = 0x193E4337379B597C7842bdc17bF1Cb2782b27762;
+        operators[0] = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
+        // operators[1] = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
+        // operators[2] = 0xEC1Fa15145c4d27F7e8645F2F68c0E0303AE5690;
         taskManager.createNewTask(
             true, blockHash, btcTxnHash, proof, 0, rawTxn, taprootAddress, networkKey, operators
         );
