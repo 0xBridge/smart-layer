@@ -38,7 +38,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
 
     // Events
     event TaskCreatorUpdated(address oldTaskCreator, address newTaskCreator);
-    event NewTaskCreated(bytes32 indexed btcTxnHash);
+    event NewTaskCreated(IAttestationCenter.TaskInfo taskInfo, bytes32 indexed btcTxnHash);
     event TaskCompleted(bool indexed isMintTxn, bytes32 indexed btcTxnHash);
 
     /**
@@ -89,45 +89,19 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
 
     /**
      * @notice Creates a new task for verification
-     * @param _isMintTxn Whether the task is a mint (1) or burn (0)
-     * @param _blockHash The hash of the Bitcoin block
-     * @param _btcTxnHash The hash of the Bitcoin transaction
-     * @param _proof The merkle proof for transaction verification
-     * @param _index The index of the transaction in the block
-     * @param _rawTxn The PSBT data to be processed
-     * @param _taprootAddress The taproot address where the btc will be getting locked
-     * @param _networkKey The network key for the AVS created from the participated operators
-     * @param _operators The addresses of the operators for the network key creation
+     * @param _taskInfo The task information struct
+     * @param params The parameters for the new task
      * @dev Only the authorized taskCreator can create new tasks
      */
     function createNewTask(
-        bool _isMintTxn,
-        bytes32 _blockHash,
-        bytes32 _btcTxnHash,
-        bytes32[] calldata _proof,
-        uint256 _index,
-        bytes calldata _rawTxn,
-        bytes32 _taprootAddress,
-        bytes32 _networkKey,
-        address[] calldata _operators
+        IAttestationCenter.TaskInfo calldata _taskInfo,
+        HomeChainCoordinator.NewTaskParams calldata params
     ) external onlyTaskCreator {
-        // Create the struct parameter for storeMessage
-        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
-            isMintTxn: _isMintTxn,
-            blockHash: _blockHash,
-            btcTxnHash: _btcTxnHash,
-            proof: _proof,
-            index: _index,
-            rawTxn: _rawTxn,
-            taprootAddress: _taprootAddress,
-            networkKey: _networkKey,
-            operators: _operators
-        });
-
+        if (_taskInfo.taskPerformer != msg.sender) revert CallerNotTaskGenerator();
         _homeChainCoordinator.storeMessage(params);
-        _taskHashes.push(_btcTxnHash);
+        _taskHashes.push(params.btcTxnHash);
 
-        emit NewTaskCreated(_btcTxnHash);
+        emit NewTaskCreated(_taskInfo, params.btcTxnHash);
     }
 
     /**

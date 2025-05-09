@@ -23,7 +23,6 @@ contract SubmitTask is Script {
 
         // Set up private keys and derive addresses
         uint256 privateKey = vm.envUint("AGGREGATOR_PRIVATE_KEY"); // Should have been Aggregator address private key
-        uint256 privateKeyAvsGovernanceOwner = vm.envUint("OWNER_PRIVATE_KEY");
 
         // Create the AttestationCenter contract instance
         IAttestationCenter attestationCenter = IAttestationCenter(ATTESTATION_CENTER);

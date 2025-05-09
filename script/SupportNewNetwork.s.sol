@@ -17,11 +17,11 @@ contract SupportNewNetworkScript is Script {
 
     // Constants
     address internal constant HOME_CHAIN_COORDINATOR_ADDRESS = 0x25BF05786eCbE7c3Ac6aD8797B0A56d32b1abFb8; // on Holesky
-    address internal constant BASE_CHAIN_COORDINATOR_ADDRESS = 0x00CDdd60F99ccDbe298AA06F0A94c6B74C46E363; // on Sepolia
+    address internal constant BASE_CHAIN_COORDINATOR_ADDRESS = 0xB8B0Fb736D2ee73a03123bA72977f86a148931Fd; // on Core
 
     // Chain identification
     uint32 internal constant LZ_SRC_EID = 40217; // Holesky
-    uint32 internal constant LZ_DEST_EID = 40161; // Sepolia
+    uint32 internal constant LZ_DEST_EID = 40153; // Core
 
     /**
      * @notice Main execution function
@@ -29,7 +29,7 @@ contract SupportNewNetworkScript is Script {
      */
     function run() public {
         // Set up destination chain fork
-        string memory destRpcUrl = vm.envString("SEPOLIA_RPC_URL");
+        string memory destRpcUrl = vm.envString("CORE_TESTNET_RPC_URL");
         uint256 destForkId = vm.createSelectFork(destRpcUrl);
 
         uint256 privateKey = vm.envUint("OWNER_PRIVATE_KEY");

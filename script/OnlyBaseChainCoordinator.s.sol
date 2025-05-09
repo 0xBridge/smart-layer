@@ -4,19 +4,15 @@ pragma solidity ^0.8.19;
 import {Script, console} from "forge-std/Script.sol";
 import {BaseChainCoordinator} from "../src/BaseChainCoordinator.sol";
 import {HelperConfig} from "./HelperConfig.s.sol";
-import {eBTCManager} from "../src/eBTCManager.sol"; // Assuming path
-import {eBTC} from "../src/eBTC.sol"; // Assuming path
+import {eBTCManager} from "../src/eBTCManager.sol"; 
+import {eBTC} from "../src/eBTC.sol"; 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-/**
- * @title OnlyBaseChainCoordinatorDeployer
- * @notice Script for deploying eBTC, eBTCManager, and BaseChainCoordinator contracts
- * @dev Deploys contracts with the specified parameters
- */
 contract OnlyBaseChainCoordinatorDeployer is Script {
     // Constants
     uint32 internal constant HOLESKY_CHAIN_EID = 40217; // Holesky LayerZero Endpoint ID
-    uint256 internal constant DEFAULT_GAS_PRICE = 1_000_000_000; // 1 Gwei
+    uint256 internal constant DEFAULT_GAS_PRICE = 2_000_000_000; // 1 Gwei
+    uint256 internal constant PRIORITY_FEE = 1_000_000_000; // 1 Gwei priority fee
 
     // Contract instances
     BaseChainCoordinator internal _baseChainCoordinator;
@@ -38,7 +34,11 @@ contract OnlyBaseChainCoordinatorDeployer is Script {
         uint256 privateKey = vm.envUint("OWNER_PRIVATE_KEY");
         address owner = vm.addr(privateKey);
 
-        vm.txGasPrice(DEFAULT_GAS_PRICE); // Set gas price for subsequent transactions
+        // Set proper EIP-1559 transaction parameters
+        // vm.txGasPrice(DEFAULT_GAS_PRICE); // Legacy gas price setting
+        // vm.fee(DEFAULT_GAS_PRICE); // Base fee
+        // vm.priorityFee(PRIORITY_FEE); // Priority fee/tip
+
         vm.startBroadcast(privateKey);
 
         address eBTCManagerAddress = _deployEBTCContracts(owner);
@@ -55,6 +55,7 @@ contract OnlyBaseChainCoordinatorDeployer is Script {
     }
 
     function _deployEBTCContracts(address owner) internal returns (address eBTCManagerAddress) {
+        // Rest of the function remains unchanged
         console.log("Deploying eBTCManager contract...");
         _eBTCManager = new eBTCManager(owner); // Assumes eBTCManager constructor takes owner
         eBTCManagerAddress = address(_eBTCManager);
