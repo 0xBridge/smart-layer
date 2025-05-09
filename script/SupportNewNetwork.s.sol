@@ -16,12 +16,12 @@ contract SupportNewNetworkScript is Script {
     BaseChainCoordinator internal _baseChainCoordinator;
 
     // Constants
-    address internal constant HOME_CHAIN_COORDINATOR_ADDRESS = 0xEE35AB43127933562c65A7942cbf1ccAac4BE86F; // on Amoy
-    address internal constant BASE_CHAIN_COORDINATOR_ADDRESS = 0x2908ba527aE590F9C7c5fCcDaC47598E28179Cf4; // on Sepolia
+    address internal constant HOME_CHAIN_COORDINATOR_ADDRESS = 0x25BF05786eCbE7c3Ac6aD8797B0A56d32b1abFb8; // on Holesky
+    address internal constant BASE_CHAIN_COORDINATOR_ADDRESS = 0xB8B0Fb736D2ee73a03123bA72977f86a148931Fd; // on Core
 
     // Chain identification
-    uint32 internal constant LZ_SRC_EID = 40267; // Amoy
-    uint32 internal constant LZ_DEST_EID = 40161; // Sepolia
+    uint32 internal constant LZ_SRC_EID = 40217; // Holesky
+    uint32 internal constant LZ_DEST_EID = 40153; // Core
 
     /**
      * @notice Main execution function
@@ -29,7 +29,7 @@ contract SupportNewNetworkScript is Script {
      */
     function run() public {
         // Set up destination chain fork
-        string memory destRpcUrl = vm.envString("SEPOLIA_RPC_URL");
+        string memory destRpcUrl = vm.envString("CORE_TESTNET_RPC_URL");
         uint256 destForkId = vm.createSelectFork(destRpcUrl);
 
         uint256 privateKey = vm.envUint("OWNER_PRIVATE_KEY");
@@ -45,11 +45,11 @@ contract SupportNewNetworkScript is Script {
         _baseChainCoordinator.setPeer(LZ_SRC_EID, receiver);
         vm.stopBroadcast();
 
+
         // Set up source chain fork
-        string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory srcRpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         uint256 srcForkId = vm.createSelectFork(srcRpcUrl);
-        uint256 aggregatorPrivateKey = vm.envUint("AGGREGATOR_PRIVATE_KEY");
-        vm.startBroadcast(aggregatorPrivateKey);
+        vm.startBroadcast(privateKey);
 
         // Create an instance of already deployed HomeChainCoordinator contract
         _homeChainCoordinator = HomeChainCoordinator(payable(HOME_CHAIN_COORDINATOR_ADDRESS));

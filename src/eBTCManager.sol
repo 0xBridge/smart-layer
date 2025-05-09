@@ -40,6 +40,7 @@ contract eBTCManager is AccessControl, Pausable, ReentrancyGuard {
     constructor(address initialOwner_) {
         // Give baseChainCoordinator access to mint and burn functions
         _setupRole(DEFAULT_ADMIN_ROLE, initialOwner_);
+        // _setupRole(MINTER_ROLE, initialOwner_); // TODO: Remove this post testing
     }
 
     /**

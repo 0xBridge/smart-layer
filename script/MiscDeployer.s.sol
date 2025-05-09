@@ -37,7 +37,7 @@ contract MiscDeployer is Script {
      * @dev Deploys and initializes the BitcoinLightClient
      */
     function run() public {
-        string memory rpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory rpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         vm.createSelectFork(rpcUrl);
         HelperConfig config = new HelperConfig();
         _networkConfig = config.getConfig();

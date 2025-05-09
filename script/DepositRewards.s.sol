@@ -44,7 +44,7 @@ contract DepositRewardsScript is Script {
 
     function _calculateERC20AmountToBeRewarded() internal returns (uint256 amountToBeRewarded) {
         // Set up destination chain fork
-        string memory destRpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory destRpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         vm.createSelectFork(destRpcUrl);
         HelperConfig destConfig = new HelperConfig();
         destNetworkConfig = destConfig.getConfig();
