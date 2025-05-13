@@ -35,7 +35,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     uint32 internal immutable _homeEid;
 
     uint256 public minBTCAmount = 1000; // Min BTC amount / satoshis that needs to be burned
-    bytes internal constant OPTIONS = hex"00030100110100000000000000000000000000030D40"; // Options for message sending
+    bytes internal constant OPTIONS = hex"000301001101000000000000000000000000001209c4"; // Options for message sending
 
     // Events
     event MessageSent(uint32 dstEid, bytes message, bytes32 receiver, uint256 nativeFee);
