@@ -11,6 +11,9 @@ import {BitcoinLightClient} from "../src/BitcoinLightClient.sol";
 import {eBTCManager} from "../src/eBTCManager.sol";
 import {eBTC} from "../src/eBTC.sol";
 import {TxidCalculator} from "../src/libraries/TxidCalculator.sol";
+import {OApp, Origin, MessagingFee, MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
+import { OptionsBuilder } from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
+
 
 contract HomeChainCoordinatorTest is Test {
     LayerZeroV2Helper private lzHelper;
@@ -305,4 +308,41 @@ contract HomeChainCoordinatorTest is Test {
         assertEq(balance, intialBalance - BTC_AMOUNT);
     }
 
+    // Add this test helper function for gas profiling
+    function testLzReceive() external {
+        vm.selectFork(srcForkId);
+        bytes32 sender = bytes32(uint256(uint160(address(baseChainCoordinator))));
+        Origin memory _origin = Origin({
+            srcEid: destNetworkConfig.chainEid,
+            sender: sender,
+            nonce: 0
+        });
+        bytes32 _guid = bytes32(0);
+        bytes memory _message = hex"0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000efb612e2a173cbaeb9dae47e54cab272743468aa000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000002b468484e6964503842414a41434141414141554949754d4e6e625332446559336e4b6677793838454d3577516f7a4b762f2f38664c7745724f38413742414141414141442f2f2f2f2f417a516841414141414141414667415574364970734d48424443464e47786e524a6a746e6c39726a3658685341774141414141414142594146484851524b3633394249467165384f505868656654696e64732b68747745414141414141414157414254566f43693249525154616d50727a367a355468685461354368495141414141414141514572454363414141414141414169555343796b6c5a6c3952476b3742554832584547414c346e393548344154454854473761567a6b464e78547a4f304555616b4e594d684c56536c6c33387337305631494d55677135763549706d7931304152374e515176624a5161436673784d6253704653556d6a36537238716a6372612f75514c6368495037454f7034797a686872696b454138414170586666685a44464c5a306c493842377245526b6a6e55533365676f686b5966654d7558494c3264364a7136754c445a522f685a4d3832582f517274587a563349655667676c6d6c394b456b7570426a337a51685842616b4e594d684c56536c6c33387337305631494d55677135763549706d7931304152374e515176624a5159634f424b4d7a3559414c443963344f4f35314e57487033524c70523549464d4b795670754a7a776c6b42305567616b4e594d684c56536c6c33387337305631494d55677135763549706d7931304152374e515176624a5161744942704c6779647557303363382f66314a68577a58446d7745386c50574c6c42415a33664b2b653145566150724d414141414141f45d052cb6b306c97c6b9d45f008cfeae8f4b25af92cac46ed3bad1af0a22e33c421dd91936ba3f8f934d4eec82ed85dedc53bf365e88b90f00b4d1db0edc74f000000000000000000000000";
+        address _executor = address(this);
+        bytes memory _extraData = hex"";
+        // This function is only for testing gas usage
+        uint256 gasUsedByLzReceiveCall;
+        vm.startPrank(srcNetworkConfig.endpoint);
+        uint256 gasBeforeLzReceiveCall = gasleft();
+        homeChainCoordinator.lzReceive(_origin, _guid, _message, _executor, _extraData);
+        gasUsedByLzReceiveCall = gasBeforeLzReceiveCall - gasleft();
+        vm.stopPrank();
+        // The gas used by the lzReceive call has been measured above.
+        // The vm.estimateGas cheatcode is not available in Forge Std.
+        // The abi.encodeWithSignature call for calldata is not needed for this gas measurement method.
+        console.log("Gas used by lzReceive call: ", gasUsedByLzReceiveCall);
+
+        vm.selectFork(destForkId);
+        // Get the options value based on the gas used
+        uint128 higherGasUsedByLzReceiveCall = uint128(gasUsedByLzReceiveCall*2);
+        bytes memory options = OptionsBuilder.addExecutorLzReceiveOption(
+            abi.encodePacked(uint16(3)),
+            higherGasUsedByLzReceiveCall, 
+            0
+        );
+        console.logBytes(options);
+    }
+
 }
+
