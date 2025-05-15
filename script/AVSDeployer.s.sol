@@ -50,7 +50,7 @@ contract AVSDeployerScript is Script {
 
     function run() public {
         // Create destination chain to be used for deployment later
-        string memory destRpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory destRpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         destForkId = vm.createSelectFork(destRpcUrl);
         HelperConfig destConfig = new HelperConfig();
         destNetworkConfig = destConfig.getConfig();

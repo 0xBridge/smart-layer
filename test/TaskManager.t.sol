@@ -60,11 +60,11 @@ contract TaskManagerTest is Test {
 
     // Events to test
     event TaskCreatorUpdated(address oldTaskCreator, address newTaskCreator);
-    event NewTaskCreated(bytes32 indexed btcTxnHash);
-    event TaskCompleted(bytes32 indexed btcTxnHash);
+    event NewTaskCreated(IAttestationCenter.TaskInfo taskInfo, bytes32 indexed btcTxnHash);
+    event TaskCompleted(bool indexed isMintTxn, bytes32 indexed btcTxnHash);
 
     function setUp() public {
-        string memory rpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory rpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         sourceForkId = vm.createSelectFork(rpcUrl);
         HelperConfig config = new HelperConfig();
         srcNetworkConfig = config.getConfig();
@@ -154,43 +154,148 @@ contract TaskManagerTest is Test {
     function testCreateNewTask() public {
         uint256 initialTaskHashLength = taskManager.getTaskHashesLength();
 
-        vm.prank(TASKS_CREATOR);
-        taskManager.createNewTask(
-            true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
-        );
+        // Create task params struct
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+            isMintTxn: true,
+            blockHash: BLOCK_HASH,
+            btcTxnHash: BTC_TXN_HASH,
+            proof: proof,
+            index: INDEX,
+            rawTxn: RAW_TXN,
+            taprootAddress: TAPROOT_ADDRESS,
+            networkKey: NETWORK_KEY,
+            operators: OPERATORS
+        });
 
+        // Create TaskInfo struct
+        IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
+            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
+            data: abi.encode(true, BTC_TXN_HASH, BTC_TXN_HASH),
+            taskPerformer: TASKS_CREATOR,
+            taskDefinitionId: 0
+        });
+
+        // Setup event expectation
+        vm.expectEmit(true, true, true, true);
+        emit NewTaskCreated(taskInfo, BTC_TXN_HASH);
+
+        // Execute the function
+        vm.prank(TASKS_CREATOR);
+        taskManager.createNewTask(taskInfo, params);
+
+        // Assert that task hash length increased
         assertEq(taskManager.getTaskHashesLength(), initialTaskHashLength + 1);
+        
+        // Assert that the task exists
+        assertTrue(taskManager.isTaskExists(BTC_TXN_HASH));
+        
+        // Assert that the task is not completed yet
+        assertFalse(taskManager.isTaskCompleted(BTC_TXN_HASH));
     }
 
     function testCreateNewTaskNotTaskCreator() public {
+        // Create task params struct
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+            isMintTxn: true,
+            blockHash: BLOCK_HASH,
+            btcTxnHash: BTC_TXN_HASH,
+            proof: proof,
+            index: INDEX,
+            rawTxn: RAW_TXN,
+            taprootAddress: TAPROOT_ADDRESS,
+            networkKey: NETWORK_KEY,
+            operators: OPERATORS
+        });
+
+        // Create TaskInfo struct
+        IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
+            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
+            data: abi.encode(true, BTC_TXN_HASH, BTC_TXN_HASH),
+            taskPerformer: TASKS_CREATOR,
+            taskDefinitionId: 0
+        });
+
         vm.prank(USER);
         vm.expectRevert(TaskManager.CallerNotTaskGenerator.selector);
-        taskManager.createNewTask(
-            true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
-        );
+        taskManager.createNewTask(taskInfo, params);
     }
 
     function testBeforeTaskSubmissionInvalidTask() public {
         bytes32 invalidTaskHash = keccak256("invalid_task");
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
             proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
-            data: abi.encode(invalidTaskHash),
+            data: abi.encode(true, invalidTaskHash, BTC_TXN_HASH),
             taskPerformer: TASKS_CREATOR,
             taskDefinitionId: 0
         });
 
         vm.prank(ATTESTATION_CENTER);
         vm.expectRevert(TaskManager.InvalidTask.selector);
-
         taskManager.beforeTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
+    }
+    
+    function testBeforeTaskSubmissionValid() public {
+        // First create a task
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+            isMintTxn: true,
+            blockHash: BLOCK_HASH,
+            btcTxnHash: BTC_TXN_HASH,
+            proof: proof,
+            index: INDEX,
+            rawTxn: RAW_TXN,
+            taprootAddress: TAPROOT_ADDRESS,
+            networkKey: NETWORK_KEY,
+            operators: OPERATORS
+        });
+
+        // Create TaskInfo struct
+        IAttestationCenter.TaskInfo memory createTaskInfo = IAttestationCenter.TaskInfo({
+            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
+            data: abi.encode(true, BTC_TXN_HASH, BTC_TXN_HASH),
+            taskPerformer: TASKS_CREATOR,
+            taskDefinitionId: 0
+        });
+
+        vm.prank(TASKS_CREATOR);
+        taskManager.createNewTask(createTaskInfo, params);
+        
+        // Now try beforeTaskSubmission with the valid task
+        IAttestationCenter.TaskInfo memory submissionTaskInfo = IAttestationCenter.TaskInfo({
+            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
+            data: abi.encode(true, BTC_TXN_HASH, BTC_TXN_HASH),
+            taskPerformer: TASKS_CREATOR,
+            taskDefinitionId: 0
+        });
+        
+        vm.prank(ATTESTATION_CENTER);
+        // This should not revert if the task is valid
+        taskManager.beforeTaskSubmission(submissionTaskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
     }
 
     function testTaskLifecycle() public {
         // Create task
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+            isMintTxn: true,
+            blockHash: BLOCK_HASH,
+            btcTxnHash: BTC_TXN_HASH,
+            proof: proof,
+            index: INDEX,
+            rawTxn: RAW_TXN,
+            taprootAddress: TAPROOT_ADDRESS,
+            networkKey: NETWORK_KEY,
+            operators: OPERATORS
+        });
+
+        // Create TaskInfo struct
+        IAttestationCenter.TaskInfo memory createTaskInfo = IAttestationCenter.TaskInfo({
+            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
+            data: abi.encode(true, BTC_TXN_HASH, BTC_TXN_HASH),
+            taskPerformer: TASKS_CREATOR,
+            taskDefinitionId: 0
+        });
+
         vm.prank(TASKS_CREATOR);
-        taskManager.createNewTask(
-            true, BLOCK_HASH, BTC_TXN_HASH, proof, INDEX, RAW_TXN, TAPROOT_ADDRESS, NETWORK_KEY, OPERATORS
-        );
+        taskManager.createNewTask(createTaskInfo, params);
 
         // Verify task is valid but not completed
         assertTrue(taskManager.isTaskExists(BTC_TXN_HASH));
@@ -199,16 +304,107 @@ contract TaskManagerTest is Test {
         // Simulate task completion through attestation center
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
             proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
-            data: abi.encode(BTC_TXN_HASH),
+            data: abi.encode(true, BTC_TXN_HASH, BTC_TXN_HASH),
             taskPerformer: TASKS_CREATOR,
             taskDefinitionId: 0
         });
 
+        // Expect the TaskCompleted event to be emitted
+        vm.expectEmit(true, true, true, true);
+        emit TaskCompleted(true, BTC_TXN_HASH);
+
+        // Fund the task manager for gas fees
+        vm.deal(address(taskManager), 1 ether);
+        
         vm.prank(ATTESTATION_CENTER);
         taskManager.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
 
         // Verify task is now completed
         assertTrue(taskManager.isTaskCompleted(BTC_TXN_HASH));
+    }
+
+    function testBurnTaskLifecycle() public {
+        // Create a burn task
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+            isMintTxn: false,
+            blockHash: BLOCK_HASH,
+            btcTxnHash: BTC_TXN_HASH,
+            proof: proof,
+            index: INDEX,
+            rawTxn: RAW_TXN,
+            taprootAddress: TAPROOT_ADDRESS,
+            networkKey: NETWORK_KEY,
+            operators: OPERATORS
+        });
+
+        // Create TaskInfo struct
+        IAttestationCenter.TaskInfo memory createTaskInfo = IAttestationCenter.TaskInfo({
+            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
+            data: abi.encode(false, BTC_TXN_HASH, BTC_TXN_HASH),
+            taskPerformer: TASKS_CREATOR,
+            taskDefinitionId: 0
+        });
+
+        vm.prank(TASKS_CREATOR);
+        taskManager.createNewTask(createTaskInfo, params);
+
+        // Verify task is valid but not completed
+        assertTrue(taskManager.isTaskExists(BTC_TXN_HASH));
+        assertFalse(taskManager.isTaskCompleted(BTC_TXN_HASH));
+
+        // Simulate task completion through attestation center
+        bytes32 actualTxnHash = keccak256("actual_txn_hash");
+        IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
+            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
+            data: abi.encode(false, BTC_TXN_HASH, actualTxnHash),
+            taskPerformer: TASKS_CREATOR,
+            taskDefinitionId: 0
+        });
+
+        // Expect the TaskCompleted event to be emitted
+        vm.expectEmit(true, true, true, true);
+        emit TaskCompleted(false, BTC_TXN_HASH);
+        
+        vm.prank(ATTESTATION_CENTER);
+        taskManager.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
+
+        // Verify task is now completed
+        assertTrue(taskManager.isTaskCompleted(BTC_TXN_HASH));
+    }
+
+    function testGetTaskHashes() public {
+        // Create multiple tasks
+        for (uint i = 0; i < 3; i++) {
+            bytes32 btcTxnHash = keccak256(abi.encode("task", i));
+            
+            HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+                isMintTxn: true,
+                blockHash: BLOCK_HASH,
+                btcTxnHash: btcTxnHash,
+                proof: proof,
+                index: INDEX,
+                rawTxn: RAW_TXN,
+                taprootAddress: TAPROOT_ADDRESS,
+                networkKey: NETWORK_KEY,
+                operators: OPERATORS
+            });
+
+            IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
+                proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
+                data: abi.encode(true, btcTxnHash, btcTxnHash),
+                taskPerformer: TASKS_CREATOR,
+                taskDefinitionId: 0
+            });
+
+            vm.prank(TASKS_CREATOR);
+            taskManager.createNewTask(taskInfo, params);
+        }
+        
+        // Get task hashes from index 0 to 2
+        bytes32[] memory taskHashes = taskManager.getTaskHashes(0, 2);
+        
+        // Verify the length
+        assertEq(taskHashes.length, 2);
     }
 
     function testQuoteGasFees() public {
@@ -246,5 +442,5 @@ contract TaskManagerTest is Test {
         assertEq(address(taskManager).balance, 0);
     }
 
-    // receive() external payable {}
+    receive() external payable {}
 }

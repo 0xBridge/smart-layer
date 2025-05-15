@@ -29,7 +29,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
 
     // State variables (Ensure the storage layout is maintained)
     bytes32 internal _latestCheckpointHeaderHash;
-    mapping(bytes32 => BitcoinUtils.BlockHeader) internal _headers;
+    mapping(bytes32 blockHash => BitcoinUtils.BlockHeader blockHeader) internal _headers;
 
     // Events
     event BlockHeaderSubmitted(bytes32 indexed blockHash, bytes32 indexed prevBlock, uint32 height);
@@ -106,7 +106,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
         uint32 blockTimestamp,
         uint32 difficultyBits,
         uint32 nonce,
-        uint32 height,
+        uint32 height, // TODO: Remove height from params and calculate it in the contract
         bytes32 prevBlock,
         bytes32 merkleRoot,
         bytes[] calldata intermediateHeaders
@@ -234,7 +234,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
      * @notice Get the latest block header
      * @return The latest checkpoint block header
      */
-    function getLatestCheckpoint() external view returns (BitcoinUtils.BlockHeader memory) {
+    function getLatestHeader() external view returns (BitcoinUtils.BlockHeader memory) {
         return _headers[_latestCheckpointHeaderHash];
     }
 

@@ -27,7 +27,7 @@ contract OnlyTaskManagerDeployer is Script {
     uint256 internal _sourceForkId;
 
     function run() public {
-        string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory srcRpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         _sourceForkId = vm.createSelectFork(srcRpcUrl);
         HelperConfig srcConfig = new HelperConfig();
         _srcNetworkConfig = srcConfig.getConfig();

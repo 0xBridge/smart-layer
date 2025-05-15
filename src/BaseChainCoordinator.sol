@@ -35,7 +35,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
     uint32 internal immutable _homeEid;
 
     uint256 public minBTCAmount = 1000; // Min BTC amount / satoshis that needs to be burned
-    bytes internal constant OPTIONS = hex"0003010011010000000000000000000000000000c350"; // Options for message sending
+    bytes internal constant OPTIONS = hex"000301001101000000000000000000000000001209c4"; // Options for message sending
 
     // Events
     event MessageSent(uint32 dstEid, bytes message, bytes32 receiver, uint256 nativeFee);
@@ -260,7 +260,7 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
     /**
      * @notice Sends a message to the specified chain
-     * @param _rawTxn The raw PSBT data for the burn transaction
+     * @param _rawTxn The raw partially signed (not finalized signed) PSBT data for the burn transaction
      * @param _amount The amount of BTC to burn
      * @param _deadline Expiration time for the permit signature
      * @param _v v of the permit signature
@@ -279,16 +279,18 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         address _eBTCToken = _eBTCManagerInstance.getEBTCTokenAddress();
         if (_eBTCToken == address(0)) revert InvalidTokenAddress();
         IERC20 eBTCToken = IERC20(_eBTCToken);
-        SafeERC20.safeTransferFrom(eBTCToken, msg.sender, address(this), _amount);
         SafeERC20.safePermit(
-            IERC20Permit(address(eBTCToken)), msg.sender, address(_eBTCManagerInstance), _amount, _deadline, _v, _r, _s
+            IERC20Permit(address(eBTCToken)), msg.sender, address(this), _amount, _deadline, _v, _r, _s
         );
+        SafeERC20.safeTransferFrom(eBTCToken, msg.sender, address(this), _amount);
+        SafeERC20.safeApprove(eBTCToken, address(_eBTCManagerInstance), _amount);
+        // Call the internal function to burn and unlock
         _burnAndUnlock(_rawTxn, _amount);
     }
 
     /**
      * @notice Sends a message to the specified chain
-     * @param _rawTxn The raw PSBT data for the burn transaction
+     * @param _rawTxn The raw partially signed (not finalized signed) PSBT data for the burn transaction
      * @param _amount The amount of BTC to burn
      */
     function burnAndUnlock(bytes calldata _rawTxn, uint256 _amount) external payable {
@@ -302,13 +304,14 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
 
     /**
      * @notice Burns eBTC tokens and sends a message to the specified chain
-     * @param _rawTxn The raw PSBT data for the burn transaction
+     * @param _rawTxn The raw partially signed (not finalized signed) PSBT data for the burn transaction
      * @param _amount The amount of BTC to burn
      */
     function _burnAndUnlock(bytes calldata _rawTxn, uint256 _amount) internal {
         if (_rawTxn.length == 0) revert InvalidPSBTData();
         // Shouldn't allow an already existing PSBT to be sent to HomeChainCoordinator via BaseChainCoordinator
-        bytes32 _btcTxnHash = TxidCalculator.calculateTxid(_rawTxn);
+        // bytes32 _btcTxnHash = TxidCalculator.calculateTxid(_rawTxn);
+        bytes32 _btcTxnHash = keccak256(_rawTxn);
         if (_btcTxnHash_txnData[_btcTxnHash].user != address(0)) {
             revert InvalidBurnRequest(_btcTxnHash);
         }
@@ -319,18 +322,35 @@ contract BaseChainCoordinator is OApp, ReentrancyGuard, Pausable, IBaseChainCoor
         _btcTxnHash_txnData[_btcTxnHash] = TxnData({status: true, user: msg.sender, amount: _amount});
 
         // Pack the amount into _extraData
-        bytes memory amountAndRawTxn = abi.encode(_amount, _rawTxn);
+        bytes memory payload = abi.encode(_amount, msg.sender, _rawTxn);
 
         // Pass the psbt data to the HomeChainCoordinator in the burn transaction
         _lzSend(
             _homeEid, // HomeChainCoordinator chainEid
-            amountAndRawTxn,
+            payload,
             OPTIONS,
             MessagingFee(msg.value, 0), // Fee in native gas and ZRO token.
-            address(this) // Refund address in case of failed source message.
+            msg.sender // Refund address in case of failed source message.
         );
 
         emit MessageSent(_homeEid, _rawTxn, peers[_homeEid], msg.value);
+    }
+
+    /**
+     * @notice Quotes the gas needed to pay for the full omnichain transaction
+     * @param _destChainEid The chainEid of the destination chain
+     * @param _payload The payload to be sent to the destination chain, abi encoded amount and rawTxn
+     * @param _payInLzToken Boolean for which token to return fee in
+     * @return nativeFee Estimated gas fee in native gas
+     * @return lzTokenFee Estimated gas fee in ZRO token
+     */
+    function quote(uint32 _destChainEid, bytes memory _payload, bool _payInLzToken)
+        public
+        view
+        returns (uint256 nativeFee, uint256 lzTokenFee)
+    {
+        MessagingFee memory fee = _quote(_destChainEid, _payload, OPTIONS, _payInLzToken);
+        return (fee.nativeFee, fee.lzTokenFee);
     }
 
     /**

