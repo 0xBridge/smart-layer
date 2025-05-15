@@ -10,7 +10,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 
 contract OnlyBaseChainCoordinatorDeployer is Script {
     // Constants
-    uint32 internal constant HOLESKY_CHAIN_EID = 40217; // Holesky LayerZero Endpoint ID
+    uint32 internal constant SRC_CHAIN_EID = 40267; // LayerZero Endpoint ID
     uint256 internal constant DEFAULT_GAS_PRICE = 2_000_000_000; // 1 Gwei
     uint256 internal constant PRIORITY_FEE = 1_000_000_000; // 1 Gwei priority fee
 
@@ -48,7 +48,7 @@ contract OnlyBaseChainCoordinatorDeployer is Script {
             owner, // owner
             eBTCManagerAddress, // eBTCManager
             _destNetworkConfig.chainEid, // chainEid
-            HOLESKY_CHAIN_EID // HomeChainCoordinator chainEid on Holesky
+            SRC_CHAIN_EID // HomeChainCoordinator chainEid
         );
         console.log("Deployed BaseChainCoordinator", address(_baseChainCoordinator));
         vm.stopBroadcast();

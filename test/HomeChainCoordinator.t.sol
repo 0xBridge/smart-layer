@@ -73,7 +73,7 @@ contract HomeChainCoordinatorTest is Test {
 
     // AVS Data (Dummy values)
     bytes32 private constant TAPROOT_ADDRESS = 0xb2925665f511a4ec1507d9710600be27f791f80131074c6eda5739053714f33b;
-    bytes32 private constant NETWORK_KEY = 0xb7a229b0c1c10c214d1b19d1263b6797dae3e978000000000000000000000000;
+    bytes32 private constant NETWORK_KEY = 0x1a4b83276e5b4ddcf3f7f52615b35c39b013c94f58b941019ddf2be7b511568f;
     address[] private OPERATORS = [
         0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE,
         0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E,
