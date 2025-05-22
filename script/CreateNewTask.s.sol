@@ -22,7 +22,7 @@ contract CreateTask is Script {
 
     // AVS Data (from test file)
     bytes32 internal constant TAPROOT_ADDRESS = 0xb2925665f511a4ec1507d9710600be27f791f80131074c6eda5739053714f33b;
-    bytes32 internal constant NETWORK_KEY = 0xb7a229b0c1c10c214d1b19d1263b6797dae3e978000000000000000000000000;
+    bytes32 internal constant NETWORK_KEY = 0x1a4b83276e5b4ddcf3f7f52615b35c39b013c94f58b941019ddf2be7b511568f;
 
     /**
      * @notice Main execution function

@@ -26,7 +26,7 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
     error InvalidPSBTData();
     error InvalidAmount(uint256 amount);
     error InvalidSourceOrDestination();
-    error InvalidReceiver(address receiver);
+    error InvalidAddress(address receiver);
     error BitcoinTxnNotFound();
     error BitcoinTxnAndPSBTMismatch();
     error InvalidPeer();
@@ -59,7 +59,6 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
     bytes internal constant OPTIONS = hex"00030100110100000000000000000000000000030D40";
     bytes32 internal constant TASK_GENERATOR_ROLE = keccak256("TASK_GENERATOR_ROLE");
     bytes32 internal constant TASK_SUBMITTER_ROLE = keccak256("TASK_SUBMITTER_ROLE");
-
 
     // Events
     event MessageCreated(bool indexed isMintTxn, bytes32 indexed blockHash, bytes32 indexed btcTxnHash);
@@ -125,7 +124,7 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
      * @dev Only callable by the contract owner
      */
     function setTaskSubmitterRole(address _account) external onlyOwner {
-        if (_account == address(0)) revert InvalidReceiver(_account);
+        if (_account == address(0)) revert InvalidAddress(_account);
         _grantRole(TASK_SUBMITTER_ROLE, _account);
     }
 
@@ -135,7 +134,7 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
      * @dev Only callable by the contract owner
      */
     function setTaskGeneratorRole(address _account) external onlyOwner {
-        if (_account == address(0)) revert InvalidReceiver(_account);
+        if (_account == address(0)) revert InvalidAddress(_account);
         _grantRole(TASK_GENERATOR_ROLE, _account);
     }
 
@@ -164,12 +163,17 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
      * @param params The parameters for storing the message
      * @dev Only callable by the contract owner
      */
-    function storeMessage(NewTaskParams calldata params) external whenNotPaused nonReentrant onlyRole(TASK_GENERATOR_ROLE) {
+    function storeMessage(NewTaskParams calldata params)
+        external
+        whenNotPaused
+        nonReentrant
+        onlyRole(TASK_GENERATOR_ROLE)
+    {
         _storeMessage(params);
     }
 
     function _storeMessage(NewTaskParams memory params) internal {
-        bytes32 merkleRoot; 
+        bytes32 merkleRoot;
         // bytes32 merkleRoot = _lightClient.getMerkleRootForBlock(params.blockHash); // TODO: Uncomment this line when the light client is available (Rahul's requirement for testing)
 
         PSBTData memory psbtData;
@@ -210,7 +214,13 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
      * @param _btcTxnHash The BTC transaction hash
      * @dev Validates the PSBT data and sends the message through LayerZero
      */
-    function sendMessage(bytes32 _btcTxnHash) external payable whenNotPaused nonReentrant onlyRole(TASK_SUBMITTER_ROLE) {
+    function sendMessage(bytes32 _btcTxnHash)
+        external
+        payable
+        whenNotPaused
+        nonReentrant
+        onlyRole(TASK_SUBMITTER_ROLE)
+    {
         // 0. Parse transaction outputs and metadata
         uint32 chainId = _btcTxnHash_psbtData[_btcTxnHash].chainId;
         // 1. Get the metadata as well as other fields required for the message
@@ -238,7 +248,7 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
         PSBTData memory psbtData = getPSBTDataForTxnHash(_btcTxnHash);
         psbtData.actualTxnHash = _btcTxnHash;
         _btcTxnHash_psbtData[_btcTxnHash] = psbtData; // Update the status of the transaction
-        
+
         if (_dstEid == _chainEid) {
             _handleSameChainMessage(_dstEid, _btcTxnHash, payload);
         } else {
@@ -336,7 +346,7 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
 
         // Validate receiver address
         if (metadata.receiverAddress == address(0)) {
-            revert InvalidReceiver(metadata.receiverAddress);
+            revert InvalidAddress(metadata.receiverAddress);
         }
     }
 
@@ -348,7 +358,7 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
      */
     function sendMessageFor(address _receiver, bytes32 _btcTxnHash) external payable whenNotPaused nonReentrant {
         if (_btcTxnHash_psbtData[_btcTxnHash].user != _receiver) {
-            revert InvalidReceiver(_receiver); // This also ensures that the txn is already present
+            revert InvalidAddress(_receiver); // This also ensures that the txn is already present
         }
 
         // 1. Parse and get metadata from psbtData
@@ -409,7 +419,11 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
      * @notice Updates the burn status of a given BTC transaction hash
      * @param _btcTxnHash The BTC transaction hash
      */
-    function updateBurnStatus(bytes32 _btcTxnHash, bytes32 _actualTxnHash) external whenNotPaused onlyRole(TASK_SUBMITTER_ROLE) {
+    function updateBurnStatus(bytes32 _btcTxnHash, bytes32 _actualTxnHash)
+        external
+        whenNotPaused
+        onlyRole(TASK_SUBMITTER_ROLE)
+    {
         // 1. Check if the transaction exists
         PSBTData memory psbtData = _btcTxnHash_psbtData[_btcTxnHash];
         if (psbtData.rawTxn.length == 0) {

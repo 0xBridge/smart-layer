@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {LayerZeroV2Helper} from "lib/pigeon/src/layerzero-v2/LayerZeroV2Helper.sol";
 import {HelperConfig} from "../script/HelperConfig.s.sol";
@@ -24,7 +24,7 @@ contract TaskManagerTest is Test {
     address private owner;
     address private constant TASKS_CREATOR = 0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE;
     address private constant USER = 0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E;
-    address private constant ATTESTATION_CENTER = 0x276ef26eEDC3CFE0Cdf22fB033Abc9bF6b6a95B3;
+    address private ATTESTATION_CENTER = 0xC43b825292517d7c0C1f03793460BCda726c6aAA;
 
     // Network configs
     uint256 private sourceForkId;
@@ -51,7 +51,7 @@ contract TaskManagerTest is Test {
 
     // AVS Data
     bytes32 private constant TAPROOT_ADDRESS = 0xb2925665f511a4ec1507d9710600be27f791f80131074c6eda5739053714f33b;
-    bytes32 private constant NETWORK_KEY = 0xb7a229b0c1c10c214d1b19d1263b6797dae3e978000000000000000000000000;
+    bytes32 private constant NETWORK_KEY = 0x1a4b83276e5b4ddcf3f7f52615b35c39b013c94f58b941019ddf2be7b511568f;
     address[] private OPERATORS = [
         0x71cf07d9c0D8E4bBB5019CcC60437c53FC51e6dE,
         0x4E56a8E3757F167378b38269E1CA0e1a1F124C9E,
@@ -59,12 +59,10 @@ contract TaskManagerTest is Test {
     ];
 
     // Events to test
-    event TaskCreatorUpdated(address oldTaskCreator, address newTaskCreator);
-    event NewTaskCreated(IAttestationCenter.TaskInfo taskInfo, bytes32 indexed btcTxnHash);
     event TaskCompleted(bool indexed isMintTxn, bytes32 indexed btcTxnHash);
 
     function setUp() public {
-        string memory rpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
+        string memory rpcUrl = vm.envString("AMOY_RPC_URL");
         sourceForkId = vm.createSelectFork(rpcUrl);
         HelperConfig config = new HelperConfig();
         srcNetworkConfig = config.getConfig();
@@ -126,18 +124,19 @@ contract TaskManagerTest is Test {
         // Deploy TaskManager
         taskManager = new TaskManager(owner, TASKS_CREATOR, ATTESTATION_CENTER, address(homeChainCoordinator));
         // Transfer ownership of HomeChainCoordinator to the taskManager
-        vm.prank(owner);
+        vm.startPrank(owner);
+        homeChainCoordinator.setTaskGeneratorRole(address(taskManager));
+        homeChainCoordinator.setTaskSubmitterRole(ATTESTATION_CENTER);
         homeChainCoordinator.transferOwnership(address(taskManager));
+        vm.stopPrank();
 
         // Fund contracts
         vm.deal(owner, 100 ether);
         vm.deal(address(taskManager), 10 ether);
-        vm.deal(address(homeChainCoordinator), 10 ether);
-
-        // lzHelper = new LayerZeroV2Helper();
+        // vm.deal(address(homeChainCoordinator), 10 ether);
     }
 
-    function testInitialState() public {
+    function testInitialState() public view {
         assertTrue(taskManager.owner() == owner);
     }
 
@@ -145,7 +144,7 @@ contract TaskManagerTest is Test {
         address newTaskCreator = makeAddr("newTaskCreator");
 
         vm.expectEmit(true, true, true, true);
-        emit TaskCreatorUpdated(TASKS_CREATOR, newTaskCreator);
+        emit TaskManager.TaskCreatorUpdated(TASKS_CREATOR, newTaskCreator);
 
         vm.prank(owner);
         taskManager.setTaskCreator(newTaskCreator);
@@ -177,7 +176,7 @@ contract TaskManagerTest is Test {
 
         // Setup event expectation
         vm.expectEmit(true, true, true, true);
-        emit NewTaskCreated(taskInfo, BTC_TXN_HASH);
+        emit TaskManager.NewTaskCreated(taskInfo, BTC_TXN_HASH);
 
         // Execute the function
         vm.prank(TASKS_CREATOR);
@@ -185,10 +184,10 @@ contract TaskManagerTest is Test {
 
         // Assert that task hash length increased
         assertEq(taskManager.getTaskHashesLength(), initialTaskHashLength + 1);
-        
+
         // Assert that the task exists
         assertTrue(taskManager.isTaskExists(BTC_TXN_HASH));
-        
+
         // Assert that the task is not completed yet
         assertFalse(taskManager.isTaskCompleted(BTC_TXN_HASH));
     }
@@ -230,10 +229,10 @@ contract TaskManagerTest is Test {
         });
 
         vm.prank(ATTESTATION_CENTER);
-        vm.expectRevert(TaskManager.InvalidTask.selector);
+        vm.expectRevert(abi.encodeWithSelector(TaskManager.InvalidTask.selector, invalidTaskHash));
         taskManager.beforeTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
     }
-    
+
     function testBeforeTaskSubmissionValid() public {
         // First create a task
         HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
@@ -258,7 +257,7 @@ contract TaskManagerTest is Test {
 
         vm.prank(TASKS_CREATOR);
         taskManager.createNewTask(createTaskInfo, params);
-        
+
         // Now try beforeTaskSubmission with the valid task
         IAttestationCenter.TaskInfo memory submissionTaskInfo = IAttestationCenter.TaskInfo({
             proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
@@ -266,9 +265,9 @@ contract TaskManagerTest is Test {
             taskPerformer: TASKS_CREATOR,
             taskDefinitionId: 0
         });
-        
-        vm.prank(ATTESTATION_CENTER);
+
         // This should not revert if the task is valid
+        vm.prank(ATTESTATION_CENTER);
         taskManager.beforeTaskSubmission(submissionTaskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
     }
 
@@ -315,7 +314,7 @@ contract TaskManagerTest is Test {
 
         // Fund the task manager for gas fees
         vm.deal(address(taskManager), 1 ether);
-        
+
         vm.prank(ATTESTATION_CENTER);
         taskManager.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
 
@@ -325,12 +324,13 @@ contract TaskManagerTest is Test {
 
     function testBurnTaskLifecycle() public {
         // Create a burn task
+        bytes32[] memory burnProof = new bytes32[](0);
         HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
             isMintTxn: false,
             blockHash: BLOCK_HASH,
             btcTxnHash: BTC_TXN_HASH,
-            proof: proof,
-            index: INDEX,
+            proof: burnProof,
+            index: 0,
             rawTxn: RAW_TXN,
             taprootAddress: TAPROOT_ADDRESS,
             networkKey: NETWORK_KEY,
@@ -364,7 +364,7 @@ contract TaskManagerTest is Test {
         // Expect the TaskCompleted event to be emitted
         vm.expectEmit(true, true, true, true);
         emit TaskCompleted(false, BTC_TXN_HASH);
-        
+
         vm.prank(ATTESTATION_CENTER);
         taskManager.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
 
@@ -374,9 +374,9 @@ contract TaskManagerTest is Test {
 
     function testGetTaskHashes() public {
         // Create multiple tasks
-        for (uint i = 0; i < 3; i++) {
+        for (uint256 i = 0; i < 3; i++) {
             bytes32 btcTxnHash = keccak256(abi.encode("task", i));
-            
+
             HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
                 isMintTxn: true,
                 blockHash: BLOCK_HASH,
@@ -399,15 +399,15 @@ contract TaskManagerTest is Test {
             vm.prank(TASKS_CREATOR);
             taskManager.createNewTask(taskInfo, params);
         }
-        
+
         // Get task hashes from index 0 to 2
         bytes32[] memory taskHashes = taskManager.getTaskHashes(0, 2);
-        
+
         // Verify the length
         assertEq(taskHashes.length, 2);
     }
 
-    function testQuoteGasFees() public {
+    function testQuoteGasFees() public view {
         (uint256 nativeFee, uint256 lzTokenFee) = taskManager.quote(BTC_TXN_HASH, RAW_TXN, false);
 
         assertTrue(nativeFee > 0);
