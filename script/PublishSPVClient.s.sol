@@ -58,7 +58,6 @@ contract PublishSPVClient is Script {
             BLOCK_TIMESTAMP,
             DIFFICULTY_BITS,
             NONCE,
-            0, // Height is calculated by the contract
             PREV_BLOCK,
             MERKLE_ROOT,
             new bytes[](0) // No intermediate headers

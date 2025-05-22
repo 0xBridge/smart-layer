@@ -271,7 +271,7 @@ contract TaskManagerTest is Test {
         taskManager.beforeTaskSubmission(submissionTaskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
     }
 
-    function testTaskLifecycle() public {
+    function testMintTaskLifecycle() public {
         // Create task
         HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
             isMintTxn: true,

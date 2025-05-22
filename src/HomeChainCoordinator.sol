@@ -173,8 +173,7 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
     }
 
     function _storeMessage(NewTaskParams memory params) internal {
-        bytes32 merkleRoot;
-        // bytes32 merkleRoot = _lightClient.getMerkleRootForBlock(params.blockHash); // TODO: Uncomment this line when the light client is available (Rahul's requirement for testing)
+        bytes32 merkleRoot = _lightClient.getMerkleRootForBlock(params.blockHash);
 
         PSBTData memory psbtData;
         // 1 for mint, 0 for burn
@@ -307,8 +306,8 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
             revert TxnAlreadyProcessed(_btcTxnHash);
         }
 
-        // 3. Validate txn with SPV data. TODO: Uncomment this line (Rahul's requirement for testing)
-        // if (!BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index)) revert BitcoinTxnNotFound();
+        // 3. Validate txn with SPV data.
+        if (!BitcoinUtils.verifyTxInclusion(_btcTxnHash, _merkleRoot, _proof, _index)) revert BitcoinTxnNotFound();
 
         // 4. Validate receiver is set for destination chain
         if (peers[_dstEid] == bytes32(0)) {

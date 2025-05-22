@@ -94,7 +94,6 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
      * @param blockTimestamp Block timestamp
      * @param difficultyBits Block difficulty bits
      * @param nonce Block nonce
-     * @param height Block height
      * @param prevBlock Previous block hash
      * @param merkleRoot Block merkle root
      * @param intermediateHeaders Array of intermediate headers (in reverse array order)
@@ -106,7 +105,6 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
         uint32 blockTimestamp,
         uint32 difficultyBits,
         uint32 nonce,
-        uint32 height, // TODO: Remove height from params and calculate it in the contract
         bytes32 prevBlock,
         bytes32 merkleRoot,
         bytes[] calldata intermediateHeaders
@@ -116,7 +114,7 @@ contract BitcoinLightClient is Initializable, UUPSUpgradeable, AccessControlUpgr
             timestamp: blockTimestamp,
             difficultyBits: difficultyBits,
             nonce: nonce,
-            height: height,
+            height: 0,
             prevBlock: prevBlock,
             merkleRoot: merkleRoot
         });
