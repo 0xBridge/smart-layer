@@ -103,7 +103,12 @@ contract TaskManagerDeployer is Script {
         console.log("Deployed BitcoinLightClient and created proxy", address(_btcLightClient));
 
         _homeChainCoordinator = new HomeChainCoordinator(
-            address(_btcLightClient), _srcNetworkConfig.endpoint, OWNER, _srcNetworkConfig.chainEid
+            address(_btcLightClient),
+            _srcNetworkConfig.endpoint,
+            OWNER,
+            GENERATOR,
+            ATTESTATION_CENTER,
+            _srcNetworkConfig.chainEid
         );
         console.log("Deployed HomeChainCoordinator", address(_homeChainCoordinator));
         _homeChainCoordinator.setPeer(_destNetworkConfig.chainEid, receiver);

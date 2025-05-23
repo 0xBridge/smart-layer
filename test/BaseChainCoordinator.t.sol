@@ -81,11 +81,7 @@
 //         eBTCManagerInstance.setEBTC(address(eBTCToken));
 
 //         baseChainCoordinator = new BaseChainCoordinator(
-//             baseNetworkConfig.endpoint,
-//             owner,
-//             address(eBTCManagerInstance),
-//             baseNetworkConfig.chainEid,
-//             HOME_CHAIN_EID
+//             baseNetworkConfig.endpoint, owner, address(eBTCManagerInstance), baseNetworkConfig.chainEid, HOME_CHAIN_EID
 //         );
 
 //         eBTCManagerInstance.setBaseChainCoordinator(address(baseChainCoordinator));
@@ -156,11 +152,8 @@
 //         });
 //         bytes memory payload = abi.encode(mintData);
 
-//         Origin memory origin = Origin({
-//             srcEid: HOME_CHAIN_EID,
-//             sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))),
-//             nonce: 1
-//         });
+//         Origin memory origin =
+//             Origin({srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 1});
 
 //         assertEq(eBTCToken.balanceOf(user), 0);
 
@@ -187,13 +180,16 @@
 //         baseChainCoordinator.pause();
 
 //         IBaseChainCoordinator.LzReceiveData memory mintData = IBaseChainCoordinator.LzReceiveData({
-//             isMint: true, userAddress: user, btcTxnHash: SAMPLE_BTC_TXN_HASH_MINT,
-//             amount: MINT_AMOUNT, isSuccess: true, actualTxnHash: bytes32(0)
+//             isMint: true,
+//             userAddress: user,
+//             btcTxnHash: SAMPLE_BTC_TXN_HASH_MINT,
+//             amount: MINT_AMOUNT,
+//             isSuccess: true,
+//             actualTxnHash: bytes32(0)
 //         });
 //         bytes memory payload = abi.encode(mintData);
-//         Origin memory origin = Origin({
-//             srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 1
-//         });
+//         Origin memory origin =
+//             Origin({srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 1});
 
 //         vm.prank(mockLzEndpoint);
 //         vm.expectRevert("Pausable: paused");
@@ -203,33 +199,41 @@
 //     function testLzReceive_Mint_FromUnauthorizedPeer_ShouldRevert() public {
 //         address unauthorizedPeer = makeAddr("unauthorizedPeer");
 //         IBaseChainCoordinator.LzReceiveData memory mintData = IBaseChainCoordinator.LzReceiveData({
-//             isMint: true, userAddress: user, btcTxnHash: SAMPLE_BTC_TXN_HASH_MINT,
-//             amount: MINT_AMOUNT, isSuccess: true, actualTxnHash: bytes32(0)
+//             isMint: true,
+//             userAddress: user,
+//             btcTxnHash: SAMPLE_BTC_TXN_HASH_MINT,
+//             amount: MINT_AMOUNT,
+//             isSuccess: true,
+//             actualTxnHash: bytes32(0)
 //         });
 //         bytes memory payload = abi.encode(mintData);
-//         Origin memory origin = Origin({
-//             srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(unauthorizedPeer))), nonce: 1
-//         });
+//         Origin memory origin =
+//             Origin({srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(unauthorizedPeer))), nonce: 1});
 
 //         vm.prank(mockLzEndpoint);
 //         vm.expectRevert("OApp: invalid peer");
 //         baseChainCoordinator.lzReceive(origin, bytes32(0), payload, address(this));
 //     }
 
-//      function testLzReceive_Mint_TxnAlreadyProcessed_ShouldRevert() public {
+//     function testLzReceive_Mint_TxnAlreadyProcessed_ShouldRevert() public {
 //         IBaseChainCoordinator.LzReceiveData memory mintData = IBaseChainCoordinator.LzReceiveData({
-//             isMint: true, userAddress: user, btcTxnHash: SAMPLE_BTC_TXN_HASH_MINT,
-//             amount: MINT_AMOUNT, isSuccess: true, actualTxnHash: bytes32(0)
+//             isMint: true,
+//             userAddress: user,
+//             btcTxnHash: SAMPLE_BTC_TXN_HASH_MINT,
+//             amount: MINT_AMOUNT,
+//             isSuccess: true,
+//             actualTxnHash: bytes32(0)
 //         });
 //         bytes memory payload = abi.encode(mintData);
-//         Origin memory origin1 = Origin({
-//             srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 1
-//         });
+//         Origin memory origin1 =
+//             Origin({srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 1});
 //         vm.prank(mockLzEndpoint);
 //         baseChainCoordinator.lzReceive(origin1, bytes32(0), payload, address(this));
 
 //         Origin memory origin2 = Origin({ // New LZ message, new nonce
-//             srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 2
+//             srcEid: HOME_CHAIN_EID,
+//             sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))),
+//             nonce: 2
 //         });
 //         vm.prank(mockLzEndpoint);
 //         vm.expectRevert(IBaseChainCoordinator.TxnAlreadyProcessed.selector);
@@ -254,19 +258,24 @@
 //         assertEq(eBTCToken.balanceOf(address(eBTCManagerInstance)), BURN_AMOUNT);
 
 //         IBaseChainCoordinator.LzReceiveData memory burnConfirmData = IBaseChainCoordinator.LzReceiveData({
-//             isMint: false, userAddress: user, btcTxnHash: SAMPLE_BTC_TXN_HASH_BURN,
-//             amount: BURN_AMOUNT, isSuccess: true, actualTxnHash: ACTUAL_BURN_TXN_HASH
+//             isMint: false,
+//             userAddress: user,
+//             btcTxnHash: SAMPLE_BTC_TXN_HASH_BURN,
+//             amount: BURN_AMOUNT,
+//             isSuccess: true,
+//             actualTxnHash: ACTUAL_BURN_TXN_HASH
 //         });
 //         bytes memory payload = abi.encode(burnConfirmData);
-//         Origin memory origin = Origin({
-//             srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 2
-//         });
+//         Origin memory origin =
+//             Origin({srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 2});
 
 //         vm.expectEmit(true, true, true, true, address(eBTCManagerInstance));
 //         emit eBTCManager.BurnCompleted(user, BURN_AMOUNT, SAMPLE_BTC_TXN_HASH_BURN, ACTUAL_BURN_TXN_HASH);
 
 //         vm.expectEmit(true, true, true, true, address(baseChainCoordinator));
-//         emit IBaseChainCoordinator.BurnStatusMessageReceived(user, SAMPLE_BTC_TXN_HASH_BURN, BURN_AMOUNT, true, ACTUAL_BURN_TXN_HASH);
+//         emit IBaseChainCoordinator.BurnStatusMessageReceived(
+//             user, SAMPLE_BTC_TXN_HASH_BURN, BURN_AMOUNT, true, ACTUAL_BURN_TXN_HASH
+//         );
 
 //         vm.prank(mockLzEndpoint);
 //         baseChainCoordinator.lzReceive(origin, bytes32(0), payload, address(this));
@@ -296,19 +305,24 @@
 //         assertEq(eBTCToken.balanceOf(address(eBTCManagerInstance)), BURN_AMOUNT);
 
 //         IBaseChainCoordinator.LzReceiveData memory burnFailData = IBaseChainCoordinator.LzReceiveData({
-//             isMint: false, userAddress: user, btcTxnHash: SAMPLE_BTC_TXN_HASH_BURN,
-//             amount: BURN_AMOUNT, isSuccess: false, actualTxnHash: bytes32(0)
+//             isMint: false,
+//             userAddress: user,
+//             btcTxnHash: SAMPLE_BTC_TXN_HASH_BURN,
+//             amount: BURN_AMOUNT,
+//             isSuccess: false,
+//             actualTxnHash: bytes32(0)
 //         });
 //         bytes memory payload = abi.encode(burnFailData);
-//         Origin memory origin = Origin({
-//             srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 3
-//         });
+//         Origin memory origin =
+//             Origin({srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 3});
 
 //         vm.expectEmit(true, true, true, true, address(eBTCManagerInstance));
 //         emit eBTCManager.BurnReverted(user, BURN_AMOUNT, SAMPLE_BTC_TXN_HASH_BURN);
 
 //         vm.expectEmit(true, true, true, true, address(baseChainCoordinator));
-//         emit IBaseChainCoordinator.BurnStatusMessageReceived(user, SAMPLE_BTC_TXN_HASH_BURN, BURN_AMOUNT, false, bytes32(0));
+//         emit IBaseChainCoordinator.BurnStatusMessageReceived(
+//             user, SAMPLE_BTC_TXN_HASH_BURN, BURN_AMOUNT, false, bytes32(0)
+//         );
 
 //         vm.prank(mockLzEndpoint);
 //         baseChainCoordinator.lzReceive(origin, bytes32(0), payload, address(this));
@@ -331,19 +345,21 @@
 //         vm.stopPrank();
 
 //         IBaseChainCoordinator.LzReceiveData memory burnConfirmData = IBaseChainCoordinator.LzReceiveData({
-//             isMint: false, userAddress: user, btcTxnHash: SAMPLE_BTC_TXN_HASH_BURN,
-//             amount: BURN_AMOUNT, isSuccess: true, actualTxnHash: ACTUAL_BURN_TXN_HASH
+//             isMint: false,
+//             userAddress: user,
+//             btcTxnHash: SAMPLE_BTC_TXN_HASH_BURN,
+//             amount: BURN_AMOUNT,
+//             isSuccess: true,
+//             actualTxnHash: ACTUAL_BURN_TXN_HASH
 //         });
 //         bytes memory payload = abi.encode(burnConfirmData);
-//         Origin memory origin1 = Origin({
-//             srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 1
-//         });
+//         Origin memory origin1 =
+//             Origin({srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 1});
 //         vm.prank(mockLzEndpoint);
 //         baseChainCoordinator.lzReceive(origin1, bytes32(0), payload, address(this));
 
-//         Origin memory origin2 = Origin({
-//             srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 2
-//         });
+//         Origin memory origin2 =
+//             Origin({srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 2});
 //         vm.prank(mockLzEndpoint);
 //         vm.expectRevert(IBaseChainCoordinator.TxnAlreadyProcessed.selector);
 //         baseChainCoordinator.lzReceive(origin2, bytes32(0), payload, address(this));
@@ -359,13 +375,16 @@
 //         vm.stopPrank();
 
 //         IBaseChainCoordinator.LzReceiveData memory burnConfirmData = IBaseChainCoordinator.LzReceiveData({
-//             isMint: false, userAddress: user, btcTxnHash: SAMPLE_BTC_TXN_HASH_BURN,
-//             amount: BURN_AMOUNT + 1, isSuccess: true, actualTxnHash: ACTUAL_BURN_TXN_HASH
+//             isMint: false,
+//             userAddress: user,
+//             btcTxnHash: SAMPLE_BTC_TXN_HASH_BURN,
+//             amount: BURN_AMOUNT + 1,
+//             isSuccess: true,
+//             actualTxnHash: ACTUAL_BURN_TXN_HASH
 //         });
 //         bytes memory payload = abi.encode(burnConfirmData);
-//         Origin memory origin = Origin({
-//             srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 1
-//         });
+//         Origin memory origin =
+//             Origin({srcEid: HOME_CHAIN_EID, sender: bytes32(uint256(uint160(homeChainCoordinatorPeer))), nonce: 1});
 
 //         vm.prank(mockLzEndpoint);
 //         vm.expectRevert("eBTCManager: Amount mismatch");

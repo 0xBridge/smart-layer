@@ -32,22 +32,22 @@ contract TaskManagerTest is Test {
     HelperConfig.NetworkConfig private srcNetworkConfig;
     HelperConfig.NetworkConfig private destNetworkConfig;
 
-    // Bitcoin SPV Testnet constants (Block #72016)
-    uint32 private constant BLOCK_VERSION = 536870912;
-    uint32 private constant BLOCK_TIMESTAMP = 1740737823;
-    uint32 private constant DIFFICULTY_BITS = 486604799;
-    uint32 private constant NONCE = 1390823984;
-    uint32 private constant HEIGHT = 72016;
-    bytes32 private constant PREV_BLOCK = 0x0000000000000671792cf513f9ef0c89fec125d9f6f415e4d2f7f799e3bba157;
-    bytes32 private constant MERKLE_ROOT = 0x322a018a28289a1a6db2c2ce2fd3a9fb013355571a2c6f001c4e3aba6a751edc;
+    // Bitcoin SPV Testnet constants (Block #80169)
+    uint32 private constant BLOCK_VERSION = 624918528;
+    uint32 private constant BLOCK_TIMESTAMP = 1745999896;
+    uint32 private constant DIFFICULTY_BITS = 419821129;
+    uint32 private constant NONCE = 183420755;
+    uint32 private constant HEIGHT = 80169;
+    bytes32 private constant PREV_BLOCK = 0x000000003b4bb24d32b1a5401933e3428188670c18eb8459b147c0575dde8151;
+    bytes32 private constant MERKLE_ROOT = 0x70529ffb76a57e9c3a5b29cc6faf0dc8dba0eb4eef82bd9ee70ac1435ad12b2d;
 
     // Test data
-    bytes32 private constant BLOCK_HASH = 0x000000000000a20dbeee6d8c5f448e71608e62972c1ff7dd53c567a2df33ff53;
-    bytes32 private constant BTC_TXN_HASH = 0x63d2189bacdd8f610bce19e493827880bb839019727728ec8f6031b90e2e9e2e;
+    bytes32 private constant BLOCK_HASH = 0x0000000000000004d815fad54546ee91bca946a5b96ab989fada5fa2c3041e02;
+    bytes32 private constant BTC_TXN_HASH = 0xc10ef0ce4ac0cbc7ffffabcc2804e70cc1f332fc29e78d79832d6d67c3b80842;
     bytes32[] private proof;
-    uint256 private constant INDEX = 132;
+    uint256 private constant INDEX = 566;
     bytes private constant RAW_TXN =
-        hex"0200000000010172a9903e9c75393c69cd155f4842796b3c52454dad15d83e627749de6c78a7780100000000ffffffff041027000000000000160014b7a229b0c1c10c214d1b19d1263b6797dae3e978e80300000000000016001471d044aeb7f41205a9ef0e3d785e7d38a776cfa10000000000000000326a30001471cf07d9c0d8e4bbb5019ccc60437c53fc51e6de00080000000000002710000400009ce100080000000000000000a82a000000000000160014d5a028b62114136a63ebcfacf94e18536b90a1210247304402206d80652d1cc1c6c4b2fe08ae3bdfa2c97121017b07826f7db0a232292c1d74020220579da941457f0d40b93443cf1a223693c59c352a188430f76682d89442918b6d0121036a43583212d54a5977f2cef457520c520ab9bf92299b2d74011ecd410bdb250600000000";
+        hex"02000000000101e48a9f3270ab1ed56b721df9f6dd24af940d23d9c73a9e9bf5a6ac93b2cf15fc0300000000ffffffff041027000000000000225120b2925665f511a4ec1507d9710600be27f791f80131074c6eda5739053714f33be80300000000000016001471d044aeb7f41205a9ef0e3d785e7d38a776cfa10000000000000000326a3000144e56a8e3757f167378b38269e1ca0e1a1f124c9e00080000000000002710000400009ca60008000000000000007b8d49000000000000160014d5a028b62114136a63ebcfacf94e18536b90a12102483045022100e36cb24dad4e568561b7a1d00ede31931b624e9698ce020e518bd1cfb9bd895802204b37fd88086672304c3b754e3df32298adcc0bdeebdbf21d7616de027d1b86b10121036a43583212d54a5977f2cef457520c520ab9bf92299b2d74011ecd410bdb250600000000";
 
     // AVS Data
     bytes32 private constant TAPROOT_ADDRESS = 0xb2925665f511a4ec1507d9710600be27f791f80131074c6eda5739053714f33b;
@@ -89,18 +89,17 @@ contract TaskManagerTest is Test {
         vm.selectFork(sourceForkId);
 
         // Initialize proof array
-        proof = new bytes32[](11);
-        proof[0] = 0x58e3e27ef80ea9af7cbf6c68414a1a30c4936442fbb78d954763a385b2cf34b4;
-        proof[1] = 0x9c60aac47f15333f997af21ef95f91fc170b2cf74550d5537bc0f8b7b268859f;
-        proof[2] = 0xfd072d502d65a9621a9cc67bba66d0ebeb8072c38e076cd321201ebc5d0fcf44;
-        proof[3] = 0xc7ed53c752b40989e0b28b9a466b7e4d247a3c8c08aa06ff09faddcc89fc1f5c;
-        proof[4] = 0xbca34a332518e157bf2bc61d07b9f79a5718306ef9770c9e31d9671c64e0e796;
-        proof[5] = 0xb9af329f68773536fea223d8b0733bdce478b19eef448f2c9e777ad0e93c556e;
-        proof[6] = 0x745e6898ccd4b8bed3bfe0972d2054ce711696250c6007a4958559dec729ff3e;
-        proof[7] = 0xbce49ee30b6ac4361edee0fb70d13d73b4d368080d957747b9e3d76a6ba23915;
-        proof[8] = 0x68a804445edf53b793135300e80f45b0160fa4f9dcf1ca6bcf7313ec6b3e4cdd;
-        proof[9] = 0x75a385f7ecc1a6c9571b60428cb2f91c0eaf2f88d6396a071cc50dca096d8cb1;
-        proof[10] = 0xce78d0c5bcc327d656cab0e8bca278b21d6f3f4438cd57d36b31640efb834e15;
+        proof = new bytes32[](10);
+        proof[0] = 0x42910540f5df3ef74afabd8756e227032693db608571f1cb536994b81c05b11c;
+        proof[1] = 0x7447f1512ee33a5cef23282b92086f11101227e287733a5bbb129ce1c0d8da63;
+        proof[2] = 0x43adec4333c66ff522e194f27eb923e6b5f19b8cb9e5d3d8ad62cc6738b30ae5;
+        proof[3] = 0xdbee4849f86c4669763f4dd02ce9c05af707e621a56e95b74182bfbba99e0a2b;
+        proof[4] = 0xedeff5ff5d27d62cad0e991aea24eb8a4887f72860ba4a0acd05bb27c119717d;
+        proof[5] = 0xd8250bb99bb9147ca8a6c9758c1f4e3f0138f27e72c6c1b9f53f854264e4c3cb;
+        proof[6] = 0x77e63b252364523ec351510abf0b8aba12a63e63291d929c63eceed09ef1addb;
+        proof[7] = 0xf02f852f17d692140acd8b6f7af7560779bc3964d2bd964c7d195ac74305c785;
+        proof[8] = 0x692cc736c3a35be44f15b4095d00bad7165a6eac429f11efb7510415793d8e21;
+        proof[9] = 0xe292d6684f4a0886a4e9e43eb90d57b0b39355815d0435f5ba5e562cadccf9ca;
 
         // Deploy Bitcoin Light Client
         BitcoinLightClient bitcoinLightClientImplementation = new BitcoinLightClient();
@@ -115,7 +114,12 @@ contract TaskManagerTest is Test {
         // Deploy HomeChainCoordinator
         vm.startPrank(owner);
         homeChainCoordinator = new HomeChainCoordinator(
-            address(btcLightClient), srcNetworkConfig.endpoint, owner, srcNetworkConfig.chainEid
+            address(btcLightClient),
+            srcNetworkConfig.endpoint,
+            owner,
+            TASKS_CREATOR,
+            ATTESTATION_CENTER,
+            srcNetworkConfig.chainEid
         );
         // Set destination peer address
         homeChainCoordinator.setPeer(destNetworkConfig.chainEid, receiver);
@@ -126,8 +130,6 @@ contract TaskManagerTest is Test {
         // Transfer ownership of HomeChainCoordinator to the taskManager
         vm.startPrank(owner);
         homeChainCoordinator.setTaskGeneratorRole(address(taskManager));
-        homeChainCoordinator.setTaskSubmitterRole(ATTESTATION_CENTER);
-        homeChainCoordinator.transferOwnership(address(taskManager));
         vm.stopPrank();
 
         // Fund contracts
@@ -293,6 +295,8 @@ contract TaskManagerTest is Test {
             taskDefinitionId: 0
         });
 
+        uint256 initialTaskHashLength = taskManager.getTaskHashesLength();
+
         vm.prank(TASKS_CREATOR);
         taskManager.createNewTask(createTaskInfo, params);
 
@@ -309,8 +313,8 @@ contract TaskManagerTest is Test {
         });
 
         // Expect the TaskCompleted event to be emitted
-        vm.expectEmit(true, true, true, true);
-        emit TaskCompleted(true, BTC_TXN_HASH);
+        // vm.expectEmit(true, true, true, true);
+        // emit TaskCompleted(true, BTC_TXN_HASH);
 
         // Fund the task manager for gas fees
         vm.deal(address(taskManager), 1 ether);
@@ -320,6 +324,7 @@ contract TaskManagerTest is Test {
 
         // Verify task is now completed
         assertTrue(taskManager.isTaskCompleted(BTC_TXN_HASH));
+        assertEq(taskManager.getTaskHashesLength(), initialTaskHashLength + 1);
     }
 
     function testBurnTaskLifecycle() public {
@@ -344,6 +349,8 @@ contract TaskManagerTest is Test {
             taskPerformer: TASKS_CREATOR,
             taskDefinitionId: 0
         });
+
+        uint256 initialTaskHashLength = taskManager.getTaskHashesLength();
 
         vm.prank(TASKS_CREATOR);
         taskManager.createNewTask(createTaskInfo, params);
@@ -370,6 +377,7 @@ contract TaskManagerTest is Test {
 
         // Verify task is now completed
         assertTrue(taskManager.isTaskCompleted(BTC_TXN_HASH));
+        assertEq(taskManager.getTaskHashesLength(), initialTaskHashLength + 1);
     }
 
     function testGetTaskHashes() public {

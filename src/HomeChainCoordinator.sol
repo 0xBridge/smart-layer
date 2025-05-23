@@ -23,17 +23,17 @@ import {Origin, IBaseChainCoordinator} from "./interfaces/IBaseChainCoordinator.
 contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable, IHomeChainCoordinator {
     // Errors
     error TxnAlreadyProcessed(bytes32 btcTxnHash);
-    error InvalidPSBTData();
     error InvalidAmount(uint256 amount);
+    error InvalidRequestFor(address receiver, bytes32 btcTxnHash);
+    error InvalidPSBTData();
     error InvalidSourceOrDestination();
-    error InvalidAddress(address receiver);
+    error InvalidAddress();
     error BitcoinTxnNotFound();
     error BitcoinTxnAndPSBTMismatch();
     error InvalidPeer();
     error WithdrawalFailed();
     error InvalidStatusUpdate();
     error InvalidRequest();
-    error InvalidTaprootAddress();
 
     struct NewTaskParams {
         bool isMintTxn; // Whether the transaction is a mint or burn
@@ -80,10 +80,19 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
      * @param owner_ Address of the contract owner
      * @param chainEid_ The endpoint ID of the current chain
      */
-    constructor(address lightClient_, address endpoint_, address owner_, uint32 chainEid_) OApp(endpoint_, owner_) {
+    constructor(
+        address lightClient_,
+        address endpoint_,
+        address owner_,
+        address taskGenerator_,
+        address taskSubmitter_,
+        uint32 chainEid_
+    ) OApp(endpoint_, owner_) {
         _lightClient = BitcoinLightClient(lightClient_);
         _chainEid = chainEid_;
         _setupRole(DEFAULT_ADMIN_ROLE, owner_);
+        _setTaskGeneratorRole(taskGenerator_);
+        _setTaskSubmitterRole(taskSubmitter_);
         _transferOwnership(owner_);
     }
 
@@ -124,7 +133,15 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
      * @dev Only callable by the contract owner
      */
     function setTaskSubmitterRole(address _account) external onlyOwner {
-        if (_account == address(0)) revert InvalidAddress(_account);
+        _setTaskSubmitterRole(_account);
+    }
+
+    /**
+     * @notice Internal function to set the task submitter role for a specific address
+     * @param _account The address to set the task submitter role for
+     */
+    function _setTaskSubmitterRole(address _account) internal {
+        if (_account == address(0)) revert InvalidAddress();
         _grantRole(TASK_SUBMITTER_ROLE, _account);
     }
 
@@ -134,7 +151,15 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
      * @dev Only callable by the contract owner
      */
     function setTaskGeneratorRole(address _account) external onlyOwner {
-        if (_account == address(0)) revert InvalidAddress(_account);
+        _setTaskGeneratorRole(_account);
+    }
+
+    /**
+     * @notice Sets the task generator role for a specific address
+     * @param _account The address to set the task generator role for
+     */
+    function _setTaskGeneratorRole(address _account) internal {
+        if (_account == address(0)) revert InvalidAddress();
         _grantRole(TASK_GENERATOR_ROLE, _account);
     }
 
@@ -345,7 +370,7 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
 
         // Validate receiver address
         if (metadata.receiverAddress == address(0)) {
-            revert InvalidAddress(metadata.receiverAddress);
+            revert InvalidAddress();
         }
     }
 
@@ -357,7 +382,7 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
      */
     function sendMessageFor(address _receiver, bytes32 _btcTxnHash) external payable whenNotPaused nonReentrant {
         if (_btcTxnHash_psbtData[_btcTxnHash].user != _receiver) {
-            revert InvalidAddress(_receiver); // This also ensures that the txn is already present
+            revert InvalidRequestFor(_receiver, _btcTxnHash); // This also implies that the txn is already present
         }
 
         // 1. Parse and get metadata from psbtData
