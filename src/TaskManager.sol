@@ -214,6 +214,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      */
     function isTaskExists(bytes32 _taskHash) public view returns (bool) {
         PSBTData memory task = _homeChainCoordinator.getPSBTDataForTxnHash(_taskHash);
+        console.logBytes(task.rawTxn);
         return task.rawTxn.length > 0;
     }
 

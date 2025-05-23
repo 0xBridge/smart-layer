@@ -460,6 +460,25 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
     }
 
     /**
+     * @notice Receives messages from LayerZero
+     * @param _origin The origin information of the message
+     * @param _guid The unique identifier for the message
+     * @param _message The message payload
+     * @param _executor The address executing the message
+     * @param _extraData Additional data for message processing
+     * @dev Only processes messages when contract is not paused
+     */
+    function lzReceive(
+        Origin calldata _origin,
+        bytes32 _guid,
+        bytes calldata _message,
+        address _executor,
+        bytes calldata _extraData
+    ) public payable virtual override whenNotPaused {
+        _lzReceive(_origin, _guid, _message, _executor, _extraData);
+    }
+
+    /**
      * @notice Internal function to receive messages from LayerZero
      * @param _origin The origin of the message
      * @param _guid The unique identifier for the message
@@ -489,7 +508,7 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
         (uint256 amount, address user, bytes memory rawTxn) = abi.decode(_message, (uint256, address, bytes));
 
         // 4. User should not be able to manipulate any existing _btcTxnHash_psbtData data (either mint or burn)
-        bytes32 burnKeccakHash = keccak256(rawTxn);
+        bytes32 burnKeccakHash = keccak256(rawTxn); // This is the keccak hash of the raw transaction of burn used as the key == btcTxnHash
         if (_btcTxnHash_psbtData[burnKeccakHash].rawTxn.length != 0) {
             revert InvalidRequest();
         }
