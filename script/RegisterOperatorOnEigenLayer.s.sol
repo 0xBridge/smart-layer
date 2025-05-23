@@ -12,7 +12,7 @@ interface IEigenLayerDelegationManager {
 
 contract RegisterOperatorOnEigenLayerScript is Script {
     // Contract address from the provided transaction
-    address private EIGEN_DELEGATION_MANAGER = 0xA44151489861Fe9e3055d95adC98FbD462B948e7; // TODO: Get from config
+    address private EIGEN_DELEGATION_MANAGER = 0xA44151489861Fe9e3055d95adC98FbD462B948e7;
 
     // Configuration parameters
     address private constant INIT_DELEGATION_APPROVER = address(0);

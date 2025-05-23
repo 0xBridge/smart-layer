@@ -17,15 +17,16 @@ function create_binding {
     rm -f $binding_dir/${contract}/binding.go
     abigen --bin=data/tmp.bin --abi=data/tmp.abi --pkg=contract${contract} --out=$binding_dir/${contract}/binding.go
     rm -rf ../data/tmp.abi ../data/tmp.bin
+    echo "generated bindings for" $contract
 }
 # avs extension and home chain coordinator
 rm -rf ../0xbridge-demo-avs/0xbridge-contracts/bindings*
 forge clean
 forge build
 
-avs_service_contracts="TaskManager HomeChainCoordinator"
+avs_service_contracts="TaskManager IAttestationCenter"
 for contract in $avs_service_contracts; do
-    create_binding . $contract ../0xbridge-demo-avs/0xbridge-contracts/bindings
+    create_binding ./ $contract ../0xbridge-demo-avs/0xbridge-contracts/bindings
 done
 
 # create_binding . ERC20Mock ./bindings

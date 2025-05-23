@@ -12,7 +12,7 @@ import {HelperConfig} from "./HelperConfig.s.sol";
  * @dev Submits new block headers to keep the SPV client up-to-date
  */
 contract PublishSPVClient is Script {
-    address private constant BTC_LIGHT_CLIENT = 0x7949780E6330FAB7b0067E179f42b013Be7cDd7B; // Replace with actual deployed address
+    address private constant BTC_LIGHT_CLIENT = 0xd7830646c943F58606a1B961ae537ccE3FFBfB76; // Replace with actual deployed address
     // Contract instance
     BitcoinLightClient internal _btcLightClient;
 
@@ -31,7 +31,7 @@ contract PublishSPVClient is Script {
      */
     function run() public {
         // Connect to the network where the BitcoinLightClient is deployed
-        string memory rpcUrl = vm.envString("AMOY_RPC_URL"); // Use the relevant network
+        string memory rpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL"); // Use the relevant network
         _forkId = vm.createSelectFork(rpcUrl);
 
         HelperConfig config = new HelperConfig();
@@ -45,7 +45,7 @@ contract PublishSPVClient is Script {
 
         // Get the latest block info for logging
         bytes32 latestHash = _btcLightClient.getLatestHeaderHash();
-        BitcoinUtils.BlockHeader memory latestHeader = _btcLightClient.getLatestCheckpoint();
+        BitcoinUtils.BlockHeader memory latestHeader = _btcLightClient.getLatestHeader();
         console.log("Current latest block height:", latestHeader.height);
         console.logBytes32(latestHash);
 
@@ -58,7 +58,6 @@ contract PublishSPVClient is Script {
             BLOCK_TIMESTAMP,
             DIFFICULTY_BITS,
             NONCE,
-            0, // Height is calculated by the contract
             PREV_BLOCK,
             MERKLE_ROOT,
             new bytes[](0) // No intermediate headers
@@ -117,7 +116,7 @@ contract PublishSPVClient is Script {
 
         // Get the updated latest block info
         bytes32 newLatestHash = _btcLightClient.getLatestHeaderHash();
-        BitcoinUtils.BlockHeader memory newLatestHeader = _btcLightClient.getLatestCheckpoint();
+        BitcoinUtils.BlockHeader memory newLatestHeader = _btcLightClient.getLatestHeader();
         console.log("New latest block height:", newLatestHeader.height);
         console.logBytes32(newLatestHash);
 

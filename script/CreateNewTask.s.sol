@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import {Script} from "forge-std/Script.sol";
 import {TaskManager} from "../src/TaskManager.sol";
 import {IAttestationCenter} from "../src/interfaces/IAttestationCenter.sol";
+import {HomeChainCoordinator} from "../src/HomeChainCoordinator.sol";
 
 /**
  * @title CreateTask
@@ -11,7 +12,7 @@ import {IAttestationCenter} from "../src/interfaces/IAttestationCenter.sol";
  */
 contract CreateTask is Script {
     // Constants
-    address internal constant TASK_MANAGER = 0x38D934791c86CE48AEb9132d1e215BE6C775B754;
+    address internal constant TASK_MANAGER = 0x193E4337379B597C7842bdc17bF1Cb2782b27762;
 
     // Bitcoin SPV Testnet constants (from test file)
     bytes32 internal constant MINT_BLOCK_HASH = 0x00000000ad4e9e95f8c6459a406accc761f78b2092b931a6d954f545dcc14e0d;
@@ -21,14 +22,14 @@ contract CreateTask is Script {
 
     // AVS Data (from test file)
     bytes32 internal constant TAPROOT_ADDRESS = 0xb2925665f511a4ec1507d9710600be27f791f80131074c6eda5739053714f33b;
-    bytes32 internal constant NETWORK_KEY = 0xb7a229b0c1c10c214d1b19d1263b6797dae3e978000000000000000000000000;
+    bytes32 internal constant NETWORK_KEY = 0x1a4b83276e5b4ddcf3f7f52615b35c39b013c94f58b941019ddf2be7b511568f;
 
     /**
      * @notice Main execution function
      * @dev Creates a task on the task manager
      */
     function run() external {
-        string memory rpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory rpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         vm.createSelectFork(rpcUrl);
 
         // Set up private keys and derive addresses
@@ -58,16 +59,35 @@ contract CreateTask is Script {
         vm.startBroadcast(privateKeyGenerator);
 
         // Create a task on the TaskManager
+        address taskPerformer = vm.addr(privateKeyGenerator);
+        bytes memory data = abi.encode(
+            true, // txnType
+            MINT_BTC_TXN_HASH, // Bitcoin txn hash / PSBT for burn by the user
+            MINT_BTC_TXN_HASH); // Actual Bitcoin mint txn hash
+            
+        IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
+            proofOfTask: "Random string",
+            data: data,
+            taskPerformer: taskPerformer,
+            taskDefinitionId: 0
+        });
+
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+            isMintTxn: true,
+            blockHash: MINT_BLOCK_HASH,
+            btcTxnHash: MINT_BTC_TXN_HASH,
+            proof: proof,
+            index: index,
+            rawTxn: MINT_RAW_TXN,
+            taprootAddress: TAPROOT_ADDRESS,
+            networkKey: NETWORK_KEY,
+            operators: operators
+        });
+
+        // Create new task on the TaskManager
         taskManager.createNewTask(
-            true, // _isMintTxn - set to true for mint transaction
-            MINT_BLOCK_HASH, // _blockHash
-            MINT_BTC_TXN_HASH, // _btcTxnHash
-            proof, // _proof
-            index, // _index
-            MINT_RAW_TXN, // _rawTxn
-            TAPROOT_ADDRESS, // _taprootAddress
-            NETWORK_KEY, // _networkKey
-            operators // _operators
+            taskInfo,
+            params
         );
 
         // Stop the broadcast

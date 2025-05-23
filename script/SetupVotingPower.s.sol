@@ -14,20 +14,20 @@ interface IStrategyManager {
 
 contract SetupVotingPowerScript is Script {
     // Holesky addresses
-    address private constant STAKED_ETH = 0x3F1c547b21f65e10480dE3ad8E19fAAC46C95034;
+    address private constant STAKED_ETH = 0x3F1c547b21f65e10480dE3ad8E19fAAC46C95034; // Needs to be replaced with the WETH address
     address private constant LIDO_REFERRAL_ADDRESS = 0x11d00000000000000000000000000000000011d0;
     address private constant EIGEN_STRATEGY_MANAGER = 0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6;
-    address private constant ST_ETH_STRATEGY = 0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3;
+    address private constant ST_ETH_STRATEGY = 0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3; // Needs to be replaced with the WETH strategy address
 
     // Configurable parameters
-    uint256 private constant ETH_AMOUNT_TO_STAKE = 0.01 ether; // NOTE: This should be changed to the desired amount
+    uint256 private constant ETH_AMOUNT_TO_STAKE = 10 ether; // NOTE: This should be changed to the desired amount
 
     function run() public {
         // Set up single chain
         string memory rpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         vm.createSelectFork(rpcUrl);
 
-        uint256 privateKey = vm.envUint("PRIVATE_KEY_ATTESTER1");
+        uint256 privateKey = vm.envUint("PRIVATE_KEY_ATTESTER5");
 
         // Start broadcasting transactions from the operator's wallet
         vm.startBroadcast(privateKey);

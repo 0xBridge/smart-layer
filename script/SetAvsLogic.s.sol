@@ -5,17 +5,14 @@ import {Script} from "forge-std/Script.sol";
 import {IAttestationCenter} from "../src/interfaces/IAttestationCenter.sol";
 
 /**
- * @title DistributeRewards
- * @notice Script to distribute rewards through the AttestationCenter
+ * @title SetAvsLogic
+ * @notice Script to set the AVS logic contract on the AttestationCenter
  * @dev Can only be called by the AVS governance owner
  */
-contract DistributeRewards is Script {
+contract SetAvsLogicScript is Script {
     // Constants
-    address internal constant ATTESTATION_CENTER = 0xf8858A9d9794C1A73272f21a7dB84471F491797F;
-
-    // Operators to reward to
-    uint256 internal constant FROM_OPERATOR_ID = 3;
-    uint256 internal constant TO_OPERATOR_ID = 4;
+    address internal constant ATTESTATION_CENTER = 0xEA40f823f46CB372Cf58C184a9Ee7ECCF0200f07;
+    address internal constant TASK_MANAGER = 0x5f5bdbbe7df9123b9E825157866F5Ac4B4b3Cd1E;
 
     /**
      * @notice Main execution function
@@ -35,7 +32,7 @@ contract DistributeRewards is Script {
         IAttestationCenter attestationCenter = IAttestationCenter(ATTESTATION_CENTER);
 
         // Call the requestBatchPayment function (can be called by avsGovernanceMultisigOwner only)
-        attestationCenter.requestBatchPayment(FROM_OPERATOR_ID, TO_OPERATOR_ID);
+        attestationCenter.setAvsLogic(TASK_MANAGER);
 
         // Stop the broadcast
         vm.stopBroadcast();
