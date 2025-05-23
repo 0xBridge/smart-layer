@@ -67,7 +67,7 @@ contract TaskManagerTest is Test {
         HelperConfig config = new HelperConfig();
         srcNetworkConfig = config.getConfig();
 
-        string memory destRpcUrl = vm.envString("SEPOLIA_RPC_URL");
+        string memory destRpcUrl = vm.envString("BSC_TESTNET_RPC_URL");
         destForkId = vm.createSelectFork(destRpcUrl);
         HelperConfig destConfig = new HelperConfig();
         destNetworkConfig = destConfig.getConfig();
@@ -90,16 +90,16 @@ contract TaskManagerTest is Test {
 
         // Initialize proof array
         proof = new bytes32[](10);
-        proof[0] = 0x42910540f5df3ef74afabd8756e227032693db608571f1cb536994b81c05b11c;
-        proof[1] = 0x7447f1512ee33a5cef23282b92086f11101227e287733a5bbb129ce1c0d8da63;
-        proof[2] = 0x43adec4333c66ff522e194f27eb923e6b5f19b8cb9e5d3d8ad62cc6738b30ae5;
-        proof[3] = 0xdbee4849f86c4669763f4dd02ce9c05af707e621a56e95b74182bfbba99e0a2b;
-        proof[4] = 0xedeff5ff5d27d62cad0e991aea24eb8a4887f72860ba4a0acd05bb27c119717d;
-        proof[5] = 0xd8250bb99bb9147ca8a6c9758c1f4e3f0138f27e72c6c1b9f53f854264e4c3cb;
-        proof[6] = 0x77e63b252364523ec351510abf0b8aba12a63e63291d929c63eceed09ef1addb;
-        proof[7] = 0xf02f852f17d692140acd8b6f7af7560779bc3964d2bd964c7d195ac74305c785;
-        proof[8] = 0x692cc736c3a35be44f15b4095d00bad7165a6eac429f11efb7510415793d8e21;
-        proof[9] = 0xe292d6684f4a0886a4e9e43eb90d57b0b39355815d0435f5ba5e562cadccf9ca;
+        proof[0] = 0x1cb1051cb8946953cbf1718560db93260327e25687bdfa4af73edff540059142;
+        proof[1] = 0x63dad8c0e19c12bb5b3a7387e2271210116f08922b2823ef5c3ae32e51f14774;
+        proof[2] = 0xe50ab33867cc62add8d3e5b98c9bf1b5e623b97ef294e122f56fc63343ecad43;
+        proof[3] = 0x2b0a9ea9bbbf8241b7956ea521e607f75ac0e92cd04d3f7669466cf84948eedb;
+        proof[4] = 0x7d7119c127bb05cd0a4aba6028f787488aeb24ea1a990ead2cd6275dfff5efed;
+        proof[5] = 0xcbc3e46442853ff5b9c1c6727ef238013f4e1f8c75c9a6a87c14b99bb90b25d8;
+        proof[6] = 0xdbadf19ed0eeec639c921d29633ea612ba8a0bbf0a5151c33e526423253be677;
+        proof[7] = 0x85c70543c75a197d4c96bdd26439bc790756f77a6f8bcd0a1492d6172f852ff0;
+        proof[8] = 0x218e3d79150451b7ef119f42ac6e5a16d7ba005d09b4154fe45ba3c336c72c69;
+        proof[9] = 0xcaf9ccad2c565ebaf535045d815593b3b0570db93ee4e9a486084a4f68d692e2;
 
         // Deploy Bitcoin Light Client
         BitcoinLightClient bitcoinLightClientImplementation = new BitcoinLightClient();
@@ -114,12 +114,7 @@ contract TaskManagerTest is Test {
         // Deploy HomeChainCoordinator
         vm.startPrank(owner);
         homeChainCoordinator = new HomeChainCoordinator(
-            address(btcLightClient),
-            srcNetworkConfig.endpoint,
-            owner,
-            TASKS_CREATOR,
-            ATTESTATION_CENTER,
-            srcNetworkConfig.chainEid
+            address(btcLightClient), srcNetworkConfig.endpoint, owner, srcNetworkConfig.chainEid
         );
         // Set destination peer address
         homeChainCoordinator.setPeer(destNetworkConfig.chainEid, receiver);
@@ -130,10 +125,11 @@ contract TaskManagerTest is Test {
         // Transfer ownership of HomeChainCoordinator to the taskManager
         vm.startPrank(owner);
         homeChainCoordinator.setTaskGeneratorRole(address(taskManager));
+        homeChainCoordinator.setTaskSubmitterRole(address(taskManager));
         vm.stopPrank();
 
         // Fund contracts
-        vm.deal(owner, 100 ether);
+        vm.deal(owner, 10 ether);
         vm.deal(address(taskManager), 10 ether);
         // vm.deal(address(homeChainCoordinator), 10 ether);
     }
@@ -274,6 +270,7 @@ contract TaskManagerTest is Test {
     }
 
     function testMintTaskLifecycle() public {
+        console.log("Starting testMintTaskLifecycle");
         // Create task
         HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
             isMintTxn: true,
@@ -296,13 +293,20 @@ contract TaskManagerTest is Test {
         });
 
         uint256 initialTaskHashLength = taskManager.getTaskHashesLength();
+        console.log("Initial task hash length: %s", initialTaskHashLength);
 
         vm.prank(TASKS_CREATOR);
         taskManager.createNewTask(createTaskInfo, params);
+        console.log("Called createNewTask");
 
         // Verify task is valid but not completed
-        assertTrue(taskManager.isTaskExists(BTC_TXN_HASH));
-        assertFalse(taskManager.isTaskCompleted(BTC_TXN_HASH));
+        bool exists = taskManager.isTaskExists(BTC_TXN_HASH);
+        bool completed = taskManager.isTaskCompleted(BTC_TXN_HASH);
+        console.log("Task exists: %s", exists);
+        console.log("Task completed: %s", completed);
+        assertTrue(exists);
+        assertFalse(completed);
+        console.log("Assertions after createNewTask passed");
 
         // Simulate task completion through attestation center
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
@@ -312,19 +316,22 @@ contract TaskManagerTest is Test {
             taskDefinitionId: 0
         });
 
-        // Expect the TaskCompleted event to be emitted
-        // vm.expectEmit(true, true, true, true);
-        // emit TaskCompleted(true, BTC_TXN_HASH);
-
         // Fund the task manager for gas fees
-        vm.deal(address(taskManager), 1 ether);
+        vm.deal(address(taskManager), 10 ether);
+        console.log("Funded taskManager with 10 ether");
 
         vm.prank(ATTESTATION_CENTER);
         taskManager.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
+        console.log("Called afterTaskSubmission");
 
         // Verify task is now completed
-        assertTrue(taskManager.isTaskCompleted(BTC_TXN_HASH));
-        assertEq(taskManager.getTaskHashesLength(), initialTaskHashLength + 1);
+        bool completedAfter = taskManager.isTaskCompleted(BTC_TXN_HASH);
+        uint256 finalTaskHashLength = taskManager.getTaskHashesLength();
+        console.log("Task completed after: %s", completedAfter);
+        console.log("Final task hash length: %s", finalTaskHashLength);
+        assertTrue(completedAfter);
+        assertEq(finalTaskHashLength, initialTaskHashLength + 1);
+        console.log("testMintTaskLifecycle finished successfully");
     }
 
     function testBurnTaskLifecycle() public {

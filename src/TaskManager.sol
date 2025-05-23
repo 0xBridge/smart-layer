@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import {console} from "forge-std/console.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -28,6 +29,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     error CallerNotAttestationCenter();
     error CallerNotTaskGenerator();
     error WithdrawalFailed();
+    error NotEnoughGasFee(uint256 gasFee);
 
     bytes32[] internal _taskHashes;
     mapping(bytes32 _taskHash => bool) internal _completedTasks;
@@ -158,6 +160,9 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
             PSBTData memory psbtData = _homeChainCoordinator.getPSBTDataForTxnHash(btcTxnHash);
 
             (uint256 nativeFee,) = quote(btcTxnHash, psbtData.rawTxn, false);
+            console.log("nativeFee", nativeFee);
+            // Check if the fee is enough
+            if (nativeFee > address(this).balance) revert NotEnoughGasFee(nativeFee);
             _homeChainCoordinator.sendMessage{value: nativeFee}(btcTxnHash);
         } else {
             _homeChainCoordinator.updateBurnStatus(btcTxnHash, actualTxnHash);

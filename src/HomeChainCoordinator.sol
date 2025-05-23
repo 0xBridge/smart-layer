@@ -80,19 +80,10 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
      * @param owner_ Address of the contract owner
      * @param chainEid_ The endpoint ID of the current chain
      */
-    constructor(
-        address lightClient_,
-        address endpoint_,
-        address owner_,
-        address taskGenerator_,
-        address taskSubmitter_,
-        uint32 chainEid_
-    ) OApp(endpoint_, owner_) {
+    constructor(address lightClient_, address endpoint_, address owner_, uint32 chainEid_) OApp(endpoint_, owner_) {
         _lightClient = BitcoinLightClient(lightClient_);
         _chainEid = chainEid_;
         _setupRole(DEFAULT_ADMIN_ROLE, owner_);
-        _setTaskGeneratorRole(taskGenerator_);
-        _setTaskSubmitterRole(taskSubmitter_);
         _transferOwnership(owner_);
     }
 
@@ -228,6 +219,7 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
             psbtData.operators = params.operators;
         }
         _btcTxnHash_psbtData[params.btcTxnHash] = psbtData;
+        console.log("Stored PSBT data for transaction hash:");
         emit MessageCreated(params.isMintTxn, params.blockHash, params.btcTxnHash);
     }
 

@@ -144,7 +144,7 @@ contract HomeChainCoordinatorTest is Test {
 
         vm.startPrank(owner);
         homeChainCoordinator = new HomeChainCoordinator(
-            address(btcLightClient), srcNetworkConfig.endpoint, owner, owner, owner, srcNetworkConfig.chainEid
+            address(btcLightClient), srcNetworkConfig.endpoint, owner, srcNetworkConfig.chainEid
         );
         homeChainCoordinator.setTaskGeneratorRole(owner);
         homeChainCoordinator.setTaskSubmitterRole(owner);
