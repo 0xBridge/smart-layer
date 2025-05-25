@@ -19,7 +19,7 @@ contract DeployEBTC is Script {
      */
     function run() external returns (address proxy_, address implementation_) {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address minter = vm.envAddress("ADMIN_ADDRESS");
+        address minter = vm.addr(deployerPrivateKey);
 
         vm.startBroadcast(deployerPrivateKey);
 

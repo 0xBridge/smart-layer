@@ -242,18 +242,13 @@ contract HomeChainCoordinatorTest is Test {
         vm.deal(address(BTC_RECEIVER), 10000 ether); // This is 10000 native tokens on the destination chain (BSC Testnet)
 
         uint256 intialBalance = eBTCToken.balanceOf(BTC_RECEIVER);
-        console.log("Initial eBTC balance of the BTC_RECEIVER: ", intialBalance);
-
         vm.recordLogs();
         vm.startPrank(BTC_RECEIVER);
         eBTCToken.approve(address(baseChainCoordinator), BTC_AMOUNT);
         bytes32 keccakTxnHash = keccak256(PARTIALLY_SIGNED_RAW_TXN_BTC);
-        console.logBytes32(keccakTxnHash);
         bytes memory newPayload = abi.encode(BTC_AMOUNT, BTC_RECEIVER, PARTIALLY_SIGNED_RAW_TXN_BTC);
         (uint256 burnMessageRelayerFee,) = baseChainCoordinator.quote(srcNetworkConfig.chainEid, newPayload, false);
-        console.log("Burn message relayer fee: ", burnMessageRelayerFee);
         baseChainCoordinator.burnAndUnlock{value: burnMessageRelayerFee * 2}(PARTIALLY_SIGNED_RAW_TXN_BTC, BTC_AMOUNT); // TODO: Check if the fee is correct
-        console.log("Burned eBTC amount: ", BTC_AMOUNT);
         vm.stopPrank();
 
         // bytes32[] memory burnProof = new bytes32[](10);
@@ -326,13 +321,11 @@ contract HomeChainCoordinatorTest is Test {
         // The gas used by the lzReceive call has been measured above.
         // The vm.estimateGas cheatcode is not available in Forge Std.
         // The abi.encodeWithSignature call for calldata is not needed for this gas measurement method.
-        console.log("Gas used by lzReceive call: ", gasUsedByLzReceiveCall);
 
         vm.selectFork(destForkId);
         // Get the options value based on the gas used
         uint128 higherGasUsedByLzReceiveCall = uint128(gasUsedByLzReceiveCall * 2);
         bytes memory options =
             OptionsBuilder.addExecutorLzReceiveOption(abi.encodePacked(uint16(3)), higherGasUsedByLzReceiveCall, 0);
-        console.logBytes(options);
     }
 }

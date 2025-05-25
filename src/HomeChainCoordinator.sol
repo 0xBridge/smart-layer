@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {console} from "forge-std/console.sol";
 import {OApp, Origin, MessagingFee, MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
@@ -219,7 +218,6 @@ contract HomeChainCoordinator is OApp, AccessControl, ReentrancyGuard, Pausable,
             psbtData.operators = params.operators;
         }
         _btcTxnHash_psbtData[params.btcTxnHash] = psbtData;
-        console.log("Stored PSBT data for transaction hash:");
         emit MessageCreated(params.isMintTxn, params.blockHash, params.btcTxnHash);
     }
 

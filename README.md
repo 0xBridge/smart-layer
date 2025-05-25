@@ -199,13 +199,13 @@ This section provides an overview of the core smart contracts within the 0xBridg
   - `constructor(...)`: Initializes with owner, task creator, Attestation Center, and `HomeChainCoordinator` addresses.
   - `setTaskCreator(...)`: Allows the owner to update the authorized task creator address.
   - `createNewTask(...)`: Called by the `_taskCreator`. It receives all necessary data for AVS verification (block details, tx details, proof, raw transaction, AVS details). It calls `_homeChainCoordinator.storeMessage()` to persist this data and adds the `_btcTxnHash` to its internal list (`_taskHashes`). This function essentially registers the verification request.
-  - `beforeTaskSubmission(...)`: Hook called by the `_attestationCenter` _before_ formally accepting a task submission from an operator/aggregator. It performs basic checks: task must be approved, exist (`isTaskExists`), and not already completed (`isTaskCompleted`).
+  - `beforeTaskSubmission(...)`: Hook called by the `_attestationCenter` _before_ formally accepting a task submission from an operator/aggregator. It performs basic checks: task must be approved, exist (`doesTaskExist`), and not already completed (`isTaskCompleted`).
   - `afterTaskSubmission(...)`: Hook called by the `_attestationCenter` _after_ a task has been successfully verified and attested to by the AVS.
     - It decodes the task details (isMint, btcTxnHash, actualTxnHash for burns).
     - Marks the task as completed (`_completedTasks[btcTxnHash] = true`).
     - **Mint Case:** If `isMintTxn` is true, it retrieves the full task data from `HomeChainCoordinator`, quotes the LayerZero fee, and calls `_homeChainCoordinator.sendMessage()` to trigger the minting process on the `BaseChainCoordinator`.
     - **Burn Case:** If `isMintTxn` is false, it calls `_homeChainCoordinator.updateBurnStatus()` with the actual Bitcoin transaction hash (`actualTxnHash`) provided by the AVS, confirming the burn was successful on the Bitcoin side.
-  - `isTaskCompleted(...)`, `isTaskExists(...)`: View functions to check the status and existence of tasks based on data in `_completedTasks` and `HomeChainCoordinator`.
+  - `isTaskCompleted(...)`, `doesTaskExist(...)`: View functions to check the status and existence of tasks based on data in `_completedTasks` and `HomeChainCoordinator`.
   - `getTaskData(...)`: Retrieves task data directly from the `HomeChainCoordinator`.
   - `getTaskHashes(...)`, `getTaskHashesLength()`: Provide access to the list of task hashes created.
 

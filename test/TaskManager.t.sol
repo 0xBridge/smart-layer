@@ -186,7 +186,7 @@ contract TaskManagerTest is Test {
         assertEq(taskManager.getTaskHashesLength(), initialTaskHashLength + 1);
 
         // Assert that the task exists
-        assertTrue(taskManager.isTaskExists(BTC_TXN_HASH));
+        assertTrue(taskManager.doesTaskExist(BTC_TXN_HASH));
 
         // Assert that the task is not completed yet
         assertFalse(taskManager.isTaskCompleted(BTC_TXN_HASH));
@@ -299,7 +299,7 @@ contract TaskManagerTest is Test {
         taskManager.createNewTask(createTaskInfo, params);
 
         // Verify task is valid but not completed
-        bool exists = taskManager.isTaskExists(BTC_TXN_HASH);
+        bool exists = taskManager.doesTaskExist(BTC_TXN_HASH);
         bool completed = taskManager.isTaskCompleted(BTC_TXN_HASH);
         assertTrue(exists);
         assertFalse(completed);
@@ -327,25 +327,18 @@ contract TaskManagerTest is Test {
 
     function testBurnTaskLifecycle() public {
         bytes memory _message = abi.encode(eBTC_AMOUNT, USER, RAW_TXN);
-        // This is a mock function to simulate the behavior of the LayerZero endpoint
-        // In a real scenario, this would be handled by the LayerZero protocol
-
         bytes32 _guid = keccak256(_message); // Random GUID for the test
-        // Create the Origin struct
         Origin memory _origin = Origin({
             srcEid: destNetworkConfig.chainEid,
             sender: bytes32(uint256(uint160(address(baseChainCoordinator)))),
             nonce: 0
         });
-        // Set the _extraData to an empty bytes array
         bytes memory _extraData = new bytes(0);
 
         vm.prank(srcNetworkConfig.endpoint);
         homeChainCoordinator.lzReceive(_origin, _guid, _message, destNetworkConfig.endpoint, _extraData);
 
-        // Create a burn task
         bytes32[] memory burnProof = new bytes32[](0);
-        // Create task params struct
         bytes32 keccakBurnHash = keccak256(RAW_TXN);
         HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
             isMintTxn: false,
@@ -359,7 +352,6 @@ contract TaskManagerTest is Test {
             operators: OPERATORS
         });
 
-        // Create TaskInfo struct
         IAttestationCenter.TaskInfo memory createTaskInfo = IAttestationCenter.TaskInfo({
             proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
             data: abi.encode(false, keccakBurnHash, keccakBurnHash),
@@ -372,13 +364,11 @@ contract TaskManagerTest is Test {
         vm.prank(TASKS_CREATOR);
         taskManager.createNewTask(createTaskInfo, params);
 
-        // Verify task is valid but not completed
-        bool exists = taskManager.isTaskExists(keccakBurnHash);
+        bool exists = taskManager.doesTaskExist(keccakBurnHash);
         bool completed = taskManager.isTaskCompleted(keccakBurnHash);
         assertTrue(exists);
         assertFalse(completed);
 
-        // Simulate task completion through attestation center
         IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
             proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
             data: abi.encode(false, keccakBurnHash, BTC_TXN_HASH),
@@ -386,14 +376,12 @@ contract TaskManagerTest is Test {
             taskDefinitionId: 0
         });
 
-        // Expect the TaskCompleted event to be emitted
         vm.expectEmit(true, true, true, true);
         emit TaskCompleted(false, keccakBurnHash);
 
         vm.prank(ATTESTATION_CENTER);
         taskManager.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
 
-        // Verify task is now completed
         bool completedAfter = taskManager.isTaskCompleted(keccakBurnHash);
         uint256 finalTaskHashLength = taskManager.getTaskHashesLength();
         assertTrue(completedAfter);
@@ -464,6 +452,162 @@ contract TaskManagerTest is Test {
 
         assertEq(address(owner).balance, initialBalance + contractBalance);
         assertEq(address(taskManager).balance, 0);
+    }
+
+    function testCannotCreateTaskWhenPaused() public {
+        // Pause the contract
+        vm.prank(owner);
+        taskManager.pause();
+
+        // Prepare task params and info
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+            isMintTxn: true,
+            blockHash: BLOCK_HASH,
+            btcTxnHash: BTC_TXN_HASH,
+            proof: proof,
+            index: INDEX,
+            rawTxn: RAW_TXN,
+            taprootAddress: TAPROOT_ADDRESS,
+            networkKey: NETWORK_KEY,
+            operators: OPERATORS
+        });
+        IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
+            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
+            data: abi.encode(true, BTC_TXN_HASH, BTC_TXN_HASH),
+            taskPerformer: TASKS_CREATOR,
+            taskDefinitionId: 0
+        });
+
+        // Should revert when paused
+        vm.prank(TASKS_CREATOR);
+        vm.expectRevert("Pausable: paused");
+        taskManager.createNewTask(taskInfo, params);
+    }
+
+    function testCannotRespondToTaskWhenPaused() public {
+        // Create a task first
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+            isMintTxn: true,
+            blockHash: BLOCK_HASH,
+            btcTxnHash: BTC_TXN_HASH,
+            proof: proof,
+            index: INDEX,
+            rawTxn: RAW_TXN,
+            taprootAddress: TAPROOT_ADDRESS,
+            networkKey: NETWORK_KEY,
+            operators: OPERATORS
+        });
+        IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
+            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
+            data: abi.encode(true, BTC_TXN_HASH, BTC_TXN_HASH),
+            taskPerformer: TASKS_CREATOR,
+            taskDefinitionId: 0
+        });
+        vm.prank(TASKS_CREATOR);
+        taskManager.createNewTask(taskInfo, params);
+
+        // Pause the contract
+        vm.prank(owner);
+        taskManager.pause();
+
+        // Should revert when paused
+        vm.prank(ATTESTATION_CENTER);
+        vm.expectRevert("Pausable: paused");
+        taskManager.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
+    }
+
+    function testCantCreateSameTaskTwice() public {
+        // Prepare task params and info
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+            isMintTxn: true,
+            blockHash: BLOCK_HASH,
+            btcTxnHash: BTC_TXN_HASH,
+            proof: proof,
+            index: INDEX,
+            rawTxn: RAW_TXN,
+            taprootAddress: TAPROOT_ADDRESS,
+            networkKey: NETWORK_KEY,
+            operators: OPERATORS
+        });
+
+        IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
+            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
+            data: abi.encode(true, BTC_TXN_HASH, BTC_TXN_HASH),
+            taskPerformer: TASKS_CREATOR,
+            taskDefinitionId: 0
+        });
+
+        vm.prank(TASKS_CREATOR);
+        taskManager.createNewTask(taskInfo, params);
+
+        vm.prank(TASKS_CREATOR);
+        vm.expectRevert(abi.encodeWithSelector(TaskManager.InvalidTask.selector, params.btcTxnHash));
+        taskManager.createNewTask(taskInfo, params);
+    }
+
+    function testCannotRespondToTaskTwice() public {
+        // Prepare task params and info
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+            isMintTxn: true,
+            blockHash: BLOCK_HASH,
+            btcTxnHash: BTC_TXN_HASH,
+            proof: proof,
+            index: INDEX,
+            rawTxn: RAW_TXN,
+            taprootAddress: TAPROOT_ADDRESS,
+            networkKey: NETWORK_KEY,
+            operators: OPERATORS
+        });
+        IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
+            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
+            data: abi.encode(true, BTC_TXN_HASH, BTC_TXN_HASH),
+            taskPerformer: TASKS_CREATOR,
+            taskDefinitionId: 0
+        });
+        vm.prank(TASKS_CREATOR);
+        taskManager.createNewTask(taskInfo, params);
+
+        // First response (should succeed)
+        vm.startPrank(ATTESTATION_CENTER);
+        taskManager.beforeTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
+        taskManager.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
+
+        // Second response (should revert)
+        vm.expectRevert(TaskManager.TaskAlreadyCompleted.selector);
+        taskManager.beforeTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
+        taskManager.afterTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
+    }
+
+    function testCannotBeforeTaskSubmissionWhenPaused() public {
+        // Create a task first
+        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
+            isMintTxn: true,
+            blockHash: BLOCK_HASH,
+            btcTxnHash: BTC_TXN_HASH,
+            proof: proof,
+            index: INDEX,
+            rawTxn: RAW_TXN,
+            taprootAddress: TAPROOT_ADDRESS,
+            networkKey: NETWORK_KEY,
+            operators: OPERATORS
+        });
+        IAttestationCenter.TaskInfo memory taskInfo = IAttestationCenter.TaskInfo({
+            proofOfTask: "QmWX8fknscwu1r7rGRgQuyqCEBhcsfHweNULMEc3vzpUjP",
+            data: abi.encode(true, BTC_TXN_HASH, BTC_TXN_HASH),
+            taskPerformer: TASKS_CREATOR,
+            taskDefinitionId: 0
+        });
+        vm.prank(TASKS_CREATOR);
+        taskManager.createNewTask(taskInfo, params);
+
+        // Pause the contract
+        vm.prank(owner);
+        taskManager.pause();
+
+        // Should revert when paused
+        vm.prank(ATTESTATION_CENTER);
+        vm.expectRevert("Pausable: paused");
+        taskManager.beforeTaskSubmission(taskInfo, true, "", [uint256(0), uint256(0)], new uint256[](0));
     }
 
     receive() external payable {}
