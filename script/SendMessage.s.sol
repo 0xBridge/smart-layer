@@ -38,7 +38,7 @@ contract SendMessageScript is Script {
     function run() public {
         uint256 aggregatorPrivateKey = vm.envUint("AGGREGATOR_PRIVATE_KEY");
 
-        string memory srcRpcUrl = vm.envString("AMOY_RPC_URL");
+        string memory srcRpcUrl = vm.envString("HOLESKY_TESTNET_RPC_URL");
         vm.createSelectFork(srcRpcUrl);
 
         vm.startBroadcast(aggregatorPrivateKey);

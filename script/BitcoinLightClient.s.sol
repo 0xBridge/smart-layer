@@ -19,7 +19,7 @@ contract DeployBitcoinLightClient is Script {
      */
     function run() external returns (address proxy_, address implementation_) {
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        address admin = vm.envAddress("ADMIN_ADDRESS");
+        address admin = vm.addr(deployerPrivateKey);
 
         // Bitcoin block header #878349: https://btcscan.org/block/000000000000000000023469320004d4838dc630ff7be3094b6f69c224ff0139
         uint32 version = 536879104;

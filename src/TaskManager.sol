@@ -28,9 +28,10 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     error CallerNotAttestationCenter();
     error CallerNotTaskGenerator();
     error WithdrawalFailed();
+    error NotEnoughGasFee(uint256 gasFee);
 
     bytes32[] internal _taskHashes;
-    mapping(bytes32 _taskHash => bool) internal _completedTasks;
+    mapping(bytes32 => bool) internal _completedTasks;
 
     address internal _taskCreator;
     address internal immutable _attestationCenter;
@@ -38,8 +39,9 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
 
     // Events
     event TaskCreatorUpdated(address oldTaskCreator, address newTaskCreator);
-    event NewTaskCreated(bytes32 indexed btcTxnHash);
+    event NewTaskCreated(IAttestationCenter.TaskInfo taskInfo, bytes32 indexed btcTxnHash);
     event TaskCompleted(bool indexed isMintTxn, bytes32 indexed btcTxnHash);
+    event TaskUpdated(IAttestationCenter.TaskInfo taskInfo, bytes32 indexed btcTxnHash);
 
     /**
      * @notice Ensures the caller is the attestation center
@@ -88,46 +90,41 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
     }
 
     /**
-     * @notice Creates a new task for verification
-     * @param _isMintTxn Whether the task is a mint (1) or burn (0)
-     * @param _blockHash The hash of the Bitcoin block
-     * @param _btcTxnHash The hash of the Bitcoin transaction
-     * @param _proof The merkle proof for transaction verification
-     * @param _index The index of the transaction in the block
-     * @param _rawTxn The PSBT data to be processed
-     * @param _taprootAddress The taproot address where the btc will be getting locked
-     * @param _networkKey The network key for the AVS created from the participated operators
-     * @param _operators The addresses of the operators for the network key creation
+     * @notice Creates a new task to be picked up the operators
+     * @param _taskInfo The task information struct
+     * @param params The parameters for the new task
      * @dev Only the authorized taskCreator can create new tasks
      */
     function createNewTask(
-        bool _isMintTxn,
-        bytes32 _blockHash,
-        bytes32 _btcTxnHash,
-        bytes32[] calldata _proof,
-        uint256 _index,
-        bytes calldata _rawTxn,
-        bytes32 _taprootAddress,
-        bytes32 _networkKey,
-        address[] calldata _operators
-    ) external onlyTaskCreator {
-        // Create the struct parameter for storeMessage
-        HomeChainCoordinator.NewTaskParams memory params = HomeChainCoordinator.NewTaskParams({
-            isMintTxn: _isMintTxn,
-            blockHash: _blockHash,
-            btcTxnHash: _btcTxnHash,
-            proof: _proof,
-            index: _index,
-            rawTxn: _rawTxn,
-            taprootAddress: _taprootAddress,
-            networkKey: _networkKey,
-            operators: _operators
-        });
-
+        IAttestationCenter.TaskInfo calldata _taskInfo,
+        HomeChainCoordinator.NewTaskParams calldata params
+    ) external whenNotPaused onlyTaskCreator {
+        if (_taskInfo.taskPerformer != msg.sender) revert CallerNotTaskGenerator();
+        if (_homeChainCoordinator.getPSBTDataForTxnHash(params.btcTxnHash).rawTxn.length > 0 && params.isMintTxn) {
+            revert InvalidTask(params.btcTxnHash);
+        }
         _homeChainCoordinator.storeMessage(params);
-        _taskHashes.push(_btcTxnHash);
+        _taskHashes.push(params.btcTxnHash);
 
-        emit NewTaskCreated(_btcTxnHash);
+        emit NewTaskCreated(_taskInfo, params.btcTxnHash);
+    }
+
+    /**
+     * @notice Updates an existing task
+     * @param _taskInfo The task information struct
+     * @param params The parameters for the new task
+     * @dev Only the authorized taskCreator can create new tasks
+     */
+    function updateExistingTask(
+        bytes32 _taskHash,
+        IAttestationCenter.TaskInfo calldata _taskInfo,
+        HomeChainCoordinator.NewTaskParams calldata params
+    ) external whenNotPaused onlyTaskCreator {
+        if (_taskInfo.taskPerformer != msg.sender) revert CallerNotTaskGenerator();
+        _homeChainCoordinator.storeMessage(params);
+        _taskHashes.push(params.btcTxnHash);
+
+        emit TaskUpdated(_taskInfo, params.btcTxnHash);
     }
 
     /**
@@ -145,13 +142,14 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         bytes calldata,
         uint256[2] calldata,
         uint256[] calldata
-    ) external view onlyAttestationCenter {
+    ) external view whenNotPaused onlyAttestationCenter {
         // Decode task hash from taskInfo data
-        (bool isMintTxn, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
+        (bool isMintTxn, bytes32 btcTxnHash, bytes32 actualTxnHash) =
+            abi.decode(_taskInfo.data, (bool, bytes32, bytes32));
 
         // Check that the task is valid, hasn't been responsed yet
         if (!_isApproved) revert TaskNotApproved();
-        if (!isTaskExists(btcTxnHash)) revert InvalidTask(btcTxnHash);
+        if (!doesTaskExist(btcTxnHash)) revert InvalidTask(btcTxnHash);
         if (isTaskCompleted(btcTxnHash)) revert TaskAlreadyCompleted();
     }
 
@@ -170,9 +168,10 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
         bytes calldata,
         uint256[2] calldata,
         uint256[] calldata
-    ) external onlyAttestationCenter {
+    ) external whenNotPaused onlyAttestationCenter {
         // Decode task hash (btcTxnHash) from taskInfo data
-        (bool isMintTxn, bytes32 btcTxnHash) = abi.decode(_taskInfo.data, (bool, bytes32));
+        (bool isMintTxn, bytes32 btcTxnHash, bytes32 actualTxnHash) =
+            abi.decode(_taskInfo.data, (bool, bytes32, bytes32));
 
         // Mark task as completed
         _completedTasks[btcTxnHash] = true;
@@ -182,9 +181,11 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
             PSBTData memory psbtData = _homeChainCoordinator.getPSBTDataForTxnHash(btcTxnHash);
 
             (uint256 nativeFee,) = quote(btcTxnHash, psbtData.rawTxn, false);
+            // Check if the fee is enough
+            if (nativeFee > address(this).balance) revert NotEnoughGasFee(nativeFee);
             _homeChainCoordinator.sendMessage{value: nativeFee}(btcTxnHash);
         } else {
-            _homeChainCoordinator.updateBurnStatus(btcTxnHash);
+            _homeChainCoordinator.updateBurnStatus(btcTxnHash, actualTxnHash);
         }
 
         // emitting event
@@ -231,7 +232,7 @@ contract TaskManager is Ownable, Pausable, ReentrancyGuard, IAvsLogic {
      * @param _taskHash The task hash to check
      * @return True if task exists and is valid
      */
-    function isTaskExists(bytes32 _taskHash) public view returns (bool) {
+    function doesTaskExist(bytes32 _taskHash) public view returns (bool) {
         PSBTData memory task = _homeChainCoordinator.getPSBTDataForTxnHash(_taskHash);
         return task.rawTxn.length > 0;
     }

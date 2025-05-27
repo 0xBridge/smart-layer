@@ -11,7 +11,7 @@ import {ERC20PermitUpgradeable} from
 
 /**
  * @title eBTC Token
- * @notice ERC20 token representing Bitcoin on other chains
+ * @notice Represents Bitcoin (BTC) on an EVM chain as an ERC20 token. 1 eBTC = 1 BTC.
  * @dev Upgradeable token with minting, burning, and permit capabilities
  */
 contract eBTC is

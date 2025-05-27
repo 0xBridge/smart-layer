@@ -96,7 +96,7 @@ contract BitcoinLightClientTest is Test {
 
         assertEq(client.getLatestHeaderHash(), BLOCK_11_HASH);
 
-        BitcoinUtils.BlockHeader memory checkpoint = client.getLatestCheckpoint();
+        BitcoinUtils.BlockHeader memory checkpoint = client.getLatestHeader();
         assertEq(checkpoint.height, 11);
         vm.stopPrank();
     }
@@ -154,7 +154,7 @@ contract BitcoinLightClientTest is Test {
         intermediateHeaders[0] = BLOCK_11_HEADER;
         client.submitRawBlockHeader(BLOCK_12_HEADER, intermediateHeaders);
 
-        BitcoinUtils.BlockHeader memory checkpoint2 = client.getLatestCheckpoint();
+        BitcoinUtils.BlockHeader memory checkpoint2 = client.getLatestHeader();
         assertEq(checkpoint2.height, 12);
         vm.stopPrank();
     }
@@ -365,7 +365,7 @@ contract BitcoinLightClientTest is Test {
 
         client.submitRawBlockHeader(BLOCK_109_HEADER, intermediateHeaders);
 
-        BitcoinUtils.BlockHeader memory checkpoint = client.getLatestCheckpoint();
+        BitcoinUtils.BlockHeader memory checkpoint = client.getLatestHeader();
         assertEq(checkpoint.height, 109);
         vm.stopPrank();
     }
